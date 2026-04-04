@@ -86,8 +86,12 @@ BIN      = 'x' "'" HEX_DIGIT* "'"
 BASE64_CHAR = ALPHA | DIGIT | '+' | '/' | '='
 STRING   = "'" string_char* "'"
          | '"' string_char* '"'
+RAW_STR  = 'r' "'" raw_char* "'"
+         | 'r' '"' raw_char* '"'
 ML_STR   = "'''" ML_BODY "'''"
          | '"""' ML_BODY '"""'
+ML_RAW   = 'r' "'''" raw_ml_char* "'''"
+         | 'r' '"""' raw_ml_char* '"""'
 ATOM     = IDENT
 ```
 
@@ -99,7 +103,34 @@ ATOM     = IDENT
 - Base64 literals follow RFC 4648 standard encoding with `=` padding.
 - Strings are always quoted. There are no unquoted string values.
 
-### 3.4 Multi-line Strings
+### 3.4 Raw Strings
+
+A raw string is prefixed with `r` and performs no escape processing. Backslashes are literal.
+
+```
+path:str = r'C:\Users\alice\Documents'
+regex:str = r"^\d{3}-\d{4}$"
+```
+
+Raw strings may also be triple-quoted for multi-line content. Indentation stripping follows the same rules as regular multi-line strings (based on closing delimiter column), but no escape sequences are processed:
+
+```
+template:str = r'''
+    Hello \n World
+    '''
+# Result: "Hello \\n World" — the \n is two literal characters
+```
+
+The only character that cannot appear in a raw string is the unescaped closing quote (or triple-quote for multi-line). To include the closing delimiter, use the alternate quote style:
+
+```
+has_single:str = r"it's raw"
+has_double:str = r'she said "hello"'
+```
+
+Null bytes (`U+0000`) are not permitted in raw strings.
+
+### 3.5 Multi-line Strings
 
 A multi-line string is delimited by triple quotes (`'''` or `"""`).
 
@@ -130,9 +161,9 @@ line two
 # Result: "line one\nline two"
 ```
 
-### 3.5 String Escapes
+### 3.6 String Escapes
 
-Within a quoted string, the following escape sequences are recognized:
+Within a quoted string (not raw), the following escape sequences are recognized:
 
 | Escape | Meaning |
 |--------|---------|
@@ -147,7 +178,7 @@ Within a quoted string, the following escape sequences are recognized:
 
 Any other `\` followed by a character is a parse error. Null bytes (`U+0000`) are not permitted in strings, whether literal or escaped.
 
-### 3.6 Tokens
+### 3.7 Tokens
 
 ```
 HASH    = '#'
@@ -314,7 +345,7 @@ map_type    = LANGLE type COLON type RANGLE
 ```
 value = scalar | NIL | atom_val | struct_val | tuple_val | list_val | map_val
 
-scalar    = STRING | INT | DEC | FLOAT | BOOL | UUID | DATE | TIME | DATETIME | BIN
+scalar    = STRING | RAW_STR | ML_STR | ML_RAW | INT | DEC | FLOAT | BOOL | UUID | DATE | TIME | DATETIME | BIN
 atom_val  = ATOM
 ```
 

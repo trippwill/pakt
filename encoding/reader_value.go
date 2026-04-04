@@ -16,14 +16,6 @@ func (r *reader) emit(kind EventKind, pos Pos, name, typ, value string) {
 	})
 }
 
-func (r *reader) emitError(pos Pos, err error) {
-	r.events = append(r.events, Event{
-		Kind: EventError,
-		Pos:  pos,
-		Err:  err,
-	})
-}
-
 // ---------------------------------------------------------------------------
 // SEP handling
 // ---------------------------------------------------------------------------
@@ -40,12 +32,12 @@ func (r *reader) readSep() (bool, error) {
 		return false, nil // EOF is not an error for SEP
 	}
 	if b == ',' {
-		r.readByte() //nolint:errcheck
+		r.readByte()              //nolint:errcheck
 		r.skipInsignificant(true) // skip WS, NL, comments after comma
 		return true, nil
 	}
 	if b == '\n' || b == '\r' {
-		r.readByte() //nolint:errcheck
+		r.readByte()              //nolint:errcheck
 		r.skipInsignificant(true) // skip WS, NL, comments after newline
 		return true, nil
 	}
@@ -68,6 +60,8 @@ func (r *reader) readValue(typ Type) error {
 			r.emit(EventScalarValue, pos, "", typ.String(), "nil")
 			return nil
 		}
+	} else if r.peekNil() {
+		return r.wrapf(ErrNilNonNullable, "nil value for non-nullable type %s", typ.String())
 	}
 
 	switch {
@@ -84,7 +78,7 @@ func (r *reader) readValue(typ Type) error {
 	case typ.Map != nil:
 		return r.readMapValue(typ.Map)
 	default:
-		return r.errorf("unknown type")
+		return r.errorf("unknown type: no type variant set")
 	}
 }
 
@@ -161,7 +155,7 @@ func (r *reader) readStructValue(st *StructType) error {
 		// Check for premature closing.
 		b, err := r.peekByte()
 		if err != nil {
-			return r.errorf("unterminated struct value")
+			return r.wrapf(ErrUnexpectedEOF, "unterminated struct value")
 		}
 		if b == '}' {
 			return r.errorf("too few values in struct: expected %d fields, got %d", len(st.Fields), i)
@@ -184,7 +178,7 @@ func (r *reader) readStructValue(st *StructType) error {
 				r.skipWS()
 				b, err = r.peekByte()
 				if err != nil {
-					return r.errorf("unterminated struct value")
+					return r.wrapf(ErrUnexpectedEOF, "unterminated struct value")
 				}
 				if b == '}' {
 					return r.errorf("too few values in struct: expected %d fields, got %d", len(st.Fields), i+1)
@@ -225,7 +219,7 @@ func (r *reader) readTupleValue(tt *TupleType) error {
 
 		b, err := r.peekByte()
 		if err != nil {
-			return r.errorf("unterminated tuple value")
+			return r.wrapf(ErrUnexpectedEOF, "unterminated tuple value")
 		}
 		if b == ')' {
 			return r.errorf("too few values in tuple: expected %d elements, got %d", len(tt.Elements), i)
@@ -247,7 +241,7 @@ func (r *reader) readTupleValue(tt *TupleType) error {
 				r.skipWS()
 				b, err = r.peekByte()
 				if err != nil {
-					return r.errorf("unterminated tuple value")
+					return r.wrapf(ErrUnexpectedEOF, "unterminated tuple value")
 				}
 				if b == ')' {
 					return r.errorf("too few values in tuple: expected %d elements, got %d", len(tt.Elements), i+1)
@@ -286,7 +280,7 @@ func (r *reader) readListValue(lt *ListType) error {
 
 		b, err := r.peekByte()
 		if err != nil {
-			return r.errorf("unterminated list value")
+			return r.wrapf(ErrUnexpectedEOF, "unterminated list value")
 		}
 		if b == ']' {
 			break
@@ -310,7 +304,7 @@ func (r *reader) readListValue(lt *ListType) error {
 			r.skipWS()
 			b, err = r.peekByte()
 			if err != nil {
-				return r.errorf("unterminated list value")
+				return r.wrapf(ErrUnexpectedEOF, "unterminated list value")
 			}
 			if b != ']' {
 				return r.errorf("expected ',' or ']' in list, got %q", rune(b))
@@ -343,7 +337,7 @@ func (r *reader) readMapValue(mt *MapType) error {
 
 		b, err := r.peekByte()
 		if err != nil {
-			return r.errorf("unterminated map value")
+			return r.wrapf(ErrUnexpectedEOF, "unterminated map value")
 		}
 		if b == '>' {
 			break
@@ -358,7 +352,7 @@ func (r *reader) readMapValue(mt *MapType) error {
 		keyStr := r.extractKeyString(keyStart)
 
 		if _, dup := seen[keyStr]; dup {
-			return r.errorf("duplicate map key: %s", keyStr)
+			return r.wrapf(ErrDuplicateKey, "duplicate map key: %s", keyStr)
 		}
 		seen[keyStr] = struct{}{}
 
@@ -388,7 +382,7 @@ func (r *reader) readMapValue(mt *MapType) error {
 			r.skipWS()
 			b, err = r.peekByte()
 			if err != nil {
-				return r.errorf("unterminated map value")
+				return r.wrapf(ErrUnexpectedEOF, "unterminated map value")
 			}
 			if b != '>' {
 				return r.errorf("expected ',' or '>' in map, got %q", rune(b))
@@ -481,7 +475,7 @@ func (r *reader) readAssignment() error {
 
 	// Check root uniqueness.
 	if _, dup := r.seen[name]; dup {
-		return Errorf(identPos, "duplicate root name %q", name)
+		return Wrapf(identPos, ErrDuplicateName, "duplicate root name %q", name)
 	}
 	r.seen[name] = struct{}{}
 

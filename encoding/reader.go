@@ -64,10 +64,11 @@ func (r *reader) readByte() (byte, error) {
 		return 0, err
 	}
 	r.lastPos = r.pos
-	if b == '\n' {
+	switch b {
+	case '\n':
 		r.pos.Line++
 		r.pos.Col = 1
-	} else if b == '\r' {
+	case '\r':
 		// Consume a following \n if present (\r\n → single newline).
 		if nb, perr := r.buf.Peek(1); perr == nil && nb[0] == '\n' {
 			r.buf.ReadByte() //nolint:errcheck
@@ -75,7 +76,7 @@ func (r *reader) readByte() (byte, error) {
 		r.pos.Line++
 		r.pos.Col = 1
 		b = '\n' // normalise
-	} else {
+	default:
 		r.pos.Col++
 	}
 	return b, nil
@@ -154,11 +155,16 @@ func (r *reader) errorf(format string, args ...any) *ParseError {
 	return Errorf(r.pos, format, args...)
 }
 
+// wrapf creates a *ParseError at the reader's current position wrapping a sentinel.
+func (r *reader) wrapf(sentinel error, format string, args ...any) *ParseError {
+	return Wrapf(r.pos, sentinel, format, args...)
+}
+
 // expectByte reads one byte and returns an error if it does not match.
 func (r *reader) expectByte(expected byte) error {
 	b, err := r.readByte()
 	if err != nil {
-		return r.errorf("expected %q, got EOF", rune(expected))
+		return r.wrapf(ErrUnexpectedEOF, "expected %q, got EOF", rune(expected))
 	}
 	if b != expected {
 		r.unreadByte()
@@ -200,7 +206,7 @@ func hexVal(b byte) int {
 func (r *reader) readIdent() (string, error) {
 	b, err := r.readByte()
 	if err != nil {
-		return "", r.errorf("expected identifier, got EOF")
+		return "", r.wrapf(ErrUnexpectedEOF, "expected identifier, got EOF")
 	}
 	if !isAlpha(b) && b != '_' {
 		r.unreadByte()
@@ -232,7 +238,7 @@ func (r *reader) readIdent() (string, error) {
 func (r *reader) readString() (string, error) {
 	quote, err := r.readByte()
 	if err != nil {
-		return "", r.errorf("expected string, got EOF")
+		return "", r.wrapf(ErrUnexpectedEOF, "expected string, got EOF")
 	}
 	if quote != '\'' && quote != '"' {
 		r.unreadByte()
@@ -251,7 +257,7 @@ func (r *reader) readString() (string, error) {
 	for {
 		b, err := r.readByte()
 		if err != nil {
-			return "", r.errorf("unterminated string")
+			return "", r.wrapf(ErrUnexpectedEOF, "unterminated string")
 		}
 		if b == quote {
 			return sb.String(), nil
@@ -278,7 +284,7 @@ func (r *reader) readString() (string, error) {
 func (r *reader) readEscape() (rune, error) {
 	b, err := r.readByte()
 	if err != nil {
-		return 0, r.errorf("unterminated escape sequence")
+		return 0, r.wrapf(ErrUnexpectedEOF, "unterminated escape sequence")
 	}
 	switch b {
 	case '\\':
@@ -304,16 +310,23 @@ func (r *reader) readEscape() (rune, error) {
 
 // readUnicodeEscape reads n hex digits and returns the corresponding rune.
 func (r *reader) readUnicodeEscape(n int) (rune, error) {
+	prefix := "\\u"
+	if n == 8 {
+		prefix = "\\U"
+	}
 	var val rune
+	var digits strings.Builder
 	for i := 0; i < n; i++ {
 		b, err := r.readByte()
 		if err != nil {
-			return 0, r.errorf("unterminated unicode escape")
+			return 0, r.wrapf(ErrUnexpectedEOF, "incomplete %s escape: found %q", prefix, prefix+digits.String())
 		}
 		d := hexVal(b)
 		if d < 0 {
-			return 0, r.errorf("invalid hex digit in unicode escape: %q", rune(b))
+			digits.WriteByte(b)
+			return 0, r.errorf("invalid hex digit in %s escape: found %q", prefix, prefix+digits.String())
 		}
+		digits.WriteByte(b)
 		val = val*16 + rune(d)
 	}
 	if val == 0 {
@@ -331,7 +344,7 @@ func (r *reader) readMultiLineString(quote byte) (string, error) {
 	// Next byte must be a newline.
 	b, err := r.readByte()
 	if err != nil {
-		return "", r.errorf("expected newline after opening triple-quote, got EOF")
+		return "", r.wrapf(ErrUnexpectedEOF, "expected newline after opening triple-quote, got EOF")
 	}
 	if b != '\n' {
 		return "", r.errorf("expected newline after opening triple-quote, got %q", rune(b))
@@ -345,7 +358,7 @@ func (r *reader) readMultiLineString(quote byte) (string, error) {
 	for {
 		line, lerr := r.readRawLine()
 		if lerr != nil {
-			return "", r.errorf("unterminated multi-line string")
+			return "", r.wrapf(ErrUnexpectedEOF, "unterminated multi-line string")
 		}
 		trimmed := strings.TrimLeft(line, " \t")
 		if trimmed == closingDelim {
@@ -443,11 +456,12 @@ func processEscapes(s string) (string, string) {
 			sb.WriteByte('\t')
 		case 'u':
 			if i+4 >= len(s) {
-				return "", "incomplete \\u escape"
+				return "", fmt.Sprintf("incomplete \\u escape: found %q", "\\u"+s[i+1:])
 			}
-			val, ok := parseHexDigits(s[i+1 : i+5])
+			hexStr := s[i+1 : i+5]
+			val, ok := parseHexDigits(hexStr)
 			if !ok {
-				return "", "invalid hex digit in \\u escape"
+				return "", fmt.Sprintf("invalid hex digit in \\u escape: found %q", "\\u"+hexStr)
 			}
 			if val == 0 {
 				return "", "null byte (U+0000) not permitted in strings"
@@ -459,11 +473,12 @@ func processEscapes(s string) (string, string) {
 			i += 4
 		case 'U':
 			if i+8 >= len(s) {
-				return "", "incomplete \\U escape"
+				return "", fmt.Sprintf("incomplete \\U escape: found %q", "\\U"+s[i+1:])
 			}
-			val, ok := parseHexDigits(s[i+1 : i+9])
+			hexStr := s[i+1 : i+9]
+			val, ok := parseHexDigits(hexStr)
 			if !ok {
-				return "", "invalid hex digit in \\U escape"
+				return "", fmt.Sprintf("invalid hex digit in \\U escape: found %q", "\\U"+hexStr)
 			}
 			if val == 0 {
 				return "", "null byte (U+0000) not permitted in strings"
@@ -500,11 +515,12 @@ func parseHexDigits(s string) (rune, bool) {
 // readDigitSep reads DIGIT_SEP = DIGIT (DIGIT | '_')*.
 func (r *reader) readDigitSep(sb *strings.Builder) error {
 	b, err := r.readByte()
-	if err != nil || !isDigit(b) {
-		if err == nil {
-			r.unreadByte()
-		}
-		return r.errorf("expected digit")
+	if err != nil {
+		return r.wrapf(ErrUnexpectedEOF, "expected digit, got EOF")
+	}
+	if !isDigit(b) {
+		r.unreadByte()
+		return r.errorf("expected digit, got %q", rune(b))
 	}
 	sb.WriteByte(b)
 	for {
@@ -526,11 +542,12 @@ func (r *reader) readDigitSep(sb *strings.Builder) error {
 func (r *reader) readExactDigits(sb *strings.Builder, n int) error {
 	for i := 0; i < n; i++ {
 		b, err := r.readByte()
-		if err != nil || !isDigit(b) {
-			if err == nil {
-				r.unreadByte()
-			}
-			return r.errorf("expected digit")
+		if err != nil {
+			return r.wrapf(ErrUnexpectedEOF, "expected digit, got EOF")
+		}
+		if !isDigit(b) {
+			r.unreadByte()
+			return r.errorf("expected digit, got %q", rune(b))
 		}
 		sb.WriteByte(b)
 	}
@@ -541,11 +558,12 @@ func (r *reader) readExactDigits(sb *strings.Builder, n int) error {
 func (r *reader) readExactHex(sb *strings.Builder, n int) error {
 	for i := 0; i < n; i++ {
 		b, err := r.readByte()
-		if err != nil || !isHex(b) {
-			if err == nil {
-				r.unreadByte()
-			}
-			return r.errorf("expected hex digit")
+		if err != nil {
+			return r.wrapf(ErrUnexpectedEOF, "expected hex digit, got EOF")
+		}
+		if !isHex(b) {
+			r.unreadByte()
+			return r.errorf("expected hex digit, got %q", rune(b))
 		}
 		sb.WriteByte(b)
 	}
@@ -556,11 +574,12 @@ func (r *reader) readExactHex(sb *strings.Builder, n int) error {
 // check validates whether a byte is a valid digit for the given base.
 func (r *reader) readPrefixedDigits(sb *strings.Builder, check func(byte) bool) error {
 	b, err := r.readByte()
-	if err != nil || !check(b) {
-		if err == nil {
-			r.unreadByte()
-		}
-		return r.errorf("expected digit after base prefix")
+	if err != nil {
+		return r.wrapf(ErrUnexpectedEOF, "expected digit after base prefix, got EOF")
+	}
+	if !check(b) {
+		r.unreadByte()
+		return r.errorf("expected digit after base prefix, got %q", rune(b))
 	}
 	sb.WriteByte(b)
 	for {
@@ -594,8 +613,11 @@ func (r *reader) readInt() (string, error) {
 
 	// Peek at first digit.
 	first, err := r.peekByte()
-	if err != nil || !isDigit(first) {
-		return "", r.errorf("expected digit in integer")
+	if err != nil {
+		return "", r.wrapf(ErrUnexpectedEOF, "expected digit in integer, got EOF")
+	}
+	if !isDigit(first) {
+		return "", r.errorf("expected digit in integer, got %q", rune(first))
 	}
 
 	if first == '0' {
@@ -702,8 +724,11 @@ func (r *reader) readFloat() (string, error) {
 
 	// Mandatory exponent.
 	b, err := r.peekByte()
-	if err != nil || (b != 'e' && b != 'E') {
-		return "", r.errorf("expected exponent ('e' or 'E') in float")
+	if err != nil {
+		return "", r.wrapf(ErrUnexpectedEOF, "expected exponent ('e' or 'E') in float, got EOF")
+	}
+	if b != 'e' && b != 'E' {
+		return "", r.errorf("expected exponent ('e' or 'E') in float, got %q", rune(b))
 	}
 	r.readByte() //nolint:errcheck
 	sb.WriteByte(b)
@@ -726,7 +751,11 @@ func (r *reader) readFloat() (string, error) {
 		count++
 	}
 	if count == 0 {
-		return "", r.errorf("expected digits in float exponent")
+		if b, err := r.peekByte(); err != nil {
+			return "", r.wrapf(ErrUnexpectedEOF, "expected digits in float exponent, got EOF")
+		} else {
+			return "", r.errorf("expected digits in float exponent, got %q", rune(b))
+		}
 	}
 	return sb.String(), nil
 }
@@ -822,19 +851,24 @@ func (r *reader) readTime() (string, error) {
 			count++
 		}
 		if count == 0 {
-			return "", r.errorf("expected digits after '.' in time")
+			if b, err := r.peekByte(); err != nil {
+				return "", r.wrapf(ErrUnexpectedEOF, "expected digits after '.' in time, got EOF")
+			} else {
+				return "", r.errorf("expected digits after '.' in time, got %q", rune(b))
+			}
 		}
 	}
 
 	// Timezone.
 	b, err := r.peekByte()
 	if err != nil {
-		return "", r.errorf("expected timezone in time")
+		return "", r.wrapf(ErrUnexpectedEOF, "expected timezone in time, got EOF")
 	}
-	if b == 'Z' {
+	switch b {
+	case 'Z':
 		r.readByte() //nolint:errcheck
 		sb.WriteByte('Z')
-	} else if b == '+' || b == '-' {
+	case '+', '-':
 		r.readByte() //nolint:errcheck
 		sb.WriteByte(b)
 		if err := r.readExactDigits(&sb, 2); err != nil {
@@ -847,7 +881,7 @@ func (r *reader) readTime() (string, error) {
 		if err := r.readExactDigits(&sb, 2); err != nil {
 			return "", err
 		}
-	} else {
+	default:
 		return "", r.errorf("expected timezone (Z or ±HH:MM) in time, got %q", rune(b))
 	}
 	return sb.String(), nil

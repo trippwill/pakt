@@ -38,7 +38,7 @@ func (r *reader) readType() (Type, error) {
 	r.skipWSAndNewlines()
 	b, err := r.peekByte()
 	if err != nil {
-		return Type{}, r.errorf("expected type, got EOF")
+		return Type{}, r.wrapf(ErrUnexpectedEOF, "expected type, got EOF")
 	}
 	switch {
 	case b == '|':
@@ -81,14 +81,14 @@ func (r *reader) readAtomSetType() (Type, error) {
 	r.skipWSAndNewlines()
 	first, err := r.readIdent()
 	if err != nil {
-		return Type{}, r.errorf("expected atom in atom set")
+		return Type{}, r.wrapf(ErrUnexpectedEOF, "expected atom in atom set, got EOF")
 	}
 	members := []string{first}
 	for {
 		r.skipWSAndNewlines()
 		b, err := r.peekByte()
 		if err != nil {
-			return Type{}, r.errorf("unterminated atom set")
+			return Type{}, r.wrapf(ErrUnexpectedEOF, "unterminated atom set")
 		}
 		if b == '|' {
 			r.readByte() //nolint:errcheck
@@ -101,7 +101,7 @@ func (r *reader) readAtomSetType() (Type, error) {
 		r.skipWSAndNewlines()
 		ident, err := r.readIdent()
 		if err != nil {
-			return Type{}, r.errorf("expected atom after ',' in atom set")
+			return Type{}, r.wrapf(ErrUnexpectedEOF, "expected atom after ',' in atom set, got EOF")
 		}
 		members = append(members, ident)
 	}
@@ -123,7 +123,7 @@ func (r *reader) readStructType() (Type, error) {
 		r.skipWSAndNewlines()
 		b, err := r.peekByte()
 		if err != nil {
-			return Type{}, r.errorf("unterminated struct type")
+			return Type{}, r.wrapf(ErrUnexpectedEOF, "unterminated struct type")
 		}
 		if b == '}' {
 			r.readByte() //nolint:errcheck
@@ -147,7 +147,7 @@ func (r *reader) readStructType() (Type, error) {
 func (r *reader) readFieldDecl() (Field, error) {
 	name, err := r.readIdent()
 	if err != nil {
-		return Field{}, r.errorf("expected field name")
+		return Field{}, r.wrapf(ErrUnexpectedEOF, "expected field name, got EOF")
 	}
 	// Colon must immediately follow the name (no WS).
 	if err := r.expectByte(':'); err != nil {
@@ -179,7 +179,7 @@ func (r *reader) readTupleType() (Type, error) {
 		r.skipWSAndNewlines()
 		b, err := r.peekByte()
 		if err != nil {
-			return Type{}, r.errorf("unterminated tuple type")
+			return Type{}, r.wrapf(ErrUnexpectedEOF, "unterminated tuple type")
 		}
 		if b == ')' {
 			r.readByte() //nolint:errcheck

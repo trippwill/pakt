@@ -1,6 +1,46 @@
-{{ define "title" }}{{ site.Title }}{{ end }}
+{{ define "title" }}{{ site.Title }} — {{ site.Params.tagline }}{{ end }}
 
 {{ define "main" }}
-  <h1>{{ .Title }}</h1>
-  {{ .Content }}
+<section class="hero">
+  <div class="hero-inner">
+    <h1 class="hero-title">PAKT</h1>
+    <p class="hero-tagline">{{ site.Params.tagline }}</p>
+    <p class="hero-desc">A typed data interchange format where every value carries its type.</p>
+    <div class="hero-code">
+      <pre><code>greeting:str     = 'hello world'
+count:int        = 42
+active:bool      = true
+server:{host:str, port:int} = { 'localhost', 8080 }</code></pre>
+    </div>
+    <div class="hero-actions">
+      <a href="/docs/" class="btn btn-primary">Read the Docs</a>
+      <a href="{{ site.Params.repo }}" class="btn btn-secondary" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="features-inner">
+    <div class="feature-card">
+      <h3>Every value has a type</h3>
+      <p>No inference, no ambiguity. Type annotations are producer assertions checked at parse time. Documents are self-validating.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Stream-parseable</h3>
+      <p>Events emitted as data is read — no full-document buffering required. Process data as it arrives, not after it's all loaded.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Spec-projected</h3>
+      <p>Consumer-side <code>.spec.pakt</code> files enable projections: materialize only the fields you need, skip everything else without allocation.</p>
+    </div>
+  </div>
+</section>
+
+<section class="install-section">
+  <div class="install-inner">
+    <h2>Get started</h2>
+    <pre><code>go install github.com/trippwill/pakt@latest</code></pre>
+    <p><a href="/docs/install/">Installation options →</a></p>
+  </div>
+</section>
 {{ end }}

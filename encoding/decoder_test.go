@@ -27,20 +27,6 @@ func decodeAll(t *testing.T, input string) []Event {
 	return events
 }
 
-func decodeExpectError(t *testing.T, input string) error {
-	t.Helper()
-	d := NewDecoder(strings.NewReader(input))
-	for {
-		_, err := d.Decode()
-		if err == io.EOF {
-			t.Fatal("expected error but got EOF")
-		}
-		if err != nil {
-			return err
-		}
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Simple scalar assignments
 // ---------------------------------------------------------------------------

@@ -1,6 +1,18 @@
 package encoding
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+// Sentinel errors for common parse failure categories.
+var (
+	ErrUnexpectedEOF  = errors.New("unexpected end of input")
+	ErrDuplicateName  = errors.New("duplicate name")
+	ErrDuplicateKey   = errors.New("duplicate map key")
+	ErrTypeMismatch   = errors.New("type mismatch")
+	ErrNilNonNullable = errors.New("nil on non-nullable type")
+)
 
 // ParseError reports a problem at a specific position in the PAKT source.
 type ParseError struct {
@@ -22,6 +34,11 @@ func Errorf(pos Pos, format string, args ...any) *ParseError {
 // Wrap returns a new [ParseError] that wraps an underlying error.
 func Wrap(pos Pos, msg string, err error) *ParseError {
 	return &ParseError{Pos: pos, Message: msg, Wrapped: err}
+}
+
+// Wrapf returns a new [ParseError] that wraps an underlying error with a formatted message.
+func Wrapf(pos Pos, sentinel error, format string, args ...any) *ParseError {
+	return &ParseError{Pos: pos, Message: fmt.Sprintf(format, args...), Wrapped: sentinel}
 }
 
 // Error implements the [error] interface.

@@ -21,7 +21,7 @@ func fileDecodeAll(t *testing.T, path string) []Event {
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	dec := NewDecoder(f)
 	var events []Event
@@ -46,7 +46,7 @@ func fileDecodeExpectError(t *testing.T, path string) error {
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	dec := NewDecoder(f)
 	for {
@@ -474,7 +474,7 @@ func TestIntegrationValidSpecFileSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	dec := NewDecoder(f)
 	var events []Event
@@ -617,5 +617,104 @@ func TestIntegrationInvalidAllFiles(t *testing.T) {
 				t.Errorf("expected *ParseError, got %T: %v", gotErr, gotErr)
 			}
 		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Sentinel error tests — verify errors.Is works on returned errors
+// ---------------------------------------------------------------------------
+
+func TestSentinelErrDuplicateName(t *testing.T) {
+	gotErr := fileDecodeExpectError(t, filepath.Join("..", "testdata", "invalid", "duplicate-name.pakt"))
+	if !errors.Is(gotErr, ErrDuplicateName) {
+		t.Fatalf("expected errors.Is(err, ErrDuplicateName), got: %v", gotErr)
+	}
+}
+
+func TestSentinelErrDuplicateKey(t *testing.T) {
+	gotErr := fileDecodeExpectError(t, filepath.Join("..", "testdata", "invalid", "duplicate-map-key.pakt"))
+	if !errors.Is(gotErr, ErrDuplicateKey) {
+		t.Fatalf("expected errors.Is(err, ErrDuplicateKey), got: %v", gotErr)
+	}
+}
+
+func TestSentinelErrNilNonNullable(t *testing.T) {
+	gotErr := fileDecodeExpectError(t, filepath.Join("..", "testdata", "invalid", "nil-non-nullable.pakt"))
+	if !errors.Is(gotErr, ErrNilNonNullable) {
+		t.Fatalf("expected errors.Is(err, ErrNilNonNullable), got: %v", gotErr)
+	}
+}
+
+func TestSentinelErrUnexpectedEOF(t *testing.T) {
+	// Unterminated string
+	d := NewDecoder(strings.NewReader("name:str = 'unterminated"))
+	var gotErr error
+	for {
+		_, err := d.Decode()
+		if err == io.EOF {
+			t.Fatal("expected error but got EOF")
+		}
+		if err != nil {
+			gotErr = err
+			break
+		}
+	}
+	if !errors.Is(gotErr, ErrUnexpectedEOF) {
+		t.Fatalf("expected errors.Is(err, ErrUnexpectedEOF) for unterminated string, got: %v", gotErr)
+	}
+}
+
+func TestSentinelErrDuplicateNameInSpec(t *testing.T) {
+	_, err := ParseSpec(strings.NewReader("name:str\nname:int"))
+	if err == nil {
+		t.Fatal("expected error for duplicate name in spec")
+	}
+	if !errors.Is(err, ErrDuplicateName) {
+		t.Fatalf("expected errors.Is(err, ErrDuplicateName), got: %v", err)
+	}
+}
+
+func TestSentinelErrDuplicateNameViaDecoder(t *testing.T) {
+	input := "name:str = 'a'\nname:str = 'b'"
+	d := NewDecoder(strings.NewReader(input))
+	var decErr error
+	for {
+		_, err := d.Decode()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			decErr = err
+			break
+		}
+	}
+	if decErr == nil {
+		t.Fatal("expected error for duplicate root name")
+	}
+	if !errors.Is(decErr, ErrDuplicateName) {
+		t.Fatalf("expected errors.Is(err, ErrDuplicateName), got: %v", decErr)
+	}
+}
+
+func TestSentinelErrDuplicateKeyUnit(t *testing.T) {
+	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
+	r := newReader(strings.NewReader("< 'a' = 1, 'a' = 2 >"))
+	err := r.readValue(typ)
+	if err == nil {
+		t.Fatal("expected error for duplicate map key")
+	}
+	if !errors.Is(err, ErrDuplicateKey) {
+		t.Fatalf("expected errors.Is(err, ErrDuplicateKey), got: %v", err)
+	}
+}
+
+func TestSentinelErrNilNonNullableUnit(t *testing.T) {
+	r := newReader(strings.NewReader("nil"))
+	err := r.readValue(scalarType(TypeStr))
+	if err == nil {
+		t.Fatal("expected error for nil on non-nullable type")
+	}
+	if !errors.Is(err, ErrNilNonNullable) {
+		t.Fatalf("expected errors.Is(err, ErrNilNonNullable), got: %v", err)
 	}
 }

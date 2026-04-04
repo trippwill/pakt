@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./... -count=1 -race -coverprofile=coverage.out
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v7
+
+      - name: Coverage summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            const output = execSync('go tool cover -func=coverage.out | grep total').toString().trim();
+            const match = output.match(/([\d.]+)%/);
+            const pct = match ? match[1] : 'unknown';
+            await core.summary
+              .addHeading('Coverage')
+              .addRaw(`Total: **${pct}%**`)
+              .write();

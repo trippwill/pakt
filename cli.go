@@ -37,7 +37,7 @@ func (c *ParseCmd) Run(cli *CLI) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	dec := encoding.NewDecoder(r)
 
@@ -46,7 +46,7 @@ func (c *ParseCmd) Run(cli *CLI) error {
 		if err != nil {
 			return fmt.Errorf("opening spec: %w", err)
 		}
-		defer specFile.Close()
+		defer func() { _ = specFile.Close() }()
 		if err := dec.SetSpec(specFile); err != nil {
 			return fmt.Errorf("loading spec: %w", err)
 		}
@@ -72,7 +72,7 @@ func (c *ValidateCmd) Run(cli *CLI) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	dec := encoding.NewDecoder(r)
 
@@ -81,7 +81,7 @@ func (c *ValidateCmd) Run(cli *CLI) error {
 		if err != nil {
 			return fmt.Errorf("opening spec: %w", err)
 		}
-		defer specFile.Close()
+		defer func() { _ = specFile.Close() }()
 		if err := dec.SetSpec(specFile); err != nil {
 			return fmt.Errorf("loading spec: %w", err)
 		}

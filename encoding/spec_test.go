@@ -458,13 +458,13 @@ func TestProjectionIntegrationWithTestData(t *testing.T) {
 	if err != nil {
 		t.Skipf("skipping integration test: %v", err)
 	}
-	defer specFile.Close()
+	defer func() { _ = specFile.Close() }()
 
 	docFile, err := os.Open("../testdata/valid/full.pakt")
 	if err != nil {
 		t.Fatalf("cannot open full.pakt: %v", err)
 	}
-	defer docFile.Close()
+	defer func() { _ = docFile.Close() }()
 
 	d := NewDecoder(docFile)
 	if err := d.SetSpec(specFile); err != nil {
@@ -627,5 +627,561 @@ count:int = 1`
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// skipCompositeInner — deeply nested composites
+// ---------------------------------------------------------------------------
+
+func TestProjectionSkipTupleWithAllInnerTypes(t *testing.T) {
+	// Tuple containing struct, list, map — exercises
+	// skipComposite('(', ')') hitting '{', '[', '<' and comments.
+	doc := `data:(int, {x:int, y:int}, [int], <str = int>) = (
+    1
+    # comment inside tuple
+    { 10, 20 }
+    [1, 2]
+    <'a' = 5>
+)
+wanted:int = 99`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "99" {
+		t.Fatalf("expected '99', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipListWithAllInnerTypes(t *testing.T) {
+	// List containing struct with tuple and map inside — exercises
+	// skipComposite('[', ']') hitting '{' → skipCompositeInner,
+	// then '(' and '<' within inner.
+	doc := `data:[{a:int, b:(int, int), c:<str = int>}] = [
+    # comment inside list
+    {
+        1
+        (2, 3)
+        <'k' = 4>
+    }
+]
+wanted:int = 88`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "88" {
+		t.Fatalf("expected '88', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipMapWithAllInnerTypes(t *testing.T) {
+	// Map containing struct values with tuple and list — exercises
+	// skipComposite('<', '>') hitting '{' → skipCompositeInner,
+	// then '(' and '[' within inner.
+	doc := `data:<str = {a:int, b:(int, int), c:[int]}> = <
+    # comment inside map
+    'key' = {
+        1
+        (2, 3)
+        [4, 5]
+    }
+>
+wanted:int = 77`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "77" {
+		t.Fatalf("expected '77', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipDeeplyNestedFiveLevels(t *testing.T) {
+	// 5 levels: struct → list → map → struct → tuple
+	// Exercises skipCompositeInner recursively with all delimiter types.
+	doc := `deep:{items:[<str = {point:(int, int)}>]} = {
+    [
+        <
+            'alpha' = { (10, 20) }
+            'beta'  = { (30, 40) }
+        >
+    ]
+}
+wanted:int = 1`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "1" {
+		t.Fatalf("expected '1', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipMixedCompositesAtSameLevel(t *testing.T) {
+	// Struct containing a list, map, and tuple at the same level.
+	doc := `server:{ports:[int], labels:<str = str>, version:(int, int, int)} = {
+    [8080, 8443]
+    <'env' = 'prod'>
+    (1, 2, 3)
+}
+wanted:int = 1`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "1" {
+		t.Fatalf("expected '1', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipInnerCompositeWithStringsAndComments(t *testing.T) {
+	// Struct → list → map → struct with strings containing delimiters
+	// and comments inside skipCompositeInner paths.
+	doc := `deep:{items:[<str = {point:(int, int)}>]} = {
+    [
+        <
+            'key with {brackets} and [more] and (parens) and <angles>' = {
+                # comment with > and ) and ] delimiters
+                (10, 20)
+            }
+        >
+    ]
+}
+wanted:int = 1`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "1" {
+		t.Fatalf("expected '1', got %q", events[1].Value)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// skipTripleQuotedString edge cases
+// ---------------------------------------------------------------------------
+
+func TestProjectionSkipTripleQuotedWithEmbeddedQuote(t *testing.T) {
+	// Triple-quoted string containing the quote character inside.
+	doc := "msg:str = '''it's a test'''\nwanted:int = 1"
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "1" {
+		t.Fatalf("expected '1', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipTripleQuotedWithEscapedBackslash(t *testing.T) {
+	// Triple-quoted with backslash-escaped backslash before the closing quotes.
+	doc := "msg:str = '''line\\\\'''\nwanted:int = 2"
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "2" {
+		t.Fatalf("expected '2', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipTripleQuotedWithEscapedQuoteBeforeClose(t *testing.T) {
+	// Backslash-quote inside triple-quoted — the \' should not start closing.
+	doc := "msg:str = '''don\\'t stop'''\nwanted:int = 3"
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "3" {
+		t.Fatalf("expected '3', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipTripleDoubleQuotedWithEmbeddedQuotes(t *testing.T) {
+	// Triple double-quoted string containing a double quote inside.
+	doc := "msg:str = \"\"\"hello \"world\"\n\"\"\"\nwanted:int = 4"
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "4" {
+		t.Fatalf("expected '4', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipEmptyTripleQuotedString(t *testing.T) {
+	// Empty triple-quoted string: six consecutive quotes with nothing inside.
+	doc := "msg:str = ''''''\nwanted:int = 5"
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "5" {
+		t.Fatalf("expected '5', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipTripleQuotedWithTwoConsecutiveQuotesThenOther(t *testing.T) {
+	// Two consecutive quotes that don't form a closing triple.
+	doc := "msg:str = '''ab''cd'''\nwanted:int = 6"
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "6" {
+		t.Fatalf("expected '6', got %q", events[1].Value)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// skipComposite with strings containing delimiters
+// ---------------------------------------------------------------------------
+
+func TestProjectionSkipCompositeWithAllDelimitersInString(t *testing.T) {
+	// String value containing all delimiter characters.
+	doc := `greeting:str = 'hello {world} [foo] (bar) <baz>'
+count:int = 10`
+	spec := "count:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "10" {
+		t.Fatalf("expected '10', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipMultiLineStringInSkippedStruct(t *testing.T) {
+	// Triple-quoted string inside a struct that is being skipped.
+	doc := "config:{msg:str, n:int} = {\n    '''\n    hello\n    world\n    '''\n    5\n}\nwanted:int = 9"
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "9" {
+		t.Fatalf("expected '9', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipMapWithEqualsInStringValues(t *testing.T) {
+	// Map where string values contain '=' signs.
+	doc := `env:<str = str> = <
+    'PATH' = '/usr/bin=/usr/local/bin'
+    'OPTS' = '--key=value --flag=true'
+>
+wanted:int = 5`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "5" {
+		t.Fatalf("expected '5', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipNestedCompositeWithDelimiterStrings(t *testing.T) {
+	// Inside a list (inner composite), strings with all delimiter chars.
+	doc := `data:{items:[str]} = {
+    ['hello } world { and [more] (stuff) <angles>']
+}
+wanted:int = 7`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "7" {
+		t.Fatalf("expected '7', got %q", events[1].Value)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// skipValue for all scalar skip paths
+// ---------------------------------------------------------------------------
+
+func TestProjectionSkipFalseValue(t *testing.T) {
+	// Specifically skip 'false' to cover the b == 'f' branch in skipValue.
+	doc := "flag:bool = false\nwanted:int = 11"
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "11" {
+		t.Fatalf("expected '11', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipAllScalarTypes(t *testing.T) {
+	// Skip every scalar type in one document to exercise all skipValue paths.
+	doc := `flag-t:bool = true
+flag-f:bool = false
+nothing:str? = nil
+neg:int = -42
+id:uuid = 550e8400-e29b-41d4-a716-446655440000
+d:date = 2026-01-15
+t:time = 14:30:00Z
+dt:datetime = 2026-06-01T14:30:00Z
+level:|dev, staging, prod| = staging
+wanted:int = 100`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "100" {
+		t.Fatalf("expected '100', got %q", events[1].Value)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Projection with complex documents
+// ---------------------------------------------------------------------------
+
+func TestProjectionFirstFieldSkippedSecondCaptured(t *testing.T) {
+	// The first field is skipped (deeply nested), second is captured.
+	doc := `complex:{items:[<str = {n:int}>]} = {
+    [
+        <
+            'key' = { 42 }
+        >
+    ]
+}
+wanted:str = 'captured'`
+	spec := "wanted:str"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[0].Kind != EventAssignStart || events[0].Name != "wanted" {
+		t.Fatalf("expected AssignStart for 'wanted', got %v", events[0])
+	}
+	if events[1].Value != "captured" {
+		t.Fatalf("expected 'captured', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionComplexDocWithNestedDelimiterStrings(t *testing.T) {
+	// Skipped field has deeply nested composites with strings containing
+	// all delimiter types; the second field is captured.
+	doc := `config:{servers:[<str = {desc:str, port:int}>]} = {
+    [
+        <
+            'prod' = {
+                'server {prod} on port [443] via (tls) at <edge>'
+                443
+            }
+            'staging' = {
+                'server {staging} on port [8443]'
+                8443
+            }
+        >
+    ]
+}
+result:str = 'ok'`
+	spec := "result:str"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "ok" {
+		t.Fatalf("expected 'ok', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipMultipleComplexFieldsCaptureMiddle(t *testing.T) {
+	// First and last fields are skipped; only the middle field is captured.
+	doc := `before:{items:[int]} = {
+    [1, 2, 3]
+}
+wanted:str = 'middle'
+after:<str = (int, int)> = <
+    'a' = (1, 2)
+    'b' = (3, 4)
+>`
+	spec := "wanted:str"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "middle" {
+		t.Fatalf("expected 'middle', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipTripleQuotedInsideNestedComposite(t *testing.T) {
+	// Triple-quoted string inside a nested composite being skipped.
+	doc := "data:{items:[str]} = {\n    [\n        '''\n        multi-line with 'quotes' inside\n        '''\n    ]\n}\nwanted:int = 42"
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "42" {
+		t.Fatalf("expected '42', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipCommentsWithDelimitersInNestedComposite(t *testing.T) {
+	// Comments containing delimiter chars inside nested composites.
+	doc := `data:{items:[{n:int}]} = {
+    [
+        {
+            # comment: } ] > ) won't close anything
+            42
+        }
+    ]
+}
+wanted:int = 1`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "1" {
+		t.Fatalf("expected '1', got %q", events[1].Value)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Nested same-type delimiters (covers depth++ in skipComposite/Inner)
+// ---------------------------------------------------------------------------
+
+func TestProjectionSkipNestedSameTypeList(t *testing.T) {
+	// List of lists — skipComposite('[', ']') sees inner '[' → depth++.
+	doc := `data:[[int]] = [[1, 2], [3, 4]]
+wanted:int = 1`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "1" {
+		t.Fatalf("expected '1', got %q", events[1].Value)
+	}
+}
+
+func TestProjectionSkipNestedSameTypeInInnerComposite(t *testing.T) {
+	// Struct containing list of lists — skipCompositeInner('[',']')
+	// sees another '[' → depth++ inside skipCompositeInner.
+	doc := `data:{matrix:[[int]]} = {
+    [[1, 2], [3, 4]]
+}
+wanted:int = 1`
+	spec := "wanted:int"
+	events := decodeAllWithSpec(t, doc, spec)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "1" {
+		t.Fatalf("expected '1', got %q", events[1].Value)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Error paths for skip functions (unterminated values)
+// ---------------------------------------------------------------------------
+
+func TestProjectionSkipUnterminatedComposite(t *testing.T) {
+	doc := "data:[int] = [1, 2"
+	spec := "wanted:int"
+	err := decodeExpectErrorWithSpec(t, doc, spec)
+	if err == nil {
+		t.Fatal("expected error for unterminated composite")
+	}
+}
+
+func TestProjectionSkipUnterminatedInnerComposite(t *testing.T) {
+	// Struct containing an unterminated list — triggers error return
+	// from skipCompositeInner propagated through skipComposite.
+	doc := "data:{items:[int]} = { [1, 2"
+	spec := "wanted:int"
+	err := decodeExpectErrorWithSpec(t, doc, spec)
+	if err == nil {
+		t.Fatal("expected error for unterminated inner composite")
+	}
+}
+
+func TestProjectionSkipUnterminatedDeeplyNestedInner(t *testing.T) {
+	// Struct → list → struct (unterminated) — triggers error return
+	// from skipCompositeInner recursive call.
+	doc := "data:{items:[{n:int}]} = { [{ 42"
+	spec := "wanted:int"
+	err := decodeExpectErrorWithSpec(t, doc, spec)
+	if err == nil {
+		t.Fatal("expected error for unterminated deeply nested composite")
+	}
+}
+
+func TestProjectionSkipUnterminatedString(t *testing.T) {
+	doc := "data:str = 'unterminated"
+	spec := "wanted:int"
+	err := decodeExpectErrorWithSpec(t, doc, spec)
+	if err == nil {
+		t.Fatal("expected error for unterminated string")
+	}
+}
+
+func TestProjectionSkipUnterminatedStringEscape(t *testing.T) {
+	doc := "data:str = 'test\\"
+	spec := "wanted:int"
+	err := decodeExpectErrorWithSpec(t, doc, spec)
+	if err == nil {
+		t.Fatal("expected error for unterminated escape in string")
+	}
+}
+
+func TestProjectionSkipUnterminatedTripleQuoted(t *testing.T) {
+	doc := "data:str = '''unterminated content"
+	spec := "wanted:int"
+	err := decodeExpectErrorWithSpec(t, doc, spec)
+	if err == nil {
+		t.Fatal("expected error for unterminated triple-quoted string")
+	}
+}
+
+func TestProjectionSkipUnterminatedTripleQuotedEscape(t *testing.T) {
+	doc := "data:str = '''content\\"
+	spec := "wanted:int"
+	err := decodeExpectErrorWithSpec(t, doc, spec)
+	if err == nil {
+		t.Fatal("expected error for unterminated escape in triple-quoted string")
+	}
+}
+
+func TestProjectionSkipUnterminatedStringInComposite(t *testing.T) {
+	// String error inside skipComposite — covers return err from skipString.
+	doc := "data:{msg:str} = { 'unterminated"
+	spec := "wanted:int"
+	err := decodeExpectErrorWithSpec(t, doc, spec)
+	if err == nil {
+		t.Fatal("expected error for unterminated string in composite")
+	}
+}
+
+func TestProjectionSkipUnterminatedStringInInnerComposite(t *testing.T) {
+	// String error inside skipCompositeInner — covers return err from
+	// skipString within the inner composite path.
+	doc := "data:{items:[str]} = { ['unterminated"
+	spec := "wanted:int"
+	err := decodeExpectErrorWithSpec(t, doc, spec)
+	if err == nil {
+		t.Fatal("expected error for unterminated string in inner composite")
 	}
 }

@@ -33,7 +33,7 @@ func ParseSpec(r io.Reader) (*Spec, error) {
 		}
 
 		if _, dup := fields[name]; dup {
-			return nil, Errorf(identPos, "duplicate field %q in spec", name)
+			return nil, Wrapf(identPos, ErrDuplicateName, "duplicate field %q in spec", name)
 		}
 
 		typ, err := rd.readTypeAnnot()
@@ -68,7 +68,7 @@ func (r *reader) readAssignmentWithSpec(spec *Spec) (name string, matched bool, 
 	}
 
 	if _, dup := r.seen[name]; dup {
-		return "", false, Errorf(identPos, "duplicate root name %q", name)
+		return "", false, Wrapf(identPos, ErrDuplicateName, "duplicate root name %q", name)
 	}
 	r.seen[name] = struct{}{}
 
@@ -121,7 +121,7 @@ func (r *reader) skipValue() error {
 	r.skipWS()
 	b, err := r.peekByte()
 	if err != nil {
-		return r.errorf("expected value, got EOF")
+		return r.wrapf(ErrUnexpectedEOF, "expected value, got EOF")
 	}
 
 	switch {
@@ -150,7 +150,7 @@ func (r *reader) skipValue() error {
 func (r *reader) skipString() error {
 	quote, err := r.readByte()
 	if err != nil {
-		return r.errorf("expected string, got EOF")
+		return r.wrapf(ErrUnexpectedEOF, "expected string, got EOF")
 	}
 
 	// Check for triple-quote.
@@ -164,12 +164,12 @@ func (r *reader) skipString() error {
 	for {
 		b, err := r.readByte()
 		if err != nil {
-			return r.errorf("unterminated string")
+			return r.wrapf(ErrUnexpectedEOF, "unterminated string")
 		}
 		if b == '\\' {
 			// Skip the escaped character.
 			if _, err := r.readByte(); err != nil {
-				return r.errorf("unterminated escape in string")
+				return r.wrapf(ErrUnexpectedEOF, "unterminated escape in string")
 			}
 			continue
 		}
@@ -186,12 +186,12 @@ func (r *reader) skipTripleQuotedString(quote byte) error {
 	for {
 		b, err := r.readByte()
 		if err != nil {
-			return r.errorf("unterminated triple-quoted string")
+			return r.wrapf(ErrUnexpectedEOF, "unterminated triple-quoted string")
 		}
 		if b == '\\' {
 			// Skip escaped character.
 			if _, err := r.readByte(); err != nil {
-				return r.errorf("unterminated escape in triple-quoted string")
+				return r.wrapf(ErrUnexpectedEOF, "unterminated escape in triple-quoted string")
 			}
 			consecutive = 0
 			continue
@@ -211,13 +211,13 @@ func (r *reader) skipTripleQuotedString(quote byte) error {
 // composites and strings containing delimiter characters.
 func (r *reader) skipComposite(open, close byte) error {
 	if _, err := r.readByte(); err != nil {
-		return r.errorf("expected %q", rune(open))
+		return r.wrapf(ErrUnexpectedEOF, "expected %q, got EOF", rune(open))
 	}
 	depth := 1
 	for depth > 0 {
 		b, err := r.readByte()
 		if err != nil {
-			return r.errorf("unterminated composite value (expected %q)", rune(close))
+			return r.wrapf(ErrUnexpectedEOF, "unterminated composite value (expected %q)", rune(close))
 		}
 
 		switch b {
@@ -271,7 +271,7 @@ func (r *reader) skipCompositeInner(open, close byte) error {
 	for depth > 0 {
 		b, err := r.readByte()
 		if err != nil {
-			return r.errorf("unterminated nested composite value")
+			return r.wrapf(ErrUnexpectedEOF, "unterminated nested composite value")
 		}
 		switch b {
 		case open:
@@ -329,7 +329,7 @@ func (r *reader) skipKeywordOrAtom() error {
 	// Read until non-identifier char.
 	b, err := r.readByte()
 	if err != nil {
-		return r.errorf("expected identifier, got EOF")
+		return r.wrapf(ErrUnexpectedEOF, "expected identifier, got EOF")
 	}
 	if !isAlpha(b) && b != '_' {
 		r.unreadByte()
@@ -356,7 +356,7 @@ func (r *reader) skipNumberLike() error {
 		b, err := r.peekByte()
 		if err != nil {
 			if count == 0 {
-				return r.errorf("expected value, got EOF")
+				return r.wrapf(ErrUnexpectedEOF, "expected value, got EOF")
 			}
 			return nil
 		}

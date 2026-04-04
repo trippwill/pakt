@@ -140,8 +140,8 @@ func TestPositionTracking(t *testing.T) {
 
 func TestUnreadByte(t *testing.T) {
 	r := mkReader("abc")
-	r.readByte()
-	r.readByte()
+	r.readByte()   //nolint:errcheck
+	r.readByte()   //nolint:errcheck
 	r.unreadByte() // undo 'b'
 	if r.pos != (Pos{1, 2}) {
 		t.Fatalf("expected pos 1:2 after unread, got %v", r.pos)

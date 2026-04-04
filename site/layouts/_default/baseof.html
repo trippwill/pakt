@@ -5,10 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ block "title" . }}{{ with .Title }}{{ . }} — {{ end }}{{ site.Title }}{{ end }}</title>
   <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+  <nav class="site-nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-brand">PAKT</a>
+      <button class="nav-toggle" aria-label="Toggle navigation" onclick="this.parentElement.classList.toggle('open')">&#9776;</button>
+      <ul class="nav-links">
+        {{ range .Site.Menus.main }}
+        <li><a href="{{ .URL }}"{{ if strings.HasPrefix .URL "https" }} target="_blank" rel="noopener"{{ end }}>{{ .Name }}</a></li>
+        {{ end }}
+      </ul>
+    </div>
+  </nav>
+
   <main>
     {{ block "main" . }}{{ end }}
   </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>&copy; {{ now.Year }} PAKT contributors &middot; <a href="{{ site.Params.repo }}">GitHub</a> &middot; <a href="https://opensource.org/licenses/MIT">MIT License</a></p>
+    </div>
+  </footer>
 </body>
 </html>

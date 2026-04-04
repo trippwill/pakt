@@ -1,11 +1,37 @@
 baseURL = 'https://usepakt.dev/'
-locale = 'en-us'
+languageCode = 'en-us'
 title = 'PAKT'
-
-[markup]
-  [markup.goldmark]
-    [markup.goldmark.renderer]
-      unsafe = false
+theme = ''
 
 [params]
   description = 'A typed data interchange format. Human-authorable. Stream-parseable. Spec-projected.'
+  tagline = 'Human-authorable. Stream-parseable. Spec-projected.'
+  repo = 'https://github.com/trippwill/pakt'
+
+[menu]
+  [[menu.main]]
+    name = 'Docs'
+    url = '/docs/'
+    weight = 1
+  [[menu.main]]
+    name = 'Spec'
+    url = '/docs/spec/'
+    weight = 2
+  [[menu.main]]
+    name = 'Guide'
+    url = '/docs/guide/'
+    weight = 3
+  [[menu.main]]
+    name = 'Install'
+    url = '/docs/install/'
+    weight = 4
+  [[menu.main]]
+    name = 'GitHub'
+    url = 'https://github.com/trippwill/pakt'
+    weight = 5
+
+[markup.goldmark.renderer]
+  unsafe = true
+
+[markup.highlight]
+  style = 'monokai'

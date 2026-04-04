@@ -1,0 +1,25 @@
+{{ define "main" }}
+<div class="docs-layout">
+  <aside class="docs-sidebar">
+    <nav>
+      <h4>Documentation</h4>
+      <ul>
+        {{ $section := .CurrentSection }}
+        {{ range $section.Pages }}
+        <li{{ if eq $.RelPermalink .RelPermalink }} class="active"{{ end }}>
+          <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+        </li>
+        {{ end }}
+      </ul>
+    </nav>
+  </aside>
+  <article class="docs-content">
+    <h1>{{ .Title }}</h1>
+    {{ .Content }}
+    <nav class="docs-prevnext">
+      {{ with .PrevInSection }}<a href="{{ .RelPermalink }}" class="prev">&larr; {{ .Title }}</a>{{ end }}
+      {{ with .NextInSection }}<a href="{{ .RelPermalink }}" class="next">{{ .Title }} &rarr;</a>{{ end }}
+    </nav>
+  </article>
+</div>
+{{ end }}

@@ -310,7 +310,7 @@ Each entry is `key : value` conforming to the map's key and value types.
 
 **Termination**: A stream ends at EOF or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(1)-decidable: stream values never begin with `IDENT COLON` because values start with literals, delimiters, or keywords.
 
-**Duplicate keys**: In a map stream, duplicate keys are a parse error, same as in a map value.
+**Duplicate keys**: In a map stream, the behavior when duplicate keys appear is **implementation-defined** (see §6).
 
 **Root uniqueness**: Stream names participate in root uniqueness — a document may not have two statements (assignments or streams) with the same name.
 
@@ -390,11 +390,21 @@ map_entries = (map_entry (SEP map_entry)* SEP?)?
 map_entry   = value COLON value
 ```
 
-Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are separated by `:`. An empty map (`<>`) is valid. Duplicate keys are a parse error.
+Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are separated by `:`. An empty map (`<>`) is valid. The behavior when duplicate keys appear is **implementation-defined** (see §6).
 
 ## 6. Uniqueness
 
-Duplicate names at the document root are a parse error — this applies to both assignments and streams. Duplicate keys within a single map value or map stream are a parse error.
+Duplicate names at the document root are a parse error — this applies to both assignments and streams.
+
+### 6.1 Map Duplicate Keys
+
+The behavior when duplicate keys appear in a map value or map stream is **implementation-defined**. Implementations must document their chosen behavior. Common strategies include:
+
+- **Error** (strict) — reject duplicate keys as a parse error.
+- **Last-wins** — later entries silently replace earlier ones.
+- **Accumulate** — all entries are preserved (multimap semantics).
+
+Implementations should default to **error** for map values (`= <...>`) and may offer configurable behavior for map streams (`<<`).
 
 Struct field names are declared in the type, not in the value, so duplicates are caught at the type level.
 

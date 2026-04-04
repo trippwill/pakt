@@ -252,11 +252,11 @@ scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool' | 'uuid' | 'date' | 'time
 
 atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
 
-struct_type = LBRACE struct_field_decl (COMMA struct_field_decl)+ RBRACE
+struct_type = LBRACE struct_field_decl (COMMA struct_field_decl)* RBRACE
 
 struct_field_decl = IDENT COLON type '?'?
 
-tuple_type  = LPAREN type (COMMA type)+ RPAREN
+tuple_type  = LPAREN type (COMMA type)* RPAREN
 
 list_type   = LBRACK type '?'? RBRACK
 

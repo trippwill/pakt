@@ -14,6 +14,16 @@ func NewParseError(pos Pos, msg string) *ParseError {
 	return &ParseError{Pos: pos, Message: msg}
 }
 
+// Errorf returns a new [ParseError] at the given position with a formatted message.
+func Errorf(pos Pos, format string, args ...any) *ParseError {
+	return &ParseError{Pos: pos, Message: fmt.Sprintf(format, args...)}
+}
+
+// Wrap returns a new [ParseError] that wraps an underlying error.
+func Wrap(pos Pos, msg string, err error) *ParseError {
+	return &ParseError{Pos: pos, Message: msg, Wrapped: err}
+}
+
 // Error implements the [error] interface.
 func (e *ParseError) Error() string {
 	return fmt.Sprintf("%d:%d: %s", e.Pos.Line, e.Pos.Col, e.Message)

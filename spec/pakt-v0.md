@@ -84,6 +84,18 @@ UUID     = HEX{8} '-' HEX{4} '-' HEX{4} '-' HEX{4} '-' HEX{12}
 BIN      = 'x' "'" HEX_DIGIT* "'"
          | 'b' "'" BASE64_CHAR* "'"
 BASE64_CHAR = ALPHA | DIGIT | '+' | '/' | '='
+
+ESCAPE      = '\' ('\' | "'" | '"' | 'n' | 'r' | 't')
+            | '\u' HEX_DIGIT{4}
+            | '\U' HEX_DIGIT{8}
+string_char = ESCAPE
+            | any code point except matching_quote, '\', NL, U+0000
+raw_char    = any code point except matching_quote, U+0000
+ML_CHAR     = ESCAPE
+            | any code point except U+0000, not forming the closing triple-quote
+ML_BODY     = ML_CHAR*
+raw_ml_char = any code point except U+0000, not forming the closing triple-quote
+
 STRING   = "'" string_char* "'"
          | '"' string_char* '"'
 RAW_STR  = 'r' "'" raw_char* "'"
@@ -99,8 +111,8 @@ ATOM     = IDENT
 - `_` in numeric literals is a visual separator, ignored by the parser.
 - `ATOM` is syntactically identical to `IDENT`. It is valid as a value only when the type is an atom set.
 - `bin` literals use a prefix to indicate encoding: `x'...'` for hexadecimal, `b'...'` for base64.
-- Hex literals accept an even number of hex digits (each pair is one byte). Whitespace within hex literals is not permitted.
-- Base64 literals follow RFC 4648 standard encoding with `=` padding.
+- Hex literals must contain an even number of hex digits (each pair is one byte); an odd count is a parse error. Whitespace within hex literals is not permitted.
+- Base64 literals follow RFC 4648 standard encoding. Padding (`=`) is required. Invalid base64 characters or incorrect padding are parse errors.
 - Strings are always quoted. There are no unquoted string values.
 
 ### 3.4 Raw Strings
@@ -112,7 +124,7 @@ path:str = r'C:\Users\alice\Documents'
 regex:str = r"^\d{3}-\d{4}$"
 ```
 
-Raw strings may also be triple-quoted for multi-line content. Indentation stripping follows the same rules as regular multi-line strings (based on closing delimiter column), but no escape sequences are processed:
+Raw strings may also be triple-quoted for multi-line content. Indentation stripping follows the same rules as regular multi-line strings (based on the first non-blank content line), but no escape sequences are processed:
 
 ```
 template:str = r'''
@@ -138,12 +150,12 @@ A multi-line string is delimited by triple quotes (`'''` or `"""`).
 
 **Closing**: The closing `'''` must appear on its own line, preceded only by whitespace. The last newline before the closing delimiter is stripped.
 
-**Indentation stripping**: The column of the closing delimiter defines the baseline indentation. That many characters of leading whitespace are removed from each content line. A non-blank content line with fewer leading whitespace characters than the baseline is a parse error.
+**Indentation stripping**: The leading whitespace of the **first non-blank content line** defines the baseline indentation. That many characters of leading whitespace are removed from each content line (including the first). A non-blank content line with fewer leading whitespace characters than the baseline is a parse error. Blank content lines (containing only whitespace) are preserved as empty lines. This rule allows streaming parsers to determine the strip level after reading a single line.
 
 **Escapes**: The same escape sequences as single-line strings are recognized inside multi-line strings.
 
 ```
-# Closing delimiter at column 4 → strip 4 spaces from each line
+# First content line has 4 leading spaces → strip 4 from each line
 query:str = '''
     SELECT id, name
     FROM users
@@ -153,7 +165,7 @@ query:str = '''
 ```
 
 ```
-# Closing delimiter at column 0 → no stripping
+# First content line has 0 leading spaces → no stripping
 raw:str = '''
 line one
 line two
@@ -183,7 +195,8 @@ Any other `\` followed by a character is a parse error. Null bytes (`U+0000`) ar
 ```
 HASH    = '#'
 ASSIGN  = '='
-COLON   = ':'                       ; type annotation and map association
+COLON   = ':'                       ; type annotation only
+SEMI    = ';'                       ; map key-value association
 STREAM  = '<<'
 AT      = '@'                       ; reserved for future constraints
 COMMA   = ','
@@ -251,7 +264,7 @@ Example: `|dev, staging, prod|`
 | Struct | `{field:type, ...}` | `{ }` | Atom (static) | Heterogeneous |
 | Tuple | `(type, ...)` | `( )` | None (positional) | Heterogeneous |
 | List | `[type]` | `[ ]` | None (ordered) | Homogeneous |
-| Map | `<keytype : valtype>` | `< >` | Any typed value | Homogeneous |
+| Map | `<keytype ; valtype>` | `< >` | Any typed value | Homogeneous |
 
 Five unique delimiter pairs — no overloads:
 
@@ -300,17 +313,17 @@ stream_body = (value (SEP value)* SEP?)?
 
 Each value conforms to the list's element type.
 
-Stream body for map types (`<K : V>`):
+Stream body for map types (`<K ; V>`):
 
 ```
 stream_body = (map_entry (SEP map_entry)* SEP?)?
 ```
 
-Each entry is `key : value` conforming to the map's key and value types.
+Each entry is `key ; value` conforming to the map's key and value types.
 
-**Termination**: A stream ends at EOF or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(1)-decidable: stream values never begin with `IDENT COLON` because values start with literals, delimiters, or keywords.
+**Termination**: A stream ends at EOF or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(1)-decidable: stream values never begin with `IDENT COLON` because values start with literals, delimiters, or keywords, and the map association operator is `;`, not `:`.
 
-**Duplicate keys**: In a map stream, the behavior when duplicate keys appear is **implementation-defined** (see §6).
+**Duplicate keys**: In a map stream, duplicate keys use **last-wins** semantics by default (see §6).
 
 **Root uniqueness**: Stream names participate in root uniqueness — a document may not have two statements (assignments or streams) with the same name.
 
@@ -337,7 +350,7 @@ tuple_type  = LPAREN type (COMMA type)* RPAREN
 
 list_type   = LBRACK type '?'? RBRACK
 
-map_type    = LANGLE type COLON type RANGLE
+map_type    = LANGLE type SEMI type RANGLE
 ```
 
 ### 5.6 Values
@@ -360,6 +373,8 @@ struct_val      = LBRACE struct_members RBRACE
 struct_members  = (value (SEP value)* SEP?)?
 ```
 
+A struct value must contain exactly as many values as the type declares fields. Fewer or more values than declared is a **parse error**. Arity is validated during parsing.
+
 > **Future consideration**: Self-describing struct members (`name:type = value`) may be added in a future version.
 
 ### 5.8 Tuple Value
@@ -370,6 +385,8 @@ Tuple values contain positional values matched left-to-right against the types d
 tuple_val      = LPAREN tuple_members RPAREN
 tuple_members  = (value (SEP value)* SEP?)?
 ```
+
+A tuple value must contain exactly as many values as the type declares elements. Fewer or more values than declared is a **parse error**. Arity is validated during parsing.
 
 > **Future consideration**: Self-describing tuple members (`:type value`) may be added in a future version.
 
@@ -387,10 +404,10 @@ All elements must conform to the declared element type. An empty list (`[]`) is 
 ```
 map_val     = LANGLE map_entries RANGLE
 map_entries = (map_entry (SEP map_entry)* SEP?)?
-map_entry   = value COLON value
+map_entry   = value SEMI value
 ```
 
-Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are separated by `:`. An empty map (`<>`) is valid. The behavior when duplicate keys appear is **implementation-defined** (see §6).
+Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are separated by `;`. An empty map (`<>`) is valid. Duplicate keys in a map value are a **parse error** (see §6).
 
 ## 6. Uniqueness
 
@@ -398,13 +415,14 @@ Duplicate names at the document root are a parse error — this applies to both 
 
 ### 6.1 Map Duplicate Keys
 
-The behavior when duplicate keys appear in a map value or map stream is **implementation-defined**. Implementations must document their chosen behavior. Common strategies include:
+Duplicate keys in a **map value** (`= <...>`) are a **parse error**. This is normative and not configurable.
+
+Duplicate keys in a **map stream** (`<<`) use **last-wins** semantics by default — later entries silently replace earlier ones. Implementations MAY offer configurable alternatives:
 
 - **Error** (strict) — reject duplicate keys as a parse error.
-- **Last-wins** — later entries silently replace earlier ones.
 - **Accumulate** — all entries are preserved (multimap semantics).
 
-Implementations should default to **error** for map values (`= <...>`) and may offer configurable behavior for map streams (`<<`).
+Implementations that offer alternative duplicate-key strategies must document their behavior and default to last-wins when no strategy is explicitly selected.
 
 Struct field names are declared in the type, not in the value, so duplicates are caught at the type level.
 
@@ -413,12 +431,10 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Whitespace around `=` is optional: `name:str = 'x'` and `name:str='x'` are equivalent.
 - Whitespace around `<<` is optional: `name:[int] << 1, 2` and `name:[int]<<1, 2` are equivalent.
 - Whitespace around `:` in type annotations is **not** permitted: `name:int`, not `name : int`.
-- Whitespace around `:` in map entries is optional: `'key' : value` and `'key':value` are equivalent.
+- Whitespace around `;` in map entries is optional: `'key' ; value` and `'key';value` are equivalent.
 - Members are separated by commas, newlines, or both (`SEP`). At least one separator is required between members.
 - Consecutive newlines (blank lines) are ignored.
 - Indentation is insignificant — cosmetic only.
-
-> **Implementation note**: The dual use of `:` (type annotations and map entries) is unambiguous in context — the parser always knows whether it is reading a type or a map value from the enclosing delimiters (`{ }` for structs, `< >` for maps). If profiling reveals the disambiguation to be a performance bottleneck, future spec versions may adopt an alternative map separator.
 
 ## 8. Structural Equivalence
 

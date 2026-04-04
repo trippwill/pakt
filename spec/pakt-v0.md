@@ -15,16 +15,22 @@ PAKT uses single-integer versioning. Each version is a complete specification. P
 
 ## 1. Document Model
 
-A PAKT document is a sequence of **assignments** at the top level. Each assignment is a named, typed value.
+A PAKT document is a sequence of **statements** at the top level. A statement is either an **assignment** (a named, typed, single value) or a **stream** (a named, typed, open-ended sequence of values).
 
-The document root is a distinct concept from a struct value — it uses self-describing assignments (`name:type = value`) rather than positional values. This is the system boundary where data enters without a parent type context.
+The document root uses self-describing statements (`name:type = value` or `name:type << values...`) rather than positional values. This is the system boundary where data enters without a parent type context.
 
 ```
 name:str = 'midwatch'
 version:(int, int, int) = (1, 0, 0)
 ```
 
-> **Future consideration**: Struct streams (a sequence of delimited struct values for data feeds) may be added in a future version.
+Streams deliver zero or more values of a collection type, terminated by EOF or the start of the next statement:
+
+```
+events:[{ts:datetime, level:str, msg:str}] <<
+{ 2026-06-01T14:30:00Z, 'info', 'server started' }
+{ 2026-06-01T14:31:00Z, 'warn', 'high latency' }
+```
 
 ## 2. Encoding
 
@@ -75,6 +81,9 @@ TZ       = 'Z' | [+-] DIGIT{2} ':' DIGIT{2}
 TIME     = DIGIT{2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)? TZ
 DATETIME = DATE 'T' TIME
 UUID     = HEX{8} '-' HEX{4} '-' HEX{4} '-' HEX{4} '-' HEX{12}
+BIN      = 'x' "'" HEX_DIGIT* "'"
+         | 'b' "'" BASE64_CHAR* "'"
+BASE64_CHAR = ALPHA | DIGIT | '+' | '/' | '='
 STRING   = "'" string_char* "'"
          | '"' string_char* '"'
 ML_STR   = "'''" ML_BODY "'''"
@@ -85,6 +94,9 @@ ATOM     = IDENT
 - Leading zeros on decimal `INT` are permitted and ignored (`01` evaluates to `1`).
 - `_` in numeric literals is a visual separator, ignored by the parser.
 - `ATOM` is syntactically identical to `IDENT`. It is valid as a value only when the type is an atom set.
+- `bin` literals use a prefix to indicate encoding: `x'...'` for hexadecimal, `b'...'` for base64.
+- Hex literals accept an even number of hex digits (each pair is one byte). Whitespace within hex literals is not permitted.
+- Base64 literals follow RFC 4648 standard encoding with `=` padding.
 - Strings are always quoted. There are no unquoted string values.
 
 ### 3.4 Multi-line Strings
@@ -140,7 +152,8 @@ Any other `\` followed by a character is a parse error. Null bytes (`U+0000`) ar
 ```
 HASH    = '#'
 ASSIGN  = '='
-COLON   = ':'
+COLON   = ':'                       ; type annotation and map association
+STREAM  = '<<'
 AT      = '@'                       ; reserved for future constraints
 COMMA   = ','
 PIPE    = '|'
@@ -167,12 +180,14 @@ Every value must have a type. There is no default type and no type inference.
 | `date` | ISO date | `2026-06-01` |
 | `time` | ISO time (tz required) | `14:30:00Z`, `14:30:00-04:00` |
 | `datetime` | ISO datetime (tz required) | `2026-06-01T14:30:00Z` |
+| `bin` | Binary data | `x'48656C6C6F'`, `b'SGVsbG8='` |
 
 **Numeric precision:**
 
 - **`int`**: Signed 64-bit integer. Range: −9,223,372,036,854,775,808 to 9,223,372,036,854,775,807. Values outside this range are a parse error.
 - **`float`**: IEEE 754 binary64 (double precision). Implementations must parse and round per IEEE 754.
 - **`dec`**: Arbitrary-precision decimal in the text representation. Implementations must support at least 34 significant digits (equivalent to IEEE 754 decimal128). An implementation may reject values exceeding its supported precision with a clear error.
+- **`bin`**: Raw byte sequence. Hex form (`x'...'`) and base64 form (`b'...'`) are semantically equivalent — both produce the same bytes. Implementations represent this as a byte array/slice.
 
 `true`, `false`, and `nil` are reserved keywords, not atoms.
 
@@ -205,7 +220,7 @@ Example: `|dev, staging, prod|`
 | Struct | `{field:type, ...}` | `{ }` | Atom (static) | Heterogeneous |
 | Tuple | `(type, ...)` | `( )` | None (positional) | Heterogeneous |
 | List | `[type]` | `[ ]` | None (ordered) | Homogeneous |
-| Map | `<keytype = valtype>` | `< >` | Any typed value | Homogeneous |
+| Map | `<keytype : valtype>` | `< >` | Any typed value | Homogeneous |
 
 Five unique delimiter pairs — no overloads:
 
@@ -228,7 +243,8 @@ The `@` token is reserved for future constraint syntax (e.g., `@len`, `@range`, 
 ### 5.1 Document
 
 ```
-document = assignment*
+document  = statement*
+statement = assignment | stream
 ```
 
 ### 5.2 Assignment
@@ -237,18 +253,48 @@ document = assignment*
 assignment = IDENT type_annot ASSIGN value
 ```
 
-### 5.3 Type Annotation
+### 5.3 Stream
+
+```
+stream = IDENT type_annot STREAM stream_body
+```
+
+A stream delivers zero or more bare values of the annotated collection type. The type must be a list type, map type, or a list-of-structs type.
+
+Stream body for list types (`[type]`):
+
+```
+stream_body = (value (SEP value)* SEP?)?
+```
+
+Each value conforms to the list's element type.
+
+Stream body for map types (`<K : V>`):
+
+```
+stream_body = (map_entry (SEP map_entry)* SEP?)?
+```
+
+Each entry is `key : value` conforming to the map's key and value types.
+
+**Termination**: A stream ends at EOF or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(1)-decidable: stream values never begin with `IDENT COLON` because values start with literals, delimiters, or keywords.
+
+**Duplicate keys**: In a map stream, duplicate keys are a parse error, same as in a map value.
+
+**Root uniqueness**: Stream names participate in root uniqueness — a document may not have two statements (assignments or streams) with the same name.
+
+### 5.4 Type Annotation
 
 ```
 type_annot = COLON type '?'?
 ```
 
-### 5.4 Type
+### 5.5 Type
 
 ```
 type = scalar_type | atom_set | struct_type | tuple_type | list_type | map_type
 
-scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool' | 'uuid' | 'date' | 'time' | 'datetime'
+scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool' | 'uuid' | 'date' | 'time' | 'datetime' | 'bin'
 
 atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
 
@@ -260,21 +306,21 @@ tuple_type  = LPAREN type (COMMA type)* RPAREN
 
 list_type   = LBRACK type '?'? RBRACK
 
-map_type    = LANGLE type ASSIGN type RANGLE
+map_type    = LANGLE type COLON type RANGLE
 ```
 
-### 5.5 Values
+### 5.6 Values
 
 ```
 value = scalar | NIL | atom_val | struct_val | tuple_val | list_val | map_val
 
-scalar    = STRING | INT | DEC | FLOAT | BOOL | UUID | DATE | TIME | DATETIME
+scalar    = STRING | INT | DEC | FLOAT | BOOL | UUID | DATE | TIME | DATETIME | BIN
 atom_val  = ATOM
 ```
 
 `nil` is valid only when the type is nullable (`type?`).
 
-### 5.6 Struct Value
+### 5.7 Struct Value
 
 Struct values contain positional values matched left-to-right against the fields declared in the type annotation. The type annotation is required.
 
@@ -285,7 +331,7 @@ struct_members  = (value (SEP value)* SEP?)?
 
 > **Future consideration**: Self-describing struct members (`name:type = value`) may be added in a future version.
 
-### 5.7 Tuple Value
+### 5.8 Tuple Value
 
 Tuple values contain positional values matched left-to-right against the types declared in the type annotation. The type annotation is required.
 
@@ -296,7 +342,7 @@ tuple_members  = (value (SEP value)* SEP?)?
 
 > **Future consideration**: Self-describing tuple members (`:type value`) may be added in a future version.
 
-### 5.8 List Value
+### 5.9 List Value
 
 ```
 list_val     = LBRACK list_members RBRACK
@@ -305,29 +351,33 @@ list_members = (value (SEP value)* SEP?)?
 
 All elements must conform to the declared element type. An empty list (`[]`) is valid.
 
-### 5.9 Map Value
+### 5.10 Map Value
 
 ```
 map_val     = LANGLE map_entries RANGLE
 map_entries = (map_entry (SEP map_entry)* SEP?)?
-map_entry   = value ASSIGN value
+map_entry   = value COLON value
 ```
 
-Keys conform to the declared key type. Values conform to the declared value type. An empty map (`<>`) is valid. Duplicate keys are a parse error.
+Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are separated by `:`. An empty map (`<>`) is valid. Duplicate keys are a parse error.
 
 ## 6. Uniqueness
 
-Duplicate names at the document root are a parse error. Duplicate keys within a single map value are a parse error.
+Duplicate names at the document root are a parse error — this applies to both assignments and streams. Duplicate keys within a single map value or map stream are a parse error.
 
 Struct field names are declared in the type, not in the value, so duplicates are caught at the type level.
 
 ## 7. Whitespace Rules
 
 - Whitespace around `=` is optional: `name:str = 'x'` and `name:str='x'` are equivalent.
+- Whitespace around `<<` is optional: `name:[int] << 1, 2` and `name:[int]<<1, 2` are equivalent.
 - Whitespace around `:` in type annotations is **not** permitted: `name:int`, not `name : int`.
+- Whitespace around `:` in map entries is optional: `'key' : value` and `'key':value` are equivalent.
 - Members are separated by commas, newlines, or both (`SEP`). At least one separator is required between members.
 - Consecutive newlines (blank lines) are ignored.
 - Indentation is insignificant — cosmetic only.
+
+> **Implementation note**: The dual use of `:` (type annotations and map entries) is unambiguous in context — the parser always knows whether it is reading a type or a map value from the enclosing delimiters (`{ }` for structs, `< >` for maps). If profiling reveals the disambiguation to be a performance bottleneck, future spec versions may adopt an alternative map separator.
 
 ## 8. Structural Equivalence
 

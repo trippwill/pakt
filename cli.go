@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -52,6 +53,8 @@ func (c *ParseCmd) Run(cli *CLI) error {
 		}
 	}
 
+	jsonEnc := json.NewEncoder(os.Stdout)
+
 	for {
 		evt, err := dec.Decode()
 		if err == io.EOF {
@@ -60,7 +63,14 @@ func (c *ParseCmd) Run(cli *CLI) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(evt.String())
+		switch c.Format {
+		case "json":
+			if err := jsonEnc.Encode(evt); err != nil {
+				return fmt.Errorf("encoding JSON: %w", err)
+			}
+		default:
+			fmt.Println(evt.String())
+		}
 	}
 
 	return nil

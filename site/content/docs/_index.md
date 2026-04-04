@@ -1,6 +1,11 @@
 ---
 title: "Documentation"
-description: "Learn about PAKT — the typed data interchange format."
+description: "Learn PAKT — guides, specification, and examples."
 ---
 
-Welcome to the PAKT documentation. Choose a topic to get started.
+Quick links to all documentation:
+
+- [Guide](/docs/guide/) — Human-friendly introduction to PAKT
+- [Specification](/docs/spec/) — Formal grammar and semantics (PAKT v0)
+- [Installation](/docs/install/) — Install the CLI and Go library
+- [Examples](/docs/examples/) — Annotated PAKT examples

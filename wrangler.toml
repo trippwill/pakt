@@ -1,0 +1,14 @@
+# Cloudflare Pages configuration
+# https://developers.cloudflare.com/pages/configuration/wrangler-configuration/
+
+name = "pakt"
+
+[pages.build]
+command = "cd site && hugo --minify"
+output_directory = "site/public"
+
+[pages.build.environment]
+HUGO_VERSION = "0.147.1"
+
+[pages.deployment]
+production_branch = "main"

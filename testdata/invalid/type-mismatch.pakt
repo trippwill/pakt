@@ -1,0 +1,2 @@
+# ERROR: string value assigned to int type
+count:int = 'not a number'

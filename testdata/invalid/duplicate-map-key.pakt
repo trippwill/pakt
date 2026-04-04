@@ -1,0 +1,6 @@
+# ERROR: duplicate key 'alice' in map
+users:<str = int> = <
+    'alice' = 1
+    'bob'   = 2
+    'alice' = 3
+>

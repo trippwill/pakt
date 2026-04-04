@@ -1,0 +1,58 @@
+# Deployment configuration
+# Generated for environment: production
+
+app-name:str = 'midwatch'
+version:(int, int, int) = (2, 14, 0)
+
+# Deployment target
+deploy:{level:|dev, staging, prod|, release:int, date:date} = {
+    prod
+    26
+    2026-06-01
+}
+
+# Feature flags
+features:[str] = [
+    'dark-mode'
+    'notifications'
+    'audit-log'
+]
+
+# Primary database connection
+db:{host:str, port:int, name:str, pool-size:int} = {
+    'db.prod.internal'
+    5432
+    'midwatch_prod'
+    20
+}
+
+# Replica endpoints
+replicas:[{host:str, port:int}] = [
+    { 'replica-1.prod.internal', 5432 }
+    { 'replica-2.prod.internal', 5432 }
+]
+
+# TLS certificate fingerprint
+tls-fingerprint:str? = 'sha256:a1b2c3d4e5f6'
+
+# Optional rollback target (nil when not set)
+rollback-version:(int, int, int)? = nil
+
+# Service metadata
+meta:<str = str> = <
+    'owner'  = 'platform-team'
+    'region' = 'us-east-1'
+    'tier'   = 'critical'
+>
+
+# Health check
+health:{endpoint:str, interval-sec:int, timeout-sec:int, healthy-threshold:int} = {
+    '/healthz'
+    30
+    5
+    3
+}
+
+active:bool       = true              # currently deployed
+instance-count:int = 4
+started:datetime  = 2026-06-01T14:30:00Z

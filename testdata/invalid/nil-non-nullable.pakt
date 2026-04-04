@@ -1,0 +1,2 @@
+# ERROR: nil assigned to non-nullable type
+name:str = nil

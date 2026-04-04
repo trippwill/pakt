@@ -1,0 +1,52 @@
+# Block struct
+server:{host:str, port:int, debug:bool} = {
+    'localhost'
+    8080
+    false
+}
+
+# Inline struct
+origin:{x:int, y:int} = { 0, 0 }
+
+# Block tuple
+version:(int, int, int) = (
+    3
+    45
+    5678
+)
+
+# Inline tuple
+point:(dec, dec) = (1.5, 2.5)
+
+# Block list
+ids:[int] = [
+    12
+    14
+    26
+    78
+]
+
+# Inline list
+tags:[str] = ['alpha', 'beta', 'release']
+
+# Empty list
+empty-list:[str] = []
+
+# Block map
+users:<int = str> = <
+    1 = 'Alice'
+    2 = 'Bob'
+    3 = 'Charlie'
+>
+
+# Inline map
+codes:<str = int> = <'us' = 1, 'gb' = 44, 'jp' = 81>
+
+# Empty map
+cache:<str = int> = <>
+
+# Map with composite values
+roster:<int = {gn:str, fn:str, admin:bool}> = <
+    01 = { 'Johnson', 'Amy', true }
+    02 = { 'Smith', 'Bob', false }
+>

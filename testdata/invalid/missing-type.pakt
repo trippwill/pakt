@@ -1,0 +1,2 @@
+# ERROR: assignment without a type annotation
+name = 'Alice'

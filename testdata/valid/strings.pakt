@@ -1,0 +1,33 @@
+# Single-quoted string
+single:str = 'hello world'
+
+# Double-quoted string
+double:str = "hello world"
+
+# Escape sequences
+newline:str   = 'line one\nline two'
+tabbed:str    = "col1\tcol2"
+backslash:str = 'C:\\Users\\alice'
+bmp-escape:str  = '\u2603'        # snowman
+full-escape:str = '\U0001F600'    # grinning face
+
+# Multi-line string with indentation stripping
+query:str = '''
+    SELECT id, name
+    FROM users
+    WHERE active = true
+    '''
+
+# Multi-line string with no stripping (closing at column 0)
+raw:str = '''
+no indent here
+second line
+'''
+
+# Multi-line double-quoted
+poem:str = """
+    Roses are red,
+    Violets are blue,
+    PAKT is typed,
+    And so are you.
+    """

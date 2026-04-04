@@ -1,0 +1,11 @@
+baseURL = 'https://usepakt.dev/'
+locale = 'en-us'
+title = 'PAKT'
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = false
+
+[params]
+  description = 'A typed data interchange format. Human-authorable. Stream-parseable. Spec-projected.'

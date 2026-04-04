@@ -1,7 +1,6 @@
 baseURL = 'https://usepakt.dev/'
 languageCode = 'en-us'
 title = 'PAKT'
-theme = ''
 
 [params]
   description = 'A typed data interchange format. Human-authorable. Stream-parseable. Spec-projected.'

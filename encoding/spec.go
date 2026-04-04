@@ -95,18 +95,8 @@ func (r *reader) readAssignmentWithSpec(spec *Spec) (name string, matched bool, 
 	typeStr := typ.String()
 	r.emit(EventAssignStart, identPos, name, typeStr, "")
 
-	if err := r.readValue(typ); err != nil {
+	if err := r.readValue(typ, name); err != nil {
 		return name, true, err
-	}
-
-	// Patch name on the first value event after AssignStart.
-	for i := len(r.events) - 1; i >= 0; i-- {
-		if r.events[i].Kind == EventAssignStart && r.events[i].Name == name {
-			if i+1 < len(r.events) && r.events[i+1].Name == "" {
-				r.events[i+1].Name = name
-			}
-			break
-		}
 	}
 
 	r.emit(EventAssignEnd, r.pos, name, typeStr, "")

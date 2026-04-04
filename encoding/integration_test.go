@@ -699,7 +699,7 @@ func TestSentinelErrDuplicateNameViaDecoder(t *testing.T) {
 func TestSentinelErrDuplicateKeyUnit(t *testing.T) {
 	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
 	r := newReader(strings.NewReader("< 'a' = 1, 'a' = 2 >"))
-	err := r.readValue(typ)
+	err := r.readValue(typ, "")
 	if err == nil {
 		t.Fatal("expected error for duplicate map key")
 	}
@@ -710,7 +710,7 @@ func TestSentinelErrDuplicateKeyUnit(t *testing.T) {
 
 func TestSentinelErrNilNonNullableUnit(t *testing.T) {
 	r := newReader(strings.NewReader("nil"))
-	err := r.readValue(scalarType(TypeStr))
+	err := r.readValue(scalarType(TypeStr), "")
 	if err == nil {
 		t.Fatal("expected error for nil on non-nullable type")
 	}

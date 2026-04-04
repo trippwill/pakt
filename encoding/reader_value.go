@@ -3,6 +3,25 @@ package encoding
 import "fmt"
 
 // ---------------------------------------------------------------------------
+// Pre-computed index name table for tuples and lists
+// ---------------------------------------------------------------------------
+
+var indexNames [64]string
+
+func init() {
+	for i := range indexNames {
+		indexNames[i] = fmt.Sprintf("[%d]", i)
+	}
+}
+
+func indexName(i int) string {
+	if i < len(indexNames) {
+		return indexNames[i]
+	}
+	return fmt.Sprintf("[%d]", i)
+}
+
+// ---------------------------------------------------------------------------
 // Event emission helpers
 // ---------------------------------------------------------------------------
 
@@ -49,7 +68,8 @@ func (r *reader) readSep() (bool, error) {
 // ---------------------------------------------------------------------------
 
 // readValue reads a value according to the given type and emits events.
-func (r *reader) readValue(typ Type) error {
+// The name parameter is threaded through to the first emitted event.
+func (r *reader) readValue(typ Type, name string) error {
 	// Check for nil on nullable types by peeking ahead for "nil" keyword.
 	if typ.Nullable {
 		if r.peekNil() {
@@ -57,7 +77,7 @@ func (r *reader) readValue(typ Type) error {
 			if err := r.readNil(); err != nil {
 				return err
 			}
-			r.emit(EventScalarValue, pos, "", typ.String(), "nil")
+			r.emit(EventScalarValue, pos, name, typ.String(), "nil")
 			return nil
 		}
 	} else if r.peekNil() {
@@ -66,17 +86,17 @@ func (r *reader) readValue(typ Type) error {
 
 	switch {
 	case typ.Scalar != nil:
-		return r.readScalarValue(*typ.Scalar)
+		return r.readScalarValue(*typ.Scalar, name)
 	case typ.AtomSet != nil:
-		return r.readAtomValue(typ.AtomSet)
+		return r.readAtomValue(typ.AtomSet, name)
 	case typ.Struct != nil:
-		return r.readStructValue(typ.Struct)
+		return r.readStructValue(typ.Struct, name)
 	case typ.Tuple != nil:
-		return r.readTupleValue(typ.Tuple)
+		return r.readTupleValue(typ.Tuple, name)
 	case typ.List != nil:
-		return r.readListValue(typ.List)
+		return r.readListValue(typ.List, name)
 	case typ.Map != nil:
-		return r.readMapValue(typ.Map)
+		return r.readMapValue(typ.Map, name)
 	default:
 		return r.errorf("unknown type: no type variant set")
 	}
@@ -86,38 +106,13 @@ func (r *reader) readValue(typ Type) error {
 // Scalar value reading
 // ---------------------------------------------------------------------------
 
-func (r *reader) readScalarValue(kind TypeKind) error {
-	pos := r.pos
-	var val string
-	var err error
-
-	switch kind {
-	case TypeStr:
-		val, err = r.readString()
-	case TypeInt:
-		val, err = r.readInt()
-	case TypeDec:
-		val, err = r.readDec()
-	case TypeFloat:
-		val, err = r.readFloat()
-	case TypeBool:
-		val, err = r.readBool()
-	case TypeUUID:
-		val, err = r.readUUID()
-	case TypeDate:
-		val, err = r.readDate()
-	case TypeTime:
-		val, err = r.readTime()
-	case TypeDateTime:
-		val, err = r.readDateTime()
-	default:
-		return r.errorf("unknown scalar type kind %d", int(kind))
-	}
+func (r *reader) readScalarValue(kind TypeKind, name string) error {
+	val, pos, err := r.readScalarDirect(kind)
 	if err != nil {
 		return err
 	}
 
-	r.emit(EventScalarValue, pos, "", kind.String(), val)
+	r.emit(EventScalarValue, pos, name, kind.String(), val)
 	return nil
 }
 
@@ -125,13 +120,13 @@ func (r *reader) readScalarValue(kind TypeKind) error {
 // Atom value reading
 // ---------------------------------------------------------------------------
 
-func (r *reader) readAtomValue(atoms *AtomSet) error {
+func (r *reader) readAtomValue(atoms *AtomSet, name string) error {
 	pos := r.pos
 	val, err := r.readAtom(atoms.Members)
 	if err != nil {
 		return err
 	}
-	r.emit(EventScalarValue, pos, "", atoms.String(), val)
+	r.emit(EventScalarValue, pos, name, atoms.String(), val)
 	return nil
 }
 
@@ -139,13 +134,13 @@ func (r *reader) readAtomValue(atoms *AtomSet) error {
 // Struct value reading
 // ---------------------------------------------------------------------------
 
-func (r *reader) readStructValue(st *StructType) error {
+func (r *reader) readStructValue(st *StructType, name string) error {
 	r.skipWS()
 	pos := r.pos
 	if err := r.expectByte('{'); err != nil {
 		return err
 	}
-	r.emit(EventCompositeStart, pos, "", st.String(), "")
+	r.emit(EventCompositeStart, pos, name, st.String(), "")
 
 	for i, field := range st.Fields {
 		if i == 0 {
@@ -161,11 +156,9 @@ func (r *reader) readStructValue(st *StructType) error {
 			return r.errorf("too few values in struct: expected %d fields, got %d", len(st.Fields), i)
 		}
 
-		nameIdx := len(r.events)
-		if err := r.readValue(field.Type); err != nil {
+		if err := r.readValue(field.Type, field.Name); err != nil {
 			return err
 		}
-		r.patchName(nameIdx, field.Name)
 
 		// After each value (except the last), consume SEP.
 		if i < len(st.Fields)-1 {
@@ -204,13 +197,13 @@ func (r *reader) readStructValue(st *StructType) error {
 // Tuple value reading
 // ---------------------------------------------------------------------------
 
-func (r *reader) readTupleValue(tt *TupleType) error {
+func (r *reader) readTupleValue(tt *TupleType, name string) error {
 	r.skipWS()
 	pos := r.pos
 	if err := r.expectByte('('); err != nil {
 		return err
 	}
-	r.emit(EventCompositeStart, pos, "", tt.String(), "")
+	r.emit(EventCompositeStart, pos, name, tt.String(), "")
 
 	for i, elem := range tt.Elements {
 		if i == 0 {
@@ -225,12 +218,9 @@ func (r *reader) readTupleValue(tt *TupleType) error {
 			return r.errorf("too few values in tuple: expected %d elements, got %d", len(tt.Elements), i)
 		}
 
-		name := fmt.Sprintf("[%d]", i)
-		nameIdx := len(r.events)
-		if err := r.readValue(elem); err != nil {
+		if err := r.readValue(elem, indexName(i)); err != nil {
 			return err
 		}
-		r.patchName(nameIdx, name)
 
 		if i < len(tt.Elements)-1 {
 			sep, err := r.readSep()
@@ -266,13 +256,13 @@ func (r *reader) readTupleValue(tt *TupleType) error {
 // List value reading
 // ---------------------------------------------------------------------------
 
-func (r *reader) readListValue(lt *ListType) error {
+func (r *reader) readListValue(lt *ListType, name string) error {
 	r.skipWS()
 	pos := r.pos
 	if err := r.expectByte('['); err != nil {
 		return err
 	}
-	r.emit(EventCompositeStart, pos, "", lt.String(), "")
+	r.emit(EventCompositeStart, pos, name, lt.String(), "")
 
 	idx := 0
 	for {
@@ -286,12 +276,9 @@ func (r *reader) readListValue(lt *ListType) error {
 			break
 		}
 
-		name := fmt.Sprintf("[%d]", idx)
-		nameIdx := len(r.events)
-		if err := r.readValue(lt.Element); err != nil {
+		if err := r.readValue(lt.Element, indexName(idx)); err != nil {
 			return err
 		}
-		r.patchName(nameIdx, name)
 		idx++
 
 		// Consume optional SEP; if no SEP, must be at ']'.
@@ -322,13 +309,13 @@ func (r *reader) readListValue(lt *ListType) error {
 // Map value reading
 // ---------------------------------------------------------------------------
 
-func (r *reader) readMapValue(mt *MapType) error {
+func (r *reader) readMapValue(mt *MapType, name string) error {
 	r.skipWS()
 	pos := r.pos
 	if err := r.expectByte('<'); err != nil {
 		return err
 	}
-	r.emit(EventCompositeStart, pos, "", mt.String(), "")
+	r.emit(EventCompositeStart, pos, name, mt.String(), "")
 
 	seen := make(map[string]struct{})
 
@@ -343,13 +330,39 @@ func (r *reader) readMapValue(mt *MapType) error {
 			break
 		}
 
-		// Read key — capture events to extract key string.
-		keyStart := len(r.events)
-		if err := r.readValue(mt.Key); err != nil {
-			return err
+		// Read key — for scalar/atom keys, read directly to capture the key string.
+		var keyStr string
+		switch {
+		case mt.Key.Nullable && r.peekNil():
+			keyPos := r.pos
+			if err := r.readNil(); err != nil {
+				return err
+			}
+			keyStr = "nil"
+			r.emit(EventScalarValue, keyPos, keyStr, mt.Key.String(), keyStr)
+		case !mt.Key.Nullable && r.peekNil():
+			return r.wrapf(ErrNilNonNullable, "nil value for non-nullable type %s", mt.Key.String())
+		case mt.Key.Scalar != nil:
+			keyVal, keyPos, err := r.readScalarDirect(*mt.Key.Scalar)
+			if err != nil {
+				return err
+			}
+			keyStr = keyVal
+			r.emit(EventScalarValue, keyPos, keyStr, mt.Key.Scalar.String(), keyStr)
+		case mt.Key.AtomSet != nil:
+			keyPos := r.pos
+			keyVal, err := r.readAtom(mt.Key.AtomSet.Members)
+			if err != nil {
+				return err
+			}
+			keyStr = keyVal
+			r.emit(EventScalarValue, keyPos, keyStr, mt.Key.AtomSet.String(), keyStr)
+		default:
+			// Composite key — rare; read normally with empty name.
+			if err := r.readValue(mt.Key, ""); err != nil {
+				return err
+			}
 		}
-		// Extract the key's string representation for duplicate detection.
-		keyStr := r.extractKeyString(keyStart)
 
 		if _, dup := seen[keyStr]; dup {
 			return r.wrapf(ErrDuplicateKey, "duplicate map key: %s", keyStr)
@@ -363,15 +376,10 @@ func (r *reader) readMapValue(mt *MapType) error {
 		}
 		r.skipWS()
 
-		// Read value, name it with the key string.
-		nameIdx := len(r.events)
-		if err := r.readValue(mt.Value); err != nil {
+		// Read value, named with the key string.
+		if err := r.readValue(mt.Value, keyStr); err != nil {
 			return err
 		}
-		// Patch the key event name.
-		r.patchName(keyStart, keyStr)
-		// Patch the value event name.
-		r.patchName(nameIdx, keyStr)
 
 		// Consume optional SEP.
 		sep, err := r.readSep()
@@ -400,24 +408,35 @@ func (r *reader) readMapValue(mt *MapType) error {
 // Helpers
 // ---------------------------------------------------------------------------
 
-// patchName sets the Name field on the first event at or after idx that
-// doesn't already have a Name set. This is used to propagate field/element
-// names from the type context into the emitted events.
-func (r *reader) patchName(idx int, name string) {
-	if idx < len(r.events) && r.events[idx].Name == "" {
-		r.events[idx].Name = name
-	}
-}
+// readScalarDirect reads a scalar value and returns it without emitting an event.
+func (r *reader) readScalarDirect(kind TypeKind) (string, Pos, error) {
+	pos := r.pos
+	var val string
+	var err error
 
-// extractKeyString returns the Value from the first ScalarValue event at or
-// after idx. For composite keys this returns empty string.
-func (r *reader) extractKeyString(idx int) string {
-	for i := idx; i < len(r.events); i++ {
-		if r.events[i].Kind == EventScalarValue {
-			return r.events[i].Value
-		}
+	switch kind {
+	case TypeStr:
+		val, err = r.readString()
+	case TypeInt:
+		val, err = r.readInt()
+	case TypeDec:
+		val, err = r.readDec()
+	case TypeFloat:
+		val, err = r.readFloat()
+	case TypeBool:
+		val, err = r.readBool()
+	case TypeUUID:
+		val, err = r.readUUID()
+	case TypeDate:
+		val, err = r.readDate()
+	case TypeTime:
+		val, err = r.readTime()
+	case TypeDateTime:
+		val, err = r.readDateTime()
+	default:
+		return "", pos, r.errorf("unknown scalar type kind %d", int(kind))
 	}
-	return ""
+	return val, pos, err
 }
 
 // peekNil checks whether the next non-WS content is the keyword "nil" followed
@@ -497,20 +516,8 @@ func (r *reader) readAssignment() error {
 	r.emit(EventAssignStart, identPos, name, typeStr, "")
 
 	// Read value.
-	if err := r.readValue(typ); err != nil {
+	if err := r.readValue(typ, name); err != nil {
 		return err
-	}
-
-	// Patch name on the first value event (the one right after AssignStart).
-	// Find the event after AssignStart and set its name to the assignment name.
-	for i := len(r.events) - 1; i >= 0; i-- {
-		if r.events[i].Kind == EventAssignStart && r.events[i].Name == name {
-			// Patch the event immediately following AssignStart.
-			if i+1 < len(r.events) && r.events[i+1].Name == "" {
-				r.events[i+1].Name = name
-			}
-			break
-		}
 	}
 
 	// Emit AssignEnd.

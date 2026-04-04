@@ -46,7 +46,7 @@ func field(name string, typ Type) Field {
 func readValueEvents(t *testing.T, input string, typ Type) []Event {
 	t.Helper()
 	r := newReader(strings.NewReader(input))
-	if err := r.readValue(typ); err != nil {
+	if err := r.readValue(typ, ""); err != nil {
 		t.Fatalf("readValue(%q): %v", input, err)
 	}
 	return r.events
@@ -152,7 +152,7 @@ func TestReadNilValue(t *testing.T) {
 
 func TestReadNilNonNullableError(t *testing.T) {
 	r := newReader(strings.NewReader("nil"))
-	err := r.readValue(scalarType(TypeStr))
+	err := r.readValue(scalarType(TypeStr), "")
 	if err == nil {
 		t.Fatal("expected error for nil on non-nullable type")
 	}
@@ -191,7 +191,7 @@ func TestReadAtomValues(t *testing.T) {
 
 func TestReadAtomValueInvalid(t *testing.T) {
 	r := newReader(strings.NewReader("test"))
-	err := r.readValue(atomSetType("dev", "staging", "prod"))
+	err := r.readValue(atomSetType("dev", "staging", "prod"), "")
 	if err == nil {
 		t.Fatal("expected error for invalid atom value")
 	}
@@ -259,7 +259,7 @@ func TestReadStructTooFewFields(t *testing.T) {
 		field("c", scalarType(TypeInt)),
 	)
 	r := newReader(strings.NewReader("{ 1, 2 }"))
-	err := r.readValue(typ)
+	err := r.readValue(typ, "")
 	if err == nil {
 		t.Fatal("expected error for too few struct fields")
 	}
@@ -329,7 +329,7 @@ func TestReadTupleTrailingSep(t *testing.T) {
 func TestReadTupleTooFewElements(t *testing.T) {
 	typ := tupleType(scalarType(TypeInt), scalarType(TypeInt), scalarType(TypeInt))
 	r := newReader(strings.NewReader("(1, 2)"))
-	err := r.readValue(typ)
+	err := r.readValue(typ, "")
 	if err == nil {
 		t.Fatal("expected error for too few tuple elements")
 	}
@@ -449,7 +449,7 @@ func TestReadMapTrailingSep(t *testing.T) {
 func TestReadMapDuplicateKeyError(t *testing.T) {
 	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
 	r := newReader(strings.NewReader("< 'a' = 1, 'a' = 2 >"))
-	err := r.readValue(typ)
+	err := r.readValue(typ, "")
 	if err == nil {
 		t.Fatal("expected error for duplicate map key")
 	}

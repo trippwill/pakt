@@ -13,12 +13,8 @@ linters:
     - unused
     - ineffassign
     - misspell
-
-linters-settings:
-  errcheck:
-    exclude-functions:
-      - (io.Closer).Close
-      - (*bufio.Reader).UnreadByte
-
-issues:
-  exclude-use-default: true
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (*bufio.Reader).UnreadByte

@@ -255,7 +255,7 @@ func BenchmarkJSONDecodeSmall(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v map[string]any
-		json.Unmarshal(data, &v)
+		json.Unmarshal(data, &v) //nolint:errcheck
 	}
 }
 
@@ -268,7 +268,7 @@ func BenchmarkPAKTEncodeSmall(b *testing.B) {
 		buf.Reset()
 		enc := NewEncoder(&buf)
 		for _, f := range fs {
-			enc.Encode(f.name, f.typ, f.val)
+			enc.Encode(f.name, f.typ, f.val) //nolint:errcheck
 		}
 	}
 }
@@ -280,7 +280,7 @@ func BenchmarkJSONEncodeSmall(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
-		json.NewEncoder(&buf).Encode(val)
+		json.NewEncoder(&buf).Encode(val) //nolint:errcheck
 	}
 }
 
@@ -289,7 +289,7 @@ func BenchmarkPAKTMarshalSmall(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Marshal("doc", val)
+		Marshal("doc", val) //nolint:errcheck
 	}
 }
 
@@ -298,7 +298,7 @@ func BenchmarkJSONMarshalSmall(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(val)
+		json.Marshal(val) //nolint:errcheck
 	}
 }
 
@@ -308,7 +308,7 @@ func BenchmarkPAKTUnmarshalSmall(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v benchSmallDoc
-		Unmarshal(data, &v)
+		Unmarshal(data, &v) //nolint:errcheck
 	}
 }
 
@@ -318,7 +318,7 @@ func BenchmarkJSONUnmarshalSmall(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v benchSmallDoc
-		json.Unmarshal(data, &v)
+		json.Unmarshal(data, &v) //nolint:errcheck
 	}
 }
 
@@ -347,7 +347,7 @@ func BenchmarkJSONDecodeWide(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v map[string]any
-		json.Unmarshal(data, &v)
+		json.Unmarshal(data, &v) //nolint:errcheck
 	}
 }
 
@@ -360,7 +360,7 @@ func BenchmarkPAKTEncodeWide(b *testing.B) {
 		buf.Reset()
 		enc := NewEncoder(&buf)
 		for _, f := range fs {
-			enc.Encode(f.name, f.typ, f.val)
+			enc.Encode(f.name, f.typ, f.val) //nolint:errcheck
 		}
 	}
 }
@@ -372,7 +372,7 @@ func BenchmarkJSONEncodeWide(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
-		json.NewEncoder(&buf).Encode(val)
+		json.NewEncoder(&buf).Encode(val) //nolint:errcheck
 	}
 }
 
@@ -401,7 +401,7 @@ func BenchmarkJSONDecodeDeep(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v map[string]any
-		json.Unmarshal(data, &v)
+		json.Unmarshal(data, &v) //nolint:errcheck
 	}
 }
 
@@ -414,7 +414,7 @@ func BenchmarkPAKTEncodeDeep(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
 		enc := NewEncoder(&buf)
-		enc.Encode("root", typ, val)
+		enc.Encode("root", typ, val) //nolint:errcheck
 	}
 }
 
@@ -425,7 +425,7 @@ func BenchmarkJSONEncodeDeep(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
-		json.NewEncoder(&buf).Encode(val)
+		json.NewEncoder(&buf).Encode(val) //nolint:errcheck
 	}
 }
 
@@ -454,7 +454,7 @@ func BenchmarkJSONDecodeLargeList(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v map[string]any
-		json.Unmarshal(data, &v)
+		json.Unmarshal(data, &v) //nolint:errcheck
 	}
 }
 
@@ -467,7 +467,7 @@ func BenchmarkPAKTEncodeLargeList(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
 		enc := NewEncoder(&buf)
-		enc.Encode("numbers", typ, val)
+		enc.Encode("numbers", typ, val) //nolint:errcheck
 	}
 }
 
@@ -478,7 +478,7 @@ func BenchmarkJSONEncodeLargeList(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
-		json.NewEncoder(&buf).Encode(val)
+		json.NewEncoder(&buf).Encode(val) //nolint:errcheck
 	}
 }
 
@@ -507,7 +507,7 @@ func BenchmarkJSONDecodeLargeMap(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v map[string]any
-		json.Unmarshal(data, &v)
+		json.Unmarshal(data, &v) //nolint:errcheck
 	}
 }
 
@@ -520,7 +520,7 @@ func BenchmarkPAKTEncodeLargeMap(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
 		enc := NewEncoder(&buf)
-		enc.Encode("data", typ, val)
+		enc.Encode("data", typ, val) //nolint:errcheck
 	}
 }
 
@@ -531,6 +531,6 @@ func BenchmarkJSONEncodeLargeMap(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
-		json.NewEncoder(&buf).Encode(val)
+		json.NewEncoder(&buf).Encode(val) //nolint:errcheck
 	}
 }

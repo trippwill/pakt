@@ -334,10 +334,10 @@ func TestUnmarshalTimeTime(t *testing.T) {
 
 func TestUnmarshalRoundTrip(t *testing.T) {
 	type Config struct {
-		Host   string `pakt:"host"`
-		Port   int64  `pakt:"port"`
-		Debug  bool   `pakt:"debug"`
-		Rate   float64 `pakt:"rate"`
+		Host  string  `pakt:"host"`
+		Port  int64   `pakt:"port"`
+		Debug bool    `pakt:"debug"`
+		Rate  float64 `pakt:"rate"`
 	}
 
 	original := Config{

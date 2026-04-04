@@ -16,7 +16,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	binaryPath = filepath.Join(dir, "pakt")
 	cmd := exec.Command("go", "build", "-o", binaryPath, ".")
@@ -116,7 +116,7 @@ func TestParseStdin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("opening test file: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	cmd := exec.Command(binaryPath, "parse", "-")
 	cmd.Stdin = f

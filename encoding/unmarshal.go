@@ -264,10 +264,11 @@ func parseIntLiteral(raw string) (int64, error) {
 	}
 
 	neg := false
-	if s[0] == '-' {
+	switch s[0] {
+	case '-':
 		neg = true
 		s = s[1:]
-	} else if s[0] == '+' {
+	case '+':
 		s = s[1:]
 	}
 
@@ -617,9 +618,10 @@ func skipValue(events []Event, i int) (int, error) {
 		depth := 1
 		i++
 		for i < len(events) && depth > 0 {
-			if events[i].Kind == EventCompositeStart {
+			switch events[i].Kind {
+			case EventCompositeStart:
 				depth++
-			} else if events[i].Kind == EventCompositeEnd {
+			case EventCompositeEnd:
 				depth--
 			}
 			i++

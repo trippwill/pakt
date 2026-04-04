@@ -1,14 +1,13 @@
 # Cloudflare Pages configuration
-# https://developers.cloudflare.com/pages/configuration/wrangler-configuration/
+# Build command and output directory are configured in the CF Pages dashboard:
+#   Build command: cd site && hugo --minify
+#   Output directory: site/public
+#   Environment variable: HUGO_VERSION = 0.147.1
+#
+# This file configures the static asset serving.
 
 name = "pakt"
+compatibility_date = "2026-04-04"
 
-[pages.build]
-command = "cd site && hugo --minify"
-output_directory = "site/public"
-
-[pages.build.environment]
-HUGO_VERSION = "0.147.1"
-
-[pages.deployment]
-production_branch = "main"
+[assets]
+directory = "./site/public"

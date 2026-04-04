@@ -4,16 +4,30 @@ package encoding
 // Type annotation reading
 // ---------------------------------------------------------------------------
 
-var scalarKeywords = map[string]TypeKind{
-	"str":      TypeStr,
-	"int":      TypeInt,
-	"dec":      TypeDec,
-	"float":    TypeFloat,
-	"bool":     TypeBool,
-	"uuid":     TypeUUID,
-	"date":     TypeDate,
-	"time":     TypeTime,
-	"datetime": TypeDateTime,
+// lookupScalarType maps a scalar keyword to its TypeKind.
+func lookupScalarType(name string) (TypeKind, bool) {
+	switch name {
+	case "str":
+		return TypeStr, true
+	case "int":
+		return TypeInt, true
+	case "dec":
+		return TypeDec, true
+	case "float":
+		return TypeFloat, true
+	case "bool":
+		return TypeBool, true
+	case "uuid":
+		return TypeUUID, true
+	case "date":
+		return TypeDate, true
+	case "time":
+		return TypeTime, true
+	case "datetime":
+		return TypeDateTime, true
+	default:
+		return 0, false
+	}
 }
 
 // readTypeAnnot reads ':' type '?'?. The colon must be the next byte (no
@@ -65,7 +79,7 @@ func (r *reader) readScalarType() (Type, error) {
 	if err != nil {
 		return Type{}, err
 	}
-	kind, ok := scalarKeywords[ident]
+	kind, ok := lookupScalarType(ident)
 	if !ok {
 		return Type{}, r.errorf("unknown scalar type %q", ident)
 	}

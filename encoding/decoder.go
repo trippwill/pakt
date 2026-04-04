@@ -35,6 +35,15 @@ func (d *Decoder) SetSpec(r io.Reader) error {
 	return nil
 }
 
+// Close releases internal resources (such as pooled buffers) back to their
+// pools. Callers should defer Close after creating a Decoder. It is safe to
+// call Close multiple times.
+func (d *Decoder) Close() {
+	if d.r != nil {
+		d.r.release()
+	}
+}
+
 // Decode reads the next event from the PAKT stream.
 //
 // On each call it returns the next [Event] in document order. When the
@@ -68,14 +77,17 @@ func (d *Decoder) Decode() (Event, error) {
 	if err != nil {
 		if err == io.EOF {
 			d.done = true
+			d.r.release()
 			return Event{}, io.EOF
 		}
 		d.done = true
+		d.r.release()
 		return Event{}, err
 	}
 
 	if len(d.r.events) == 0 {
 		d.done = true
+		d.r.release()
 		return Event{}, io.EOF
 	}
 

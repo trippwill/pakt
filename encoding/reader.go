@@ -5,8 +5,16 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
+
+// bufPool reuses bufio.Readers to avoid 4KB allocations per Decoder.
+var bufPool = sync.Pool{
+	New: func() any {
+		return bufio.NewReaderSize(nil, 4096)
+	},
+}
 
 // reader is the hybrid lexer/parser that reads PAKT input directly from bytes
 // and emits Events. It is unexported; the public API is [Decoder].
@@ -17,13 +25,26 @@ type reader struct {
 	bomChecked bool
 	events     []Event
 	seen       map[string]struct{}
+	sb         strings.Builder // reusable builder to avoid per-read allocations
 }
 
 func newReader(r io.Reader) *reader {
+	br := bufPool.Get().(*bufio.Reader)
+	br.Reset(r)
 	return &reader{
-		buf:  bufio.NewReader(r),
-		pos:  Pos{Line: 1, Col: 1},
-		seen: make(map[string]struct{}),
+		buf:    br,
+		pos:    Pos{Line: 1, Col: 1},
+		events: make([]Event, 0, 16),
+		seen:   make(map[string]struct{}, 16),
+	}
+}
+
+// release returns the pooled bufio.Reader.
+func (r *reader) release() {
+	if r.buf != nil {
+		r.buf.Reset(nil)
+		bufPool.Put(r.buf)
+		r.buf = nil
 	}
 }
 
@@ -213,8 +234,8 @@ func (r *reader) readIdent() (string, error) {
 		return "", r.errorf("expected identifier, got %q", rune(b))
 	}
 
-	var sb strings.Builder
-	sb.WriteByte(b)
+	r.sb.Reset()
+	r.sb.WriteByte(b)
 	for {
 		b, err = r.peekByte()
 		if err != nil {
@@ -222,12 +243,12 @@ func (r *reader) readIdent() (string, error) {
 		}
 		if isAlpha(b) || isDigit(b) || b == '_' || b == '-' {
 			r.readByte() //nolint:errcheck
-			sb.WriteByte(b)
+			r.sb.WriteByte(b)
 		} else {
 			break
 		}
 	}
-	return sb.String(), nil
+	return r.sb.String(), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -253,21 +274,21 @@ func (r *reader) readString() (string, error) {
 	}
 
 	// Single-line string.
-	var sb strings.Builder
+	r.sb.Reset()
 	for {
 		b, err := r.readByte()
 		if err != nil {
 			return "", r.wrapf(ErrUnexpectedEOF, "unterminated string")
 		}
 		if b == quote {
-			return sb.String(), nil
+			return r.sb.String(), nil
 		}
 		if b == '\\' {
 			ch, err := r.readEscape()
 			if err != nil {
 				return "", err
 			}
-			sb.WriteRune(ch)
+			r.sb.WriteRune(ch)
 			continue
 		}
 		if b == '\n' {
@@ -276,7 +297,7 @@ func (r *reader) readString() (string, error) {
 		if b == 0 {
 			return "", r.errorf("null byte in string")
 		}
-		sb.WriteByte(b)
+		r.sb.WriteByte(b)
 	}
 }
 
@@ -369,15 +390,15 @@ func (r *reader) readMultiLineString(quote byte) (string, error) {
 	}
 
 	// Strip baseline indentation and process escapes.
-	var result strings.Builder
+	r.sb.Reset()
 	for i, line := range rawLines {
 		if i > 0 {
-			result.WriteByte('\n')
+			r.sb.WriteByte('\n')
 		}
 		// Blank lines are exempt from the indentation check.
 		if strings.TrimSpace(line) == "" {
 			if len(line) > baseline {
-				result.WriteString(line[baseline:])
+				r.sb.WriteString(line[baseline:])
 			}
 			continue
 		}
@@ -390,27 +411,27 @@ func (r *reader) readMultiLineString(quote byte) (string, error) {
 		if perr != "" {
 			return "", r.errorf("%s", perr)
 		}
-		result.WriteString(processed)
+		r.sb.WriteString(processed)
 	}
-	return result.String(), nil
+	return r.sb.String(), nil
 }
 
 // readRawLine reads bytes until a newline (or EOF) without escape processing.
 // If bytes were read before EOF, the partial line is returned without error.
 func (r *reader) readRawLine() (string, error) {
-	var sb strings.Builder
+	r.sb.Reset()
 	for {
 		b, err := r.readByte()
 		if err != nil {
-			if sb.Len() > 0 {
-				return sb.String(), nil
+			if r.sb.Len() > 0 {
+				return r.sb.String(), nil
 			}
 			return "", err
 		}
 		if b == '\n' {
-			return sb.String(), nil
+			return r.sb.String(), nil
 		}
-		sb.WriteByte(b)
+		r.sb.WriteByte(b)
 	}
 }
 
@@ -603,12 +624,12 @@ func (r *reader) readPrefixedDigits(sb *strings.Builder, check func(byte) bool) 
 
 // readInt reads INT = ['-'] DIGIT_SEP | ['-'] '0x' HEX_SEP | etc.
 func (r *reader) readInt() (string, error) {
-	var sb strings.Builder
+	r.sb.Reset()
 
 	// Optional negative sign.
 	if b, err := r.peekByte(); err == nil && b == '-' {
 		r.readByte() //nolint:errcheck
-		sb.WriteByte('-')
+		r.sb.WriteByte('-')
 	}
 
 	// Peek at first digit.
@@ -622,31 +643,31 @@ func (r *reader) readInt() (string, error) {
 
 	if first == '0' {
 		r.readByte() //nolint:errcheck
-		sb.WriteByte('0')
+		r.sb.WriteByte('0')
 		// Check for base prefix.
 		if b, err := r.peekByte(); err == nil {
 			switch b {
 			case 'x':
 				r.readByte() //nolint:errcheck
-				sb.WriteByte('x')
-				if err := r.readPrefixedDigits(&sb, isHex); err != nil {
+				r.sb.WriteByte('x')
+				if err := r.readPrefixedDigits(&r.sb, isHex); err != nil {
 					return "", err
 				}
-				return sb.String(), nil
+				return r.sb.String(), nil
 			case 'b':
 				r.readByte() //nolint:errcheck
-				sb.WriteByte('b')
-				if err := r.readPrefixedDigits(&sb, isBin); err != nil {
+				r.sb.WriteByte('b')
+				if err := r.readPrefixedDigits(&r.sb, isBin); err != nil {
 					return "", err
 				}
-				return sb.String(), nil
+				return r.sb.String(), nil
 			case 'o':
 				r.readByte() //nolint:errcheck
-				sb.WriteByte('o')
-				if err := r.readPrefixedDigits(&sb, isOct); err != nil {
+				r.sb.WriteByte('o')
+				if err := r.readPrefixedDigits(&r.sb, isOct); err != nil {
 					return "", err
 				}
-				return sb.String(), nil
+				return r.sb.String(), nil
 			}
 		}
 		// Plain decimal that starts with 0. Continue reading digits.
@@ -657,19 +678,19 @@ func (r *reader) readInt() (string, error) {
 			}
 			if isDigit(b) || b == '_' {
 				r.readByte() //nolint:errcheck
-				sb.WriteByte(b)
+				r.sb.WriteByte(b)
 			} else {
 				break
 			}
 		}
-		return sb.String(), nil
+		return r.sb.String(), nil
 	}
 
 	// Regular decimal DIGIT_SEP.
-	if err := r.readDigitSep(&sb); err != nil {
+	if err := r.readDigitSep(&r.sb); err != nil {
 		return "", err
 	}
-	return sb.String(), nil
+	return r.sb.String(), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -678,23 +699,23 @@ func (r *reader) readInt() (string, error) {
 
 // readDec reads DEC = ['-'] DIGIT_SEP '.' DIGIT_SEP.
 func (r *reader) readDec() (string, error) {
-	var sb strings.Builder
+	r.sb.Reset()
 
 	if b, err := r.peekByte(); err == nil && b == '-' {
 		r.readByte() //nolint:errcheck
-		sb.WriteByte('-')
+		r.sb.WriteByte('-')
 	}
-	if err := r.readDigitSep(&sb); err != nil {
+	if err := r.readDigitSep(&r.sb); err != nil {
 		return "", err
 	}
 	if err := r.expectByte('.'); err != nil {
 		return "", err
 	}
-	sb.WriteByte('.')
-	if err := r.readDigitSep(&sb); err != nil {
+	r.sb.WriteByte('.')
+	if err := r.readDigitSep(&r.sb); err != nil {
 		return "", err
 	}
-	return sb.String(), nil
+	return r.sb.String(), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -703,21 +724,21 @@ func (r *reader) readDec() (string, error) {
 
 // readFloat reads FLOAT = ['-'] DIGIT_SEP ('.' DIGIT_SEP)? ('e'|'E') [+-]? DIGIT+.
 func (r *reader) readFloat() (string, error) {
-	var sb strings.Builder
+	r.sb.Reset()
 
 	if b, err := r.peekByte(); err == nil && b == '-' {
 		r.readByte() //nolint:errcheck
-		sb.WriteByte('-')
+		r.sb.WriteByte('-')
 	}
-	if err := r.readDigitSep(&sb); err != nil {
+	if err := r.readDigitSep(&r.sb); err != nil {
 		return "", err
 	}
 
 	// Optional '.' DIGIT_SEP.
 	if b, err := r.peekByte(); err == nil && b == '.' {
 		r.readByte() //nolint:errcheck
-		sb.WriteByte('.')
-		if err := r.readDigitSep(&sb); err != nil {
+		r.sb.WriteByte('.')
+		if err := r.readDigitSep(&r.sb); err != nil {
 			return "", err
 		}
 	}
@@ -731,12 +752,12 @@ func (r *reader) readFloat() (string, error) {
 		return "", r.errorf("expected exponent ('e' or 'E') in float, got %q", rune(b))
 	}
 	r.readByte() //nolint:errcheck
-	sb.WriteByte(b)
+	r.sb.WriteByte(b)
 
 	// Optional sign.
 	if b, err := r.peekByte(); err == nil && (b == '+' || b == '-') {
 		r.readByte() //nolint:errcheck
-		sb.WriteByte(b)
+		r.sb.WriteByte(b)
 	}
 
 	// DIGIT+ (no underscores in exponent per spec).
@@ -747,7 +768,7 @@ func (r *reader) readFloat() (string, error) {
 			break
 		}
 		r.readByte() //nolint:errcheck
-		sb.WriteByte(b)
+		r.sb.WriteByte(b)
 		count++
 	}
 	if count == 0 {
@@ -757,7 +778,7 @@ func (r *reader) readFloat() (string, error) {
 			return "", r.errorf("expected digits in float exponent, got %q", rune(b))
 		}
 	}
-	return sb.String(), nil
+	return r.sb.String(), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -794,52 +815,52 @@ func (r *reader) readNil() error {
 
 // readDate reads DATE = DIGIT{4}-DIGIT{2}-DIGIT{2}.
 func (r *reader) readDate() (string, error) {
-	var sb strings.Builder
-	if err := r.readExactDigits(&sb, 4); err != nil {
+	r.sb.Reset()
+	if err := r.readExactDigits(&r.sb, 4); err != nil {
 		return "", err
 	}
 	if err := r.expectByte('-'); err != nil {
 		return "", err
 	}
-	sb.WriteByte('-')
-	if err := r.readExactDigits(&sb, 2); err != nil {
+	r.sb.WriteByte('-')
+	if err := r.readExactDigits(&r.sb, 2); err != nil {
 		return "", err
 	}
 	if err := r.expectByte('-'); err != nil {
 		return "", err
 	}
-	sb.WriteByte('-')
-	if err := r.readExactDigits(&sb, 2); err != nil {
+	r.sb.WriteByte('-')
+	if err := r.readExactDigits(&r.sb, 2); err != nil {
 		return "", err
 	}
-	return sb.String(), nil
+	return r.sb.String(), nil
 }
 
 // readTime reads TIME = DIGIT{2}:DIGIT{2}:DIGIT{2}(.DIGIT+)? TZ.
 func (r *reader) readTime() (string, error) {
-	var sb strings.Builder
-	if err := r.readExactDigits(&sb, 2); err != nil {
+	r.sb.Reset()
+	if err := r.readExactDigits(&r.sb, 2); err != nil {
 		return "", err
 	}
 	if err := r.expectByte(':'); err != nil {
 		return "", err
 	}
-	sb.WriteByte(':')
-	if err := r.readExactDigits(&sb, 2); err != nil {
+	r.sb.WriteByte(':')
+	if err := r.readExactDigits(&r.sb, 2); err != nil {
 		return "", err
 	}
 	if err := r.expectByte(':'); err != nil {
 		return "", err
 	}
-	sb.WriteByte(':')
-	if err := r.readExactDigits(&sb, 2); err != nil {
+	r.sb.WriteByte(':')
+	if err := r.readExactDigits(&r.sb, 2); err != nil {
 		return "", err
 	}
 
 	// Optional fractional seconds.
 	if b, err := r.peekByte(); err == nil && b == '.' {
 		r.readByte() //nolint:errcheck
-		sb.WriteByte('.')
+		r.sb.WriteByte('.')
 		count := 0
 		for {
 			b, err := r.peekByte()
@@ -847,7 +868,7 @@ func (r *reader) readTime() (string, error) {
 				break
 			}
 			r.readByte() //nolint:errcheck
-			sb.WriteByte(b)
+			r.sb.WriteByte(b)
 			count++
 		}
 		if count == 0 {
@@ -867,44 +888,44 @@ func (r *reader) readTime() (string, error) {
 	switch b {
 	case 'Z':
 		r.readByte() //nolint:errcheck
-		sb.WriteByte('Z')
+		r.sb.WriteByte('Z')
 	case '+', '-':
 		r.readByte() //nolint:errcheck
-		sb.WriteByte(b)
-		if err := r.readExactDigits(&sb, 2); err != nil {
+		r.sb.WriteByte(b)
+		if err := r.readExactDigits(&r.sb, 2); err != nil {
 			return "", err
 		}
 		if err := r.expectByte(':'); err != nil {
 			return "", err
 		}
-		sb.WriteByte(':')
-		if err := r.readExactDigits(&sb, 2); err != nil {
+		r.sb.WriteByte(':')
+		if err := r.readExactDigits(&r.sb, 2); err != nil {
 			return "", err
 		}
 	default:
 		return "", r.errorf("expected timezone (Z or ±HH:MM) in time, got %q", rune(b))
 	}
-	return sb.String(), nil
+	return r.sb.String(), nil
 }
 
 // readDateTime reads DATETIME = DATE 'T' TIME.
 func (r *reader) readDateTime() (string, error) {
-	var sb strings.Builder
 	date, err := r.readDate()
 	if err != nil {
 		return "", err
 	}
-	sb.WriteString(date)
 	if err := r.expectByte('T'); err != nil {
 		return "", err
 	}
-	sb.WriteByte('T')
 	t, err := r.readTime()
 	if err != nil {
 		return "", err
 	}
-	sb.WriteString(t)
-	return sb.String(), nil
+	r.sb.Reset()
+	r.sb.WriteString(date)
+	r.sb.WriteByte('T')
+	r.sb.WriteString(t)
+	return r.sb.String(), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -913,20 +934,20 @@ func (r *reader) readDateTime() (string, error) {
 
 // readUUID reads UUID = HEX{8}-HEX{4}-HEX{4}-HEX{4}-HEX{12}.
 func (r *reader) readUUID() (string, error) {
-	var sb strings.Builder
+	r.sb.Reset()
 	segments := [5]int{8, 4, 4, 4, 12}
 	for i, n := range segments {
 		if i > 0 {
 			if err := r.expectByte('-'); err != nil {
 				return "", err
 			}
-			sb.WriteByte('-')
+			r.sb.WriteByte('-')
 		}
-		if err := r.readExactHex(&sb, n); err != nil {
+		if err := r.readExactHex(&r.sb, n); err != nil {
 			return "", err
 		}
 	}
-	return sb.String(), nil
+	return r.sb.String(), nil
 }
 
 // ---------------------------------------------------------------------------

@@ -402,12 +402,15 @@ func (d *Decoder) decodeWithSpec() (Event, error) {
 				// Document fully consumed. Check for missing spec fields.
 				if missingErr := d.checkMissingSpecFields(); missingErr != nil {
 					d.done = true
+					d.r.release()
 					return Event{}, missingErr
 				}
 				d.done = true
+				d.r.release()
 				return Event{}, io.EOF
 			}
 			d.done = true
+			d.r.release()
 			return Event{}, err
 		}
 

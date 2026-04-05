@@ -14,6 +14,10 @@ import (
 // Unmarshal parses PAKT data and stores the result in the value pointed to by v.
 // v must be a pointer to a struct. Each top-level PAKT statement is matched
 // to struct fields by name (using pakt struct tags or lowercase field names).
+//
+// Unmarshal uses an optimized path that reads directly from the input byte slice
+// without buffering, and populates struct fields via a visitor-driven parser that
+// bypasses Event creation. For streaming use cases, prefer [Decoder.UnmarshalNext].
 func Unmarshal(data []byte, v any) error {
 	if v == nil {
 		return fmt.Errorf("pakt: Unmarshal requires a non-nil pointer")

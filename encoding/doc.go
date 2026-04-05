@@ -23,6 +23,24 @@
 // struct tags (`pakt:"name"`) for field mapping. [Encoder] provides low-level
 // control over output formatting.
 //
+// # Streaming Unmarshal
+//
+// For large datasets, [Decoder.UnmarshalNext] reads one top-level statement at a
+// time and populates a Go value directly — no intermediate Event objects are
+// created. Combined with [Decoder.More], this enables constant-memory processing
+// of arbitrarily large stream (<<) statements:
+//
+//	dec := encoding.NewDecoder(r)
+//	defer dec.Close()
+//	for dec.More() {
+//	    var entry MyStruct
+//	    if err := dec.UnmarshalNext(&entry); err != nil { ... }
+//	    process(entry)
+//	}
+//
+// [Unmarshal] uses an optimized path that reads directly from the input []byte
+// without buffering overhead.
+//
 // # Errors
 //
 // Parse errors are reported as [*ParseError] with source position and a

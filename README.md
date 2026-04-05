@@ -55,6 +55,51 @@ pakt validate data.pakt
 import "github.com/trippwill/pakt/encoding"
 ```
 
+### Unmarshal
+
+```go
+type Config struct {
+    Host string `pakt:"host"`
+    Port int    `pakt:"port"`
+}
+
+data := []byte("host:str = 'localhost'\nport:int = 8080")
+var cfg Config
+if err := encoding.Unmarshal(data, &cfg); err != nil {
+    log.Fatal(err)
+}
+```
+
+### Streaming Decode (Events)
+
+```go
+dec := encoding.NewDecoder(reader)
+defer dec.Close()
+for {
+    ev, err := dec.Decode()
+    if err == io.EOF { break }
+    fmt.Println(ev.Kind, ev.Name, ev.Value)
+}
+```
+
+### Streaming Unmarshal (large datasets)
+
+Process stream entries one at a time with constant memory:
+
+```go
+dec := encoding.NewDecoder(reader)
+defer dec.Close()
+
+// Read top-level fields into a struct
+for dec.More() {
+    var entry FSEntry
+    if err := dec.UnmarshalNext(&entry); err != nil {
+        break
+    }
+    process(entry)
+}
+```
+
 ## Documentation
 
 - [PAKT Specification](spec/pakt-v0.md) — formal grammar and semantics

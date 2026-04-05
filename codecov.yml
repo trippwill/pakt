@@ -1,0 +1,25 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+    patch:
+      default:
+        target: 70%
+
+ignore:
+  - "main.go"
+  - "cli.go"
+  - "cli_test.go"
+  - "site/**"
+  - "testdata/**"
+  - "encoding/bench_test.go"
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true

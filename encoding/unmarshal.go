@@ -20,7 +20,7 @@ func Unmarshal(data []byte, v any) error {
 		return fmt.Errorf("pakt: Unmarshal requires a non-nil pointer")
 	}
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
+	if rv.Kind() != reflect.Pointer {
 		return fmt.Errorf("pakt: Unmarshal requires a pointer, got %s", rv.Type())
 	}
 	if rv.IsNil() {
@@ -223,7 +223,7 @@ func setScalar(target reflect.Value, scalarType TypeKind, rawValue string) error
 
 // setNil sets a value to its zero value, or nil for pointers/maps/slices.
 func setNil(target reflect.Value) error {
-	if target.Kind() == reflect.Ptr || target.Kind() == reflect.Map ||
+	if target.Kind() == reflect.Pointer || target.Kind() == reflect.Map ||
 		target.Kind() == reflect.Slice || target.Kind() == reflect.Interface {
 		target.Set(reflect.Zero(target.Type()))
 		return nil
@@ -234,7 +234,7 @@ func setNil(target reflect.Value) error {
 
 // allocPtr allocates through pointer indirections.
 func allocPtr(v reflect.Value) reflect.Value {
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			v.Set(reflect.New(v.Type().Elem()))
 		}

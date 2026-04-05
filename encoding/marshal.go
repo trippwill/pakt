@@ -50,7 +50,7 @@ func marshal(name string, v any, indent string) ([]byte, error) {
 // using struct tag info to map fields.
 func prepareValue(typ Type, v reflect.Value) (any, error) {
 	// Dereference pointers.
-	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
+	for v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
 		if v.IsNil() {
 			return nil, nil
 		}
@@ -195,7 +195,7 @@ func prepareMap(typ Type, v reflect.Value) (map[any]any, error) {
 // isZero reports whether v is the zero value for its type.
 func isZero(v reflect.Value) bool {
 	switch v.Kind() {
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		return v.IsNil()
 	case reflect.Slice, reflect.Map:
 		return v.IsNil() || v.Len() == 0

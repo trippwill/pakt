@@ -26,8 +26,34 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <p>&copy; {{ now.Year }} PAKT contributors &middot; <a href="{{ site.Params.repo }}">GitHub</a> &middot; <a href="https://opensource.org/licenses/MIT">MIT License</a></p>
+      <p><span class="spec-badge">PAKT 0 Draft</span> &middot; &copy; {{ now.Year }} PAKT contributors &middot; <a href="{{ site.Params.repo }}">GitHub</a> &middot; <a href="https://opensource.org/licenses/MIT">MIT License</a></p>
     </div>
   </footer>
+
+  <script>
+  /* Code block copy buttons */
+  (function() {
+    document.querySelectorAll('.docs-content pre, .install-section pre, .content-inner pre').forEach(function(pre) {
+      var btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = 'Copy';
+      btn.setAttribute('aria-label', 'Copy code to clipboard');
+      pre.style.position = 'relative';
+      pre.appendChild(btn);
+      btn.addEventListener('click', function() {
+        var code = pre.querySelector('code');
+        var text = code ? code.textContent : pre.textContent;
+        navigator.clipboard.writeText(text).then(function() {
+          btn.textContent = 'Copied!';
+          btn.classList.add('copied');
+          setTimeout(function() {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+          }, 1500);
+        });
+      });
+    });
+  })();
+  </script>
 </body>
 </html>

@@ -98,7 +98,7 @@ code {
 
 /* ===== Hero ===== */
 .hero {
-  background: #1a1a2e;
+  background: radial-gradient(ellipse at 50% 0%, #252550 0%, #1a1a2e 70%);
   color: #e8e8f0;
   padding: 4rem 1.5rem;
   text-align: center;
@@ -150,6 +150,16 @@ code {
   color: #d4d4e8;
 }
 
+/* PAKT syntax highlighting */
+.pk-type { color: #e6a817; }
+.pk-op { color: #7089b0; }
+.pk-str { color: #98c379; }
+.pk-num { color: #d19a66; }
+.pk-bool { color: #c678dd; }
+.pk-name { color: #d4d4e8; }
+.pk-delim { color: #b8b8cc; }
+.pk-comment { color: #5c6370; font-style: italic; }
+
 .hero-actions {
   display: flex;
   gap: 1rem;
@@ -197,7 +207,7 @@ code {
   max-width: 960px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 2rem;
 }
 
@@ -206,6 +216,12 @@ code {
   border: 1px solid #e4e4e8;
   border-radius: 8px;
   padding: 1.75rem;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .feature-card h3 {
@@ -485,6 +501,129 @@ code {
   color: #e6a817;
 }
 
+/* ===== Comparison Section ===== */
+.comparison-section {
+  padding: 4rem 1.5rem;
+  background: #fff;
+  border-top: 1px solid #eee;
+}
+
+.comparison-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.comparison-inner h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 2rem;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.comparison-col h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.comparison-col pre {
+  background: #1a1a2e;
+  color: #d4d4e8;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.comparison-col pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+}
+
+.comparison-caption {
+  font-size: 0.95rem;
+  color: #666;
+  font-style: italic;
+}
+
+/* ===== Copy Button ===== */
+.copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(255,255,255,0.1);
+  color: #a0a0b8;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.4;
+}
+
+.copy-btn:hover {
+  background: rgba(255,255,255,0.18);
+  color: #e6a817;
+}
+
+.copy-btn.copied {
+  background: rgba(230,168,23,0.2);
+  color: #e6a817;
+  border-color: rgba(230,168,23,0.3);
+}
+
+/* ===== Doc Anchor Links ===== */
+.docs-content h2,
+.docs-content h3 {
+  position: relative;
+}
+
+.docs-content h2::before,
+.docs-content h3::before {
+  content: '#';
+  opacity: 0;
+  margin-left: -1.2em;
+  padding-right: 0.3em;
+  color: #e6a817;
+  transition: opacity 0.15s;
+  position: absolute;
+}
+
+.docs-content h2:hover::before,
+.docs-content h3:hover::before {
+  opacity: 0.6;
+}
+
+/* ===== Footer Badge ===== */
+.spec-badge {
+  display: inline-block;
+  background: rgba(230,168,23,0.15);
+  color: #e6a817;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15em 0.6em;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .nav-toggle {
@@ -509,6 +648,10 @@ code {
   }
 
   .features-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-grid {
     grid-template-columns: 1fr;
   }
 

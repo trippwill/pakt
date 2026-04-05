@@ -3,6 +3,7 @@ package encoding
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // TypeKind identifies a scalar type in the PAKT type system.
@@ -125,15 +126,16 @@ type AtomSet struct {
 
 // String returns the PAKT syntax for the atom set.
 func (a *AtomSet) String() string {
-	s := "|"
+	var s strings.Builder
+	s.WriteString("|")
 	for i, m := range a.Members {
 		if i > 0 {
-			s += ", "
+			s.WriteString(", ")
 		}
-		s += m
+		s.WriteString(m)
 	}
-	s += "|"
-	return s
+	s.WriteString("|")
+	return s.String()
 }
 
 // StructType is a composite type with named, heterogeneously-typed fields.
@@ -143,15 +145,16 @@ type StructType struct {
 
 // String returns the PAKT syntax for the struct type.
 func (st *StructType) String() string {
-	s := "{"
+	var s strings.Builder
+	s.WriteString("{")
 	for i, f := range st.Fields {
 		if i > 0 {
-			s += ", "
+			s.WriteString(", ")
 		}
-		s += f.Name + ":" + f.Type.String()
+		s.WriteString(f.Name + ":" + f.Type.String())
 	}
-	s += "}"
-	return s
+	s.WriteString("}")
+	return s.String()
 }
 
 // Field describes a single field in a [StructType].
@@ -167,15 +170,16 @@ type TupleType struct {
 
 // String returns the PAKT syntax for the tuple type.
 func (tt *TupleType) String() string {
-	s := "("
+	var s strings.Builder
+	s.WriteString("(")
 	for i, e := range tt.Elements {
 		if i > 0 {
-			s += ", "
+			s.WriteString(", ")
 		}
-		s += e.String()
+		s.WriteString(e.String())
 	}
-	s += ")"
-	return s
+	s.WriteString(")")
+	return s.String()
 }
 
 // ListType is a homogeneous, variable-length sequence.

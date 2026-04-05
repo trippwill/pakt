@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -361,7 +362,7 @@ func (r *reader) readUnicodeEscape(n int) (rune, error) {
 	}
 	var val rune
 	var digits strings.Builder
-	for i := 0; i < n; i++ {
+	for range n {
 		b, err := r.readByte()
 		if err != nil {
 			return 0, r.wrapf(ErrUnexpectedEOF, "incomplete %s escape: found %q", prefix, prefix+digits.String())
@@ -666,7 +667,7 @@ func (r *reader) readDigitSep(sb *strings.Builder) error {
 
 // readExactDigits reads exactly n decimal digits.
 func (r *reader) readExactDigits(sb *strings.Builder, n int) error {
-	for i := 0; i < n; i++ {
+	for range n {
 		b, err := r.readByte()
 		if err != nil {
 			return r.wrapf(ErrUnexpectedEOF, "expected digit, got EOF")
@@ -682,7 +683,7 @@ func (r *reader) readExactDigits(sb *strings.Builder, n int) error {
 
 // readExactHex reads exactly n hex digits.
 func (r *reader) readExactHex(sb *strings.Builder, n int) error {
-	for i := 0; i < n; i++ {
+	for range n {
 		b, err := r.readByte()
 		if err != nil {
 			return r.wrapf(ErrUnexpectedEOF, "expected hex digit, got EOF")
@@ -1074,10 +1075,8 @@ func (r *reader) readAtom(allowed []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, a := range allowed {
-		if id == a {
-			return id, nil
-		}
+	if slices.Contains(allowed, id) {
+		return id, nil
 	}
 	return "", r.errorf("atom %q not in allowed set %v", id, allowed)
 }

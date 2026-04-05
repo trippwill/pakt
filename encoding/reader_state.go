@@ -234,15 +234,32 @@ func (sm *stateMachine) primeNextMatchedStatement(spec *Spec) (string, error) {
 	}
 }
 
-func (sm *stateMachine) streamTerminated() (bool, error) {
+// streamTerminated checks whether the stream has ended (EOF or next
+// top-level statement). The element type is needed to distinguish bare
+// identifiers that are atom-set values from identifiers that begin a
+// new statement header (IDENT COLON).
+func (sm *stateMachine) streamTerminated(elemCanBeIdent bool) (bool, error) {
 	sm.r.skipInsignificant(true)
-	if _, err := sm.r.peekByte(); err != nil {
+	b, err := sm.r.peekByte()
+	if err != nil {
 		if err == io.EOF {
 			return true, nil
 		}
 		return false, err
 	}
-	return sm.r.peekTopStatementStart(), nil
+	// If the next byte can't start an identifier, it's definitely a value.
+	if !isAlpha(b) && b != '_' {
+		return false, nil
+	}
+	// If the element type allows bare identifiers (atom set, bool, nil),
+	// the only way to distinguish "value" from "next statement" is to
+	// check for IDENT COLON. Fall back to a bounded peek.
+	if elemCanBeIdent {
+		return sm.r.peekIdentColon(), nil
+	}
+	// Element type cannot start with a bare identifier, so any IDENT
+	// here must be the start of the next statement.
+	return true, nil
 }
 
 func (sm *stateMachine) beginMapKeyValue(keyType Type, after parserState) (Event, bool, error) {
@@ -318,6 +335,21 @@ func scalarTypeKind(t Type) TypeKind {
 	}
 }
 
+// typeCanStartWithIdent reports whether values of the given type can
+// begin with a bare identifier character (alpha or underscore).
+func typeCanStartWithIdent(t Type) bool {
+	if t.Nullable {
+		return true // nil starts with 'n'
+	}
+	if t.AtomSet != nil {
+		return true
+	}
+	if t.Scalar != nil {
+		return *t.Scalar == TypeBool // true/false start with ident chars
+	}
+	return false
+}
+
 func (sm *stateMachine) step() (Event, error) {
 	for {
 		switch sm.state {
@@ -369,11 +401,11 @@ func (sm *stateMachine) step() (Event, error) {
 					}
 					sm.state = sm.currentChildResume()
 					return Event{
-						Kind:  EventScalarValue,
-						Pos:   pos,
-						Name:  name,
+						Kind:       EventScalarValue,
+						Pos:        pos,
+						Name:       name,
 						ScalarType: scalarTypeKind(typ),
-						Value: "nil",
+						Value:      "nil",
 					}, nil
 				}
 			} else if sm.r.peekNil() {
@@ -388,11 +420,11 @@ func (sm *stateMachine) step() (Event, error) {
 				}
 				sm.state = sm.currentChildResume()
 				return Event{
-					Kind:  EventScalarValue,
-					Pos:   pos,
-					Name:  name,
+					Kind:       EventScalarValue,
+					Pos:        pos,
+					Name:       name,
 					ScalarType: *typ.Scalar,
-					Value: val,
+					Value:      val,
 				}, nil
 
 			case typ.AtomSet != nil:
@@ -403,46 +435,46 @@ func (sm *stateMachine) step() (Event, error) {
 				}
 				sm.state = sm.currentChildResume()
 				return Event{
-					Kind:  EventScalarValue,
-					Pos:   pos,
-					Name:  name,
+					Kind:       EventScalarValue,
+					Pos:        pos,
+					Name:       name,
 					ScalarType: TypeAtom,
-					Value: val,
+					Value:      val,
 				}, nil
 
 			case typ.Struct != nil:
 				sm.push(frame{
-					kind:    frameStruct,
-					resume:  sm.currentChildResume(),
-					name:    name,
-					st:      typ.Struct,
+					kind:   frameStruct,
+					resume: sm.currentChildResume(),
+					name:   name,
+					st:     typ.Struct,
 				})
 				sm.state = stateStructOpen
 
 			case typ.Tuple != nil:
 				sm.push(frame{
-					kind:    frameTuple,
-					resume:  sm.currentChildResume(),
-					name:    name,
-					tt:      typ.Tuple,
+					kind:   frameTuple,
+					resume: sm.currentChildResume(),
+					name:   name,
+					tt:     typ.Tuple,
 				})
 				sm.state = stateTupleOpen
 
 			case typ.List != nil:
 				sm.push(frame{
-					kind:    frameList,
-					resume:  sm.currentChildResume(),
-					name:    name,
-					lt:      typ.List,
+					kind:   frameList,
+					resume: sm.currentChildResume(),
+					name:   name,
+					lt:     typ.List,
 				})
 				sm.state = stateListOpen
 
 			case typ.Map != nil:
 				sm.push(frame{
-					kind:    frameMap,
-					resume:  sm.currentChildResume(),
-					name:    name,
-					mt:      typ.Map,
+					kind:   frameMap,
+					resume: sm.currentChildResume(),
+					name:   name,
+					mt:     typ.Map,
 				})
 				sm.state = stateMapOpen
 
@@ -765,7 +797,7 @@ func (sm *stateMachine) step() (Event, error) {
 
 		case stateStreamListItem:
 			fr := sm.current()
-			done, err := sm.streamTerminated()
+			done, err := sm.streamTerminated(typeCanStartWithIdent(fr.lt.Element))
 			if err != nil {
 				return Event{}, err
 			}
@@ -788,7 +820,7 @@ func (sm *stateMachine) step() (Event, error) {
 				return Event{}, err
 			}
 			if !sep {
-				done, err := sm.streamTerminated()
+				done, err := sm.streamTerminated(typeCanStartWithIdent(fr.lt.Element))
 				if err != nil {
 					return Event{}, err
 				}
@@ -803,7 +835,7 @@ func (sm *stateMachine) step() (Event, error) {
 
 		case stateStreamMapKey:
 			fr := sm.current()
-			done, err := sm.streamTerminated()
+			done, err := sm.streamTerminated(typeCanStartWithIdent(fr.mt.Key))
 			if err != nil {
 				return Event{}, err
 			}
@@ -838,7 +870,8 @@ func (sm *stateMachine) step() (Event, error) {
 				return Event{}, err
 			}
 			if !sep {
-				done, err := sm.streamTerminated()
+				fr := sm.current()
+				done, err := sm.streamTerminated(typeCanStartWithIdent(fr.mt.Key))
 				if err != nil {
 					return Event{}, err
 				}

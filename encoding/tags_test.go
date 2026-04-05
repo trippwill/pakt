@@ -80,8 +80,8 @@ func TestTypeOf_ByteSlice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TypeOf([]byte): %v", err)
 	}
-	if got := typ.String(); got != "str" {
-		t.Errorf("TypeOf([]byte) = %s, want str", got)
+	if got := typ.String(); got != "bin" {
+		t.Errorf("TypeOf([]byte) = %s, want bin", got)
 	}
 }
 
@@ -114,8 +114,8 @@ func TestTypeOf_Map(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TypeOf(map[string]int): %v", err)
 	}
-	if got := typ.String(); got != "<str = int>" {
-		t.Errorf("TypeOf(map[string]int) = %s, want <str = int>", got)
+	if got := typ.String(); got != "<str ; int>" {
+		t.Errorf("TypeOf(map[string]int) = %s, want <str ; int>", got)
 	}
 }
 
@@ -269,7 +269,7 @@ func TestTypeOf_MapField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TypeOf(WithMap): %v", err)
 	}
-	want := "{labels:<str = str>}"
+	want := "{labels:<str ; str>}"
 	if got := typ.String(); got != want {
 		t.Errorf("TypeOf(WithMap) = %s, want %s", got, want)
 	}
@@ -430,7 +430,7 @@ func TestTypeOf_MapOfSlice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TypeOf(Config): %v", err)
 	}
-	want := "{hosts:<str = [str]>}"
+	want := "{hosts:<str ; [str]>}"
 	if got := typ.String(); got != want {
 		t.Errorf("TypeOf(Config) = %s, want %s", got, want)
 	}

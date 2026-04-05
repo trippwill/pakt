@@ -8,7 +8,7 @@
 
 PAKT documents are UTF-8. A BOM at the start is accepted but ignored.
 
-Everything is an assignment: a name, a type, and a value.
+At the top level, a PAKT document is a sequence of statements. A statement is either an assignment or a stream.
 
 ```
 greeting:str     = 'hello world'
@@ -23,6 +23,12 @@ id:uuid          = 550e8400-e29b-41d4-a716-446655440000
 started:date     = 2026-06-01
 opened:time      = 09:30:00-04:00
 updated:datetime = 2026-06-01T14:30:00Z
+payload:bin      = x'48656C6C6F'
+```
+
+```
+events:[int] << 1, 2, 3
+metrics:<str ; int> << 'ok' ; 1, 'warn' ; 2
 ```
 
 Every value must have a type. No exceptions.
@@ -32,6 +38,9 @@ Every value must have a type. No exceptions.
 - `int` is a signed 64-bit integer (−9.2 × 10¹⁸ to 9.2 × 10¹⁸). Out-of-range values are a parse error.
 - `float` is IEEE 754 binary64 (double precision).
 - `dec` is arbitrary-precision in the text. Implementations must support at least 34 significant digits.
+- `bin` is raw byte data. The decoder accepts both hex (`x'...'`) and base64 (`b'...'`) literals.
+
+`<<` streams are parsed by the current Go library and CLI. In the event stream they surface as explicit `StreamStart` / `StreamEnd` root events rather than pretending to be delimited collections.
 
 ---
 
@@ -60,9 +69,27 @@ flag:str    = '\U0001F600'       # grinning face
 
 Null bytes are not allowed in strings.
 
+### Raw Strings
+
+Prefix a string with `r` to disable escape processing:
+
+```
+path:str  = r'C:\Users\alice\Documents'
+regex:str = r"^\d{3}-\d{4}$"
+```
+
+Raw strings may also be triple-quoted. Indentation stripping works the same way as regular multi-line strings, but backslashes stay literal:
+
+```
+template:str = r'''
+    Hello \n World
+    '''
+# Result: "Hello \\n World"
+```
+
 ### Multi-line Strings
 
-Triple quotes (`'''` or `"""`) for multi-line content. The closing delimiter's column sets the indentation baseline — that many spaces are stripped from each line:
+Triple quotes (`'''` or `"""`) for multi-line content. The first non-blank content line sets the indentation baseline — that much leading whitespace is stripped from every non-blank content line:
 
 ```
 query:str = '''
@@ -175,25 +202,25 @@ Empty lists are valid: `ids:[int] = []`
 
 ## Maps
 
-A homogeneous collection of key-value pairs, wrapped in `< >`. Keys and values separated by `=`:
+A homogeneous collection of key-value pairs, wrapped in `< >`. Keys and values are separated by `;`:
 
 ```
-users:<int = str> = <
-1 = 'Alice'
-2 = 'Bob'
+users:<int ; str> = <
+1 ; 'Alice'
+2 ; 'Bob'
 >
 ```
 
 Values can be composites:
 
 ```
-users:<int = {gn:str, fn:str, admin:bool, dob:(int, int, int)}> = <
-01 = { 'Johnson', 'Amy', true, (1982, 06, 22) }
-02 = { 'Smith', 'Bob', false, (2001, 03, 12) }
+users:<int ; {gn:str, fn:str, admin:bool, dob:(int, int, int)}> = <
+01 ; { 'Johnson', 'Amy', true, (1982, 06, 22) }
+02 ; { 'Smith', 'Bob', false, (2001, 03, 12) }
 >
 ```
 
-Empty maps are valid: `cache:<str = int> = <>`
+Empty maps are valid: `cache:<str ; int> = <>`
 
 Duplicate keys in a map are an error.
 
@@ -228,7 +255,7 @@ deploy:{level:str, release:int} = {
 deploy:{level:str, release:int} = { 'platform', 26 }
 ```
 
-Whitespace around `=` is optional. Indentation is cosmetic.
+Whitespace around `=` in assignments and `;` in maps is optional. Indentation is cosmetic.
 
 ---
 
@@ -242,7 +269,7 @@ name:str = 'Alice'
 name:str = 'Bob'
 ```
 
-Duplicate map keys are also an error. PAKT is strict — no silent last-wins.
+Duplicate map keys are preserved in encounter order. Interpreting them is an application/domain concern above the raw decode stream.
 
 ---
 
@@ -282,11 +309,9 @@ A consumer supplies a spec at parse time as a filter. The streaming parser only 
 
 ```
 # Full document
-{
 level:|dev, staging, prod| = prod
 release:int = 26
 date:date   = 2026-06-01
-}
 ```
 
 ```
@@ -314,6 +339,7 @@ Specs can be static files or constructed dynamically at runtime. File extension:
 | Decimal | `:dec` | `3.14`, `1_000.50` |
 | Float | `:float` | `6.022e23`, `1.5E-10` |
 | Boolean | `:bool` | `true`, `false` |
+| Binary | `:bin` | `x'48656C6C6F'`, `b'SGVsbG8='` |
 | UUID | `:uuid` | `550e8400-e29b-...` |
 | Date | `:date` | `2026-06-01` |
 | Time | `:time` | `14:30:00Z`, `14:30:00-04:00` |
@@ -322,14 +348,13 @@ Specs can be static files or constructed dynamically at runtime. File extension:
 | Struct | `:{field:type, ...}` | `{ val, ... }` (positional) |
 | Tuple | `:(type, ...)` | `(val, val, ...)` |
 | List | `:[type]` | `[val, ...]` |
-| Map | `:<K = V>` | `<key = val, ...>` |
+| Map | `:<K ; V>` | `<key ; val, ...>` |
 | Nullable | `:type?` | value or `nil` |
 
 **Five rules:**
 
-1. `=` always means "maps to" — name to value in assignments, key to value in maps
+1. `=` is only the assignment operator — maps use `;` between key and value
 2. Every value must have a type — no defaults, no inference
 3. Append `?` for nullable — only nullable types accept `nil`
 4. Block and inline are the same semantics, different whitespace
 5. Indentation is never significant
-

@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"reflect"
@@ -194,6 +195,15 @@ func (e *Encoder) writeScalar(kind TypeKind, v any) {
 			return
 		}
 		e.write(s)
+	case TypeBin:
+		switch data := v.(type) {
+		case []byte:
+			e.writeBin(data)
+		case string:
+			e.writeBin([]byte(data))
+		default:
+			e.err = fmt.Errorf("bin value must be []byte or string, got %T", v)
+		}
 	default:
 		e.err = fmt.Errorf("unknown scalar kind: %d", int(kind))
 	}
@@ -243,6 +253,12 @@ func (e *Encoder) writeString(s string) {
 		}
 	}
 	e.write(string(quote))
+}
+
+func (e *Encoder) writeBin(data []byte) {
+	e.write("x'")
+	e.write(hex.EncodeToString(data))
+	e.write("'")
 }
 
 // writeMultiLineString writes a triple-quoted string with indentation stripping.
@@ -426,7 +442,7 @@ func (e *Encoder) writeMapValue(mt *MapType, v any) {
 		for _, entry := range entries {
 			e.writeIndent()
 			e.writeValue(mt.Key, entry.key)
-			e.write(" = ")
+			e.write(" ; ")
 			e.writeValue(mt.Value, entry.val)
 			e.newline()
 		}
@@ -440,7 +456,7 @@ func (e *Encoder) writeMapValue(mt *MapType, v any) {
 				e.write(", ")
 			}
 			e.writeValue(mt.Key, entry.key)
-			e.write(" = ")
+			e.write(" ; ")
 			e.writeValue(mt.Value, entry.val)
 		}
 		e.write(">")

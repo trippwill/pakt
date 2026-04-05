@@ -13,6 +13,18 @@ PAKT uses single-integer versioning. Each version is a complete specification. P
 | PAKT 0 | Draft — in development |
 | PAKT 1 | (future) First stable release |
 
+### 0.1 Design Principles
+
+1. **Performance is a feature.** The format, grammar, and type system are designed so that a conforming parser can operate in a single streaming pass with minimal allocation. Spec rules must not require unbounded buffering or retroactive reinterpretation.
+
+2. **Type context flows with the data.** Every value carries or inherits its type. The parser never guesses. This enables type-directed scanning and projection without schema negotiation.
+
+3. **The decoder is lossless; interpretation is layered.** A conforming decoder preserves all information present in the source — including duplicate map keys and encounter order. Policy decisions such as rejecting duplicates, applying last-wins, or accumulating values belong to higher-level consumers, not the core decoder.
+
+4. **Presentation is an application concern.** Human-readable formatting, event enrichment, and display transformations (such as CLI output or JSON projection) are not encoder or decoder responsibilities. The core event contract is minimal and machine-oriented.
+
+5. **The grammar is the event model.** Each grammatical construct — assignment, stream, struct, tuple, list, map, scalar — maps to a distinct event kind. Consumers should not need to inspect payload strings to determine structural context.
+
 ## 1. Document Model
 
 A PAKT document is a sequence of **statements** at the top level. A statement is either an **assignment** (a named, typed, single value) or a **stream** (a named, typed, open-ended sequence of values).
@@ -321,9 +333,9 @@ stream_body = (map_entry (SEP map_entry)* SEP?)?
 
 Each entry is `key ; value` conforming to the map's key and value types.
 
-**Termination**: A stream ends at EOF or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(1)-decidable: stream values never begin with `IDENT COLON` because values start with literals, delimiters, or keywords, and the map association operator is `;`, not `:`.
+**Termination**: A stream ends at EOF or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(1)-decidable: values may begin with a bare identifier (for atom sets), but values never require `:` after that leading identifier, and the map association operator is `;`, not `:`.
 
-**Duplicate keys**: In a map stream, duplicate keys use **last-wins** semantics by default (see §6).
+**Duplicate keys**: Repeated map entries are preserved in encounter order. Interpreting duplicate keys is an application/domain concern (see §6).
 
 **Root uniqueness**: Stream names participate in root uniqueness — a document may not have two statements (assignments or streams) with the same name.
 
@@ -407,7 +419,7 @@ map_entries = (map_entry (SEP map_entry)* SEP?)?
 map_entry   = value SEMI value
 ```
 
-Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are separated by `;`. An empty map (`<>`) is valid. Duplicate keys in a map value are a **parse error** (see §6).
+Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are separated by `;`. An empty map (`<>`) is valid. Duplicate keys are preserved in encounter order; interpreting them is an application/domain concern (see §6).
 
 ## 6. Uniqueness
 
@@ -415,14 +427,9 @@ Duplicate names at the document root are a parse error — this applies to both 
 
 ### 6.1 Map Duplicate Keys
 
-Duplicate keys in a **map value** (`= <...>`) are a **parse error**. This is normative and not configurable.
+Duplicate keys in either a **map value** (`= <...>`) or a **map stream** (`<<`) are not a format-level parse error and do not carry built-in replacement semantics in the format itself.
 
-Duplicate keys in a **map stream** (`<<`) use **last-wins** semantics by default — later entries silently replace earlier ones. Implementations MAY offer configurable alternatives:
-
-- **Error** (strict) — reject duplicate keys as a parse error.
-- **Accumulate** — all entries are preserved (multimap semantics).
-
-Implementations that offer alternative duplicate-key strategies must document their behavior and default to last-wins when no strategy is explicitly selected.
+A conforming decoder should preserve repeated map entries in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
 
 Struct field names are declared in the type, not in the value, so duplicates are caught at the type level.
 
@@ -432,7 +439,7 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Whitespace around `<<` is optional: `name:[int] << 1, 2` and `name:[int]<<1, 2` are equivalent.
 - Whitespace around `:` in type annotations is **not** permitted: `name:int`, not `name : int`.
 - Whitespace around `;` in map entries is optional: `'key' ; value` and `'key';value` are equivalent.
-- Members are separated by commas, newlines, or both (`SEP`). At least one separator is required between members.
+- Members are separated by commas, newlines, or both (`SEP`). At least one separator is required between stream items or between members inside delimited composites.
 - Consecutive newlines (blank lines) are ignored.
 - Indentation is insignificant — cosmetic only.
 
@@ -530,11 +537,61 @@ date:date                 = 2026-06-01
 #   → sees release only
 ```
 
+Projections apply equally to assignments and streams. A spec field that matches a `<<` stream emits the stream's events; a spec field that does not match a stream skips the entire stream body without allocation.
+
+```
+# Document with mixed statements
+name:str = 'midwatch'
+events:[{ts:datetime, level:str}] <<
+    { 2026-06-01T14:30:00Z, 'info' }
+    { 2026-06-01T14:31:00Z, 'warn' }
+metrics:<str ; int> << 'ok' ; 1, 'err' ; 2
+
+# Projection: events:[{ts:datetime, level:str}]
+#   → emits the events stream, skips name and metrics
+```
+
 ## 10. File Conventions
 
 | Extension | Purpose | MIME Type |
 |-----------|---------|----------|
 | `.pakt` | PAKT data document | `application/vnd.pakt` |
 | `.spec.pakt` | PAKT spec file | `application/vnd.pakt.spec` |
+
+## 11. Error Model
+
+A conforming implementation must report parse errors with sufficient detail for programmatic handling and human diagnosis.
+
+### 11.1 Error Structure
+
+Each error MUST include:
+
+- **Code** — a numeric identifier from the table below (or an implementation-defined code ≥ 100)
+- **Identifier** — a short string name corresponding to the code
+- **Position** — source line and column (1-based)
+- **Message** — a human-readable description of the problem
+
+### 11.2 Normative Error Categories
+
+Codes 1–99 are reserved for the spec. Implementations MUST support at least these categories and MUST allow callers to distinguish them programmatically (via sentinel errors, error codes, typed exceptions, or equivalent).
+
+| Code | Identifier | Condition |
+|------|-----------|-----------|
+| 1 | `unexpected_eof` | Input ends before a syntactic construct is complete |
+| 2 | `duplicate_name` | Two root-level statements share the same identifier |
+| 3 | `type_mismatch` | A value does not conform to its declared type, or a spec projection type does not match the document type |
+| 4 | `nil_non_nullable` | `nil` appears where the type is not nullable |
+| 5 | `syntax` | Any lexical or grammatical error not covered by a more specific category |
+
+### 11.3 Extensibility
+
+Implementations MAY define additional error categories with codes ≥ 100. Implementation-defined categories must be documented and must not reuse codes 1–99 for different meanings.
+
+### 11.4 Non-Errors
+
+The following conditions are explicitly **not** parse errors:
+
+- **Duplicate map keys** — preserved in encounter order per §6.1 and principle 3 (lossless decoder). Higher-level consumers decide whether duplicates are meaningful.
+- **Unknown fields during projection** — silently skipped per §9.4.
 
 Website: [usepakt.dev](https://usepakt.dev)

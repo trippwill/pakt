@@ -60,9 +60,9 @@ func typeOfReflect(t reflect.Type, seen map[reflect.Type]bool) (Type, error) {
 		return Type{Scalar: &k}, nil
 	}
 
-	// []byte → str
+	// []byte → bin
 	if t == byteSliceType {
-		k := TypeStr
+		k := TypeBin
 		return Type{Scalar: &k}, nil
 	}
 

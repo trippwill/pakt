@@ -28,6 +28,7 @@ id:uuid          = 550e8400-e29b-41d4-a716-446655440000
 started:date     = 2026-06-01
 opened:time      = 09:30:00-04:00
 updated:datetime = 2026-06-01T14:30:00Z
+payload:bin      = x'48656C6C6F'
 ```
 
 **Key points:**
@@ -35,13 +36,14 @@ updated:datetime = 2026-06-01T14:30:00Z
 - Integers support decimal, hex (`0x`), binary (`0b`), and octal (`0o`) literals
 - Underscores (`_`) are visual separators — `1_000_000` is the same as `1000000`
 - `dec` is arbitrary-precision decimal; `float` is IEEE 754 binary64
+- `bin` accepts both hex (`x'...'`) and base64 (`b'...'`) forms
 - Time and datetime values require a timezone (`Z` or offset like `-04:00`)
 
 ---
 
 ## String Varieties
 
-Strings are always quoted. PAKT supports single quotes, double quotes, escape sequences, and multi-line triple-quoted strings:
+Strings are always quoted. PAKT supports single quotes, double quotes, raw strings, escape sequences, and multi-line triple-quoted strings:
 
 ```
 # Single and double quotes are interchangeable
@@ -56,14 +58,18 @@ backslash:str = 'C:\\Users\\alice'
 # Unicode escapes
 bmp-escape:str  = '\u2603'        # snowman ☃
 full-escape:str = '\U0001F600'    # grinning face 😀
+
+# Raw strings
+windows-path:str = r'C:\Users\alice\Documents'
+pattern:str      = r"^\d{3}-\d{4}$"
 ```
 
 ### Multi-line strings
 
-Triple quotes (`'''` or `"""`) open a multi-line string. The closing delimiter's column position determines how much leading whitespace is stripped:
+Triple quotes (`'''` or `"""`) open a multi-line string. The first non-blank content line determines how much leading whitespace is stripped:
 
 ```
-# Indentation stripping: closing ''' at column 4 strips 4 spaces per line
+# Indentation stripping: the first content line has 4 leading spaces, so 4 are stripped from each non-blank content line
 query:str = '''
     SELECT id, name
     FROM users
@@ -71,7 +77,7 @@ query:str = '''
     '''
 # Result: "SELECT id, name\nFROM users\nWHERE active = true"
 
-# No stripping when the closing delimiter is at column 0
+# No stripping when the first non-blank content line starts at column 0
 raw:str = '''
 no indent here
 second line
@@ -85,6 +91,11 @@ poem:str = """
     PAKT is typed,
     And so are you.
     """
+
+# Raw multi-line strings keep backslashes literal
+template:str = r'''
+    Hello \n World
+    '''
 ```
 
 ---
@@ -169,21 +180,21 @@ empty-list:[str] = []
 
 ## Maps
 
-Maps are key-value collections. The `=` in the type declares key and value types; the `=` in entries separates individual keys from values:
+Maps are key-value collections. The `;` in the type declares key and value types; the `;` in entries separates individual keys from values:
 
 ```
 # Block map
-users:<int = str> = <
-    1 = 'Alice'
-    2 = 'Bob'
-    3 = 'Charlie'
+users:<int ; str> = <
+    1 ; 'Alice'
+    2 ; 'Bob'
+    3 ; 'Charlie'
 >
 
 # Inline map
-codes:<str = int> = <'us' = 1, 'gb' = 44, 'jp' = 81>
+codes:<str ; int> = <'us' ; 1, 'gb' ; 44, 'jp' ; 81>
 
 # Empty maps are valid
-cache:<str = int> = <>
+cache:<str ; int> = <>
 ```
 
 ### Maps with composite values
@@ -191,13 +202,13 @@ cache:<str = int> = <>
 Map values can be structs, tuples, or any other composite:
 
 ```
-roster:<int = {gn:str, fn:str, admin:bool}> = <
-    01 = { 'Johnson', 'Amy', true }
-    02 = { 'Smith', 'Bob', false }
+roster:<int ; {gn:str, fn:str, admin:bool}> = <
+    01 ; { 'Johnson', 'Amy', true }
+    02 ; { 'Smith', 'Bob', false }
 >
 ```
 
-**Note:** Duplicate keys within a map are a parse error.
+**Note:** Duplicate keys within a map are preserved in encounter order. Higher-level consumers decide what that means for their domain.
 
 ---
 
@@ -274,9 +285,9 @@ tls-fingerprint:str? = 'sha256:a1b2c3d4e5f6'
 rollback-version:(int, int, int)? = nil    # not set
 
 # Service metadata map
-meta:<str = str> = <
+meta:<str ; str> = <
     'owner'  = 'platform-team'
-    'region' = 'us-east-1'
+    'region' ; 'us-east-1'
     'tier'   = 'critical'
 >
 

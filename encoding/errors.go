@@ -9,7 +9,6 @@ import (
 var (
 	ErrUnexpectedEOF  = errors.New("unexpected end of input")
 	ErrDuplicateName  = errors.New("duplicate name")
-	ErrDuplicateKey   = errors.New("duplicate map key")
 	ErrTypeMismatch   = errors.New("type mismatch")
 	ErrNilNonNullable = errors.New("nil on non-nullable type")
 )

@@ -81,9 +81,9 @@ func prepareValue(typ Type, v reflect.Value) (any, error) {
 		return string(b), nil
 	}
 
-	// []byte → string.
+	// []byte → binary data.
 	if v.Type() == byteSliceType {
-		return string(v.Bytes()), nil
+		return bytes.Clone(v.Bytes()), nil
 	}
 
 	switch v.Kind() {

@@ -9,21 +9,61 @@ import (
 type EventKind int
 
 const (
-	EventAssignStart    EventKind = iota // beginning of a top-level assignment
-	EventAssignEnd                       // end of a top-level assignment
-	EventScalarValue                     // a scalar (or nil/atom) value
-	EventCompositeStart                  // opening delimiter of a composite value
-	EventCompositeEnd                    // closing delimiter of a composite value
-	EventError                           // parse or validation error
+	EventAssignStart     EventKind = iota // beginning of a top-level assignment
+	EventAssignEnd                        // end of a top-level assignment
+	EventListStreamStart                  // beginning of a top-level list stream
+	EventListStreamEnd                    // end of a top-level list stream
+	EventMapStreamStart                   // beginning of a top-level map stream
+	EventMapStreamEnd                     // end of a top-level map stream
+	EventScalarValue                      // a scalar (or nil/atom) value
+	EventStructStart                      // opening delimiter of a struct value
+	EventStructEnd                        // closing delimiter of a struct value
+	EventTupleStart                       // opening delimiter of a tuple value
+	EventTupleEnd                         // closing delimiter of a tuple value
+	EventListStart                        // opening delimiter of a list value
+	EventListEnd                          // closing delimiter of a list value
+	EventMapStart                         // opening delimiter of a map value
+	EventMapEnd                           // closing delimiter of a map value
+	EventError                            // parse or validation error
 )
 
 var eventKindNames = [...]string{
-	EventAssignStart:    "AssignStart",
-	EventAssignEnd:      "AssignEnd",
-	EventScalarValue:    "ScalarValue",
-	EventCompositeStart: "CompositeStart",
-	EventCompositeEnd:   "CompositeEnd",
-	EventError:          "Error",
+	EventAssignStart:     "AssignStart",
+	EventAssignEnd:       "AssignEnd",
+	EventListStreamStart: "ListStreamStart",
+	EventListStreamEnd:   "ListStreamEnd",
+	EventMapStreamStart:  "MapStreamStart",
+	EventMapStreamEnd:    "MapStreamEnd",
+	EventScalarValue:     "ScalarValue",
+	EventStructStart:     "StructStart",
+	EventStructEnd:       "StructEnd",
+	EventTupleStart:      "TupleStart",
+	EventTupleEnd:        "TupleEnd",
+	EventListStart:       "ListStart",
+	EventListEnd:         "ListEnd",
+	EventMapStart:        "MapStart",
+	EventMapEnd:          "MapEnd",
+	EventError:           "Error",
+}
+
+// IsCompositeStart reports whether k is a composite opening event.
+func (k EventKind) IsCompositeStart() bool {
+	return k == EventStructStart || k == EventTupleStart || k == EventListStart || k == EventMapStart
+}
+
+// IsCompositeEnd reports whether k is a composite closing event.
+func (k EventKind) IsCompositeEnd() bool {
+	return k == EventStructEnd || k == EventTupleEnd || k == EventListEnd || k == EventMapEnd
+}
+
+// IsStreamStart reports whether k is a stream opening event.
+func (k EventKind) IsStreamStart() bool {
+	return k == EventListStreamStart || k == EventMapStreamStart
+}
+
+// IsStreamEnd reports whether k is a stream closing event.
+func (k EventKind) IsStreamEnd() bool {
+	return k == EventListStreamEnd || k == EventMapStreamEnd
 }
 
 // String returns the human-readable name for the event kind.
@@ -62,20 +102,20 @@ type Pos struct {
 
 // Event is a single element in the decoded PAKT stream.
 type Event struct {
-	Kind  EventKind `json:"kind"`            // category of event
-	Pos   Pos       `json:"pos"`             // source position
-	Name  string    `json:"name,omitempty"`  // assignment or field name (empty for positional values)
-	Type  string    `json:"type,omitempty"`  // type annotation as written in the source
-	Value string    `json:"value,omitempty"` // literal value text (empty for composite/structural events)
-	Err   error     `json:"-"`               // non-nil only when Kind == EventError; handled by custom MarshalJSON
+	Kind       EventKind `json:"kind"`                 // category of event
+	Pos        Pos       `json:"pos"`                  // source position
+	Name       string    `json:"name,omitempty"`       // assignment or field name (empty for positional values)
+	ScalarType TypeKind  `json:"scalarType,omitempty"` // scalar type kind (zero for structural events)
+	Value      string    `json:"value,omitempty"`      // literal value text (empty for structural events)
+	Err        error     `json:"-"`                    // non-nil only when Kind == EventError; handled by custom MarshalJSON
 }
 
 // String returns a tab-separated representation of the event:
 //
-//	EVENT\tLINE:COL\tNAME\tTYPE\tVALUE
+//	EVENT\tLINE:COL\tNAME\tSCALAR_TYPE\tVALUE
 func (e Event) String() string {
 	return fmt.Sprintf("%s\t%d:%d\t%s\t%s\t%s",
-		e.Kind, e.Pos.Line, e.Pos.Col, e.Name, e.Type, e.Value)
+		e.Kind, e.Pos.Line, e.Pos.Col, e.Name, e.ScalarType, e.Value)
 }
 
 // MarshalJSON produces a JSON object for the Event.

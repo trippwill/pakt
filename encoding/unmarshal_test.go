@@ -47,6 +47,10 @@ type withMap struct {
 	Headers map[string]string `pakt:"headers"`
 }
 
+type withBytes struct {
+	Data []byte `pakt:"data"`
+}
+
 type withPointer struct {
 	Name *string `pakt:"name"`
 	Age  *int64  `pakt:"age"`
@@ -213,7 +217,7 @@ func TestUnmarshalIntList(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUnmarshalMapValue(t *testing.T) {
-	data := []byte("headers:<str = str> = <'Content-Type' = 'application/json', 'Accept' = 'text/html'>")
+	data := []byte("headers:<str ; str> = <'Content-Type' ; 'application/json', 'Accept' ; 'text/html'>")
 	var v withMap
 	if err := Unmarshal(data, &v); err != nil {
 		t.Fatal(err)
@@ -223,6 +227,17 @@ func TestUnmarshalMapValue(t *testing.T) {
 	}
 	if v.Headers["Accept"] != "text/html" {
 		t.Errorf("got Accept=%q", v.Headers["Accept"])
+	}
+}
+
+func TestUnmarshalBinValue(t *testing.T) {
+	data := []byte("data:bin = b'SGVsbG8='")
+	var v withBytes
+	if err := Unmarshal(data, &v); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(v.Data, []byte("Hello")) {
+		t.Fatalf("got %v, want %v", v.Data, []byte("Hello"))
 	}
 }
 
@@ -551,7 +566,7 @@ func TestUnmarshalEmptyList(t *testing.T) {
 }
 
 func TestUnmarshalEmptyMap(t *testing.T) {
-	data := []byte("headers:<str = str> = <>")
+	data := []byte("headers:<str ; str> = <>")
 	var v withMap
 	if err := Unmarshal(data, &v); err != nil {
 		t.Fatal(err)

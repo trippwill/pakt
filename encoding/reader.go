@@ -2,6 +2,8 @@ package encoding
 
 import (
 	"bufio"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"strings"
@@ -23,7 +25,6 @@ type reader struct {
 	pos        Pos
 	lastPos    Pos
 	bomChecked bool
-	events     []Event
 	seen       map[string]struct{}
 	sb         strings.Builder // reusable builder to avoid per-read allocations
 }
@@ -32,10 +33,9 @@ func newReader(r io.Reader) *reader {
 	br := bufPool.Get().(*bufio.Reader)
 	br.Reset(r)
 	return &reader{
-		buf:    br,
-		pos:    Pos{Line: 1, Col: 1},
-		events: make([]Event, 0, 16),
-		seen:   make(map[string]struct{}, 16),
+		buf:  br,
+		pos:  Pos{Line: 1, Col: 1},
+		seen: make(map[string]struct{}, 16),
 	}
 }
 
@@ -194,6 +194,41 @@ func (r *reader) expectByte(expected byte) error {
 	return nil
 }
 
+func (r *reader) peekRawStringStart() bool {
+	r.ensureBOM()
+	p, err := r.buf.Peek(2)
+	return err == nil && p[0] == 'r' && (p[1] == '\'' || p[1] == '"')
+}
+
+func (r *reader) peekBinLiteralStart() bool {
+	r.ensureBOM()
+	p, err := r.buf.Peek(2)
+	return err == nil && (p[0] == 'x' || p[0] == 'b') && p[1] == '\''
+}
+
+// peekIdentColon reports whether the next bytes are IDENT followed
+// immediately by ':'. Used only for the atom-set ambiguity case in
+// stream termination where a bare identifier could be a value or a
+// new statement header.
+func (r *reader) peekIdentColon() bool {
+	r.ensureBOM()
+	p, err := r.buf.Peek(256)
+	if err != nil && len(p) == 0 {
+		return false
+	}
+	if len(p) == 0 {
+		return false
+	}
+	if !isAlpha(p[0]) && p[0] != '_' {
+		return false
+	}
+	i := 1
+	for i < len(p) && (isAlpha(p[i]) || isDigit(p[i]) || p[i] == '_' || p[i] == '-') {
+		i++
+	}
+	return i < len(p) && p[i] == ':'
+}
+
 // ---------------------------------------------------------------------------
 // Character classification helpers
 // ---------------------------------------------------------------------------
@@ -255,13 +290,25 @@ func (r *reader) readIdent() (string, error) {
 // String reading
 // ---------------------------------------------------------------------------
 
-// readString reads a single-quoted, double-quoted, or triple-quoted string.
+// readString reads a quoted or raw string, including triple-quoted forms.
 func (r *reader) readString() (string, error) {
-	quote, err := r.readByte()
+	raw := false
+	start, err := r.readByte()
 	if err != nil {
 		return "", r.wrapf(ErrUnexpectedEOF, "expected string, got EOF")
 	}
+	quote := start
+	if start == 'r' {
+		raw = true
+		quote, err = r.readByte()
+		if err != nil {
+			return "", r.wrapf(ErrUnexpectedEOF, "expected quote after raw string prefix, got EOF")
+		}
+	}
 	if quote != '\'' && quote != '"' {
+		if raw {
+			return "", r.errorf("expected quote after raw string prefix, got %q", rune(quote))
+		}
 		r.unreadByte()
 		return "", r.errorf("expected string, got %q", rune(quote))
 	}
@@ -270,7 +317,7 @@ func (r *reader) readString() (string, error) {
 	if p, perr := r.buf.Peek(2); perr == nil && p[0] == quote && p[1] == quote {
 		r.readByte() //nolint:errcheck // second quote
 		r.readByte() //nolint:errcheck // third quote
-		return r.readMultiLineString(quote)
+		return r.readMultiLineString(quote, raw)
 	}
 
 	// Single-line string.
@@ -283,7 +330,7 @@ func (r *reader) readString() (string, error) {
 		if b == quote {
 			return r.sb.String(), nil
 		}
-		if b == '\\' {
+		if !raw && b == '\\' {
 			ch, err := r.readEscape()
 			if err != nil {
 				return "", err
@@ -361,59 +408,140 @@ func (r *reader) readUnicodeEscape(n int) (rune, error) {
 
 // readMultiLineString reads the body of a triple-quoted string.
 // The opening triple-quote has already been consumed.
-func (r *reader) readMultiLineString(quote byte) (string, error) {
+func (r *reader) readMultiLineString(quote byte, raw bool) (string, error) {
+	var out strings.Builder
+	if err := r.consumeMultiLineString(quote, raw, &out); err != nil {
+		return "", err
+	}
+	return out.String(), nil
+}
+
+func (r *reader) consumeMultiLineString(quote byte, raw bool, out *strings.Builder) error {
 	// Next byte must be a newline.
 	b, err := r.readByte()
 	if err != nil {
-		return "", r.wrapf(ErrUnexpectedEOF, "expected newline after opening triple-quote, got EOF")
+		return r.wrapf(ErrUnexpectedEOF, "expected newline after opening triple-quote, got EOF")
 	}
 	if b != '\n' {
-		return "", r.errorf("expected newline after opening triple-quote, got %q", rune(b))
+		return r.errorf("expected newline after opening triple-quote, got %q", rune(b))
 	}
 
 	closingDelim := string([]byte{quote, quote, quote})
-
-	// Collect raw source lines until the closing delimiter.
-	var rawLines []string
 	baseline := 0
+	baselineSet := false
+	lineCount := 0
+
+	writeLine := func(line string) error {
+		if out != nil {
+			if lineCount > 0 {
+				out.WriteByte('\n')
+			}
+		}
+		lineCount++
+		if line == "" {
+			return nil
+		}
+		if raw {
+			if strings.IndexByte(line, 0) >= 0 {
+				return r.errorf("null byte in string")
+			}
+			if out != nil {
+				out.WriteString(line)
+			}
+			return nil
+		}
+		processed, perr := processEscapes(line)
+		if perr != "" {
+			return r.errorf("%s", perr)
+		}
+		if out != nil {
+			out.WriteString(processed)
+		}
+		return nil
+	}
+
 	for {
 		line, lerr := r.readRawLine()
 		if lerr != nil {
-			return "", r.wrapf(ErrUnexpectedEOF, "unterminated multi-line string")
+			return r.wrapf(ErrUnexpectedEOF, "unterminated multi-line string")
 		}
 		trimmed := strings.TrimLeft(line, " \t")
 		if trimmed == closingDelim {
-			baseline = len(line) - len(trimmed)
-			break
+			return nil
 		}
-		rawLines = append(rawLines, line)
-	}
-
-	// Strip baseline indentation and process escapes.
-	r.sb.Reset()
-	for i, line := range rawLines {
-		if i > 0 {
-			r.sb.WriteByte('\n')
-		}
-		// Blank lines are exempt from the indentation check.
 		if strings.TrimSpace(line) == "" {
-			if len(line) > baseline {
-				r.sb.WriteString(line[baseline:])
+			if err := writeLine(""); err != nil {
+				return err
 			}
 			continue
 		}
+
 		leading := countLeadingWS(line)
+		if !baselineSet {
+			baseline = leading
+			baselineSet = true
+		}
 		if leading < baseline {
-			return "", r.errorf("insufficient indentation in multi-line string (line %d)", i+1)
+			return r.errorf("insufficient indentation in multi-line string")
 		}
-		stripped := line[baseline:]
-		processed, perr := processEscapes(stripped)
-		if perr != "" {
-			return "", r.errorf("%s", perr)
+		if err := writeLine(line[baseline:]); err != nil {
+			return err
 		}
-		r.sb.WriteString(processed)
 	}
-	return r.sb.String(), nil
+}
+
+// readBin reads a binary literal and returns its canonical lower-case hex value.
+func (r *reader) readBin() (string, error) {
+	prefix, err := r.readByte()
+	if err != nil {
+		return "", r.wrapf(ErrUnexpectedEOF, "expected binary literal, got EOF")
+	}
+	if prefix != 'x' && prefix != 'b' {
+		r.unreadByte()
+		return "", r.errorf("expected binary literal, got %q", rune(prefix))
+	}
+	if err := r.expectByte('\''); err != nil {
+		return "", err
+	}
+
+	r.sb.Reset()
+	for {
+		b, err := r.readByte()
+		if err != nil {
+			return "", r.wrapf(ErrUnexpectedEOF, "unterminated binary literal")
+		}
+		if b == '\'' {
+			break
+		}
+		if b == '\n' {
+			return "", r.errorf("newline in binary literal")
+		}
+		if b == 0 {
+			return "", r.errorf("null byte in binary literal")
+		}
+		r.sb.WriteByte(b)
+	}
+
+	lit := r.sb.String()
+	switch prefix {
+	case 'x':
+		if len(lit)%2 != 0 {
+			return "", r.errorf("hex binary literal must contain an even number of digits")
+		}
+		data, err := hex.DecodeString(lit)
+		if err != nil {
+			return "", r.errorf("invalid hex binary literal")
+		}
+		return hex.EncodeToString(data), nil
+	case 'b':
+		data, err := base64.StdEncoding.Strict().DecodeString(lit)
+		if err != nil {
+			return "", r.errorf("invalid base64 binary literal")
+		}
+		return hex.EncodeToString(data), nil
+	default:
+		return "", r.errorf("unknown binary literal prefix %q", rune(prefix))
+	}
 }
 
 // readRawLine reads bytes until a newline (or EOF) without escape processing.

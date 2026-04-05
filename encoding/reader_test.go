@@ -326,7 +326,7 @@ func TestReadMultiLineStringEscapes(t *testing.T) {
 }
 
 func TestReadMultiLineStringInsufficientIndent(t *testing.T) {
-	input := "'''\n  short\n    '''"
+	input := "'''\n    first\n  second\n    '''"
 	r := mkReader(input)
 	_, err := r.readString()
 	if err == nil {
@@ -353,6 +353,51 @@ func TestReadMultiLineStringBlankLine(t *testing.T) {
 	want := "line1\n\nline2"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestReadRawStringSingleLine(t *testing.T) {
+	r := mkReader(`r'C:\Users\alice\Documents'`)
+	got, err := r.readString()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != `C:\Users\alice\Documents` {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadRawStringMultiLine(t *testing.T) {
+	input := "r'''\n    Hello \\n World\n    '''"
+	r := mkReader(input)
+	got, err := r.readString()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != `Hello \n World` {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadBinHex(t *testing.T) {
+	r := mkReader(`x'48656C6C6F'`)
+	got, err := r.readBin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "48656c6c6f" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadBinBase64(t *testing.T) {
+	r := mkReader(`b'SGVsbG8='`)
+	got, err := r.readBin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "48656c6c6f" {
+		t.Fatalf("got %q", got)
 	}
 }
 

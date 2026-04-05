@@ -33,20 +33,20 @@ tags:[str] = ['alpha', 'beta', 'release']
 empty-list:[str] = []
 
 # Block map
-users:<int = str> = <
-    1 = 'Alice'
-    2 = 'Bob'
-    3 = 'Charlie'
+users:<int ; str> = <
+    1 ; 'Alice'
+    2 ; 'Bob'
+    3 ; 'Charlie'
 >
 
 # Inline map
-codes:<str = int> = <'us' = 1, 'gb' = 44, 'jp' = 81>
+codes:<str ; int> = <'us' ; 1, 'gb' ; 44, 'jp' ; 81>
 
 # Empty map
-cache:<str = int> = <>
+cache:<str ; int> = <>
 
 # Map with composite values
-roster:<int = {gn:str, fn:str, admin:bool}> = <
-    01 = { 'Johnson', 'Amy', true }
-    02 = { 'Smith', 'Bob', false }
+roster:<int ; {gn:str, fn:str, admin:bool}> = <
+    01 ; { 'Johnson', 'Amy', true }
+    02 ; { 'Smith', 'Bob', false }
 >

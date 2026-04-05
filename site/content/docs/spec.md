@@ -6,163 +6,46 @@ weight: 2
 
 > **PAKT** — a typed data interchange format. Human-authorable. Stream-parseable. Spec-projected.
 
-## 0. Version
+This site page is a synchronized overview of the current **PAKT v0** surface. The normative source remains [`spec/pakt-v0.md`](https://github.com/trippwill/pakt/blob/main/spec/pakt-v0.md).
 
-This document defines **PAKT 0** (draft). The specification is not yet stable — breaking changes may occur before PAKT 1.
+> **Implementation note:** The current Go library and CLI implement top-level `<<` stream statements as first-class root events (`StreamStart` / `StreamEnd`).
 
-PAKT uses single-integer versioning. Each version is a complete specification. Parser libraries advertise which spec versions they support.
+## Version
+
+PAKT uses single-integer versioning. Each version is a complete specification.
 
 | Version | Status |
 |---------|--------|
 | PAKT 0 | Draft — in development |
 | PAKT 1 | (future) First stable release |
 
-## 1. Document Model
+## Document Model
 
-A PAKT document is a sequence of **assignments** at the top level. Each assignment is a named, typed value.
+The canonical document grammar is:
 
-The document root is a distinct concept from a struct value — it uses self-describing assignments (`name:type = value`) rather than positional values. This is the system boundary where data enters without a parent type context.
-
+```text
+document  = statement*
+statement = assignment | stream
 ```
+
+Current Go implementation support:
+
+- `assignment = IDENT type_annot ASSIGN value`
+- `stream = IDENT type_annot STREAM stream_body`
+
+Assignments look like:
+
+```pakt
 name:str = 'midwatch'
 version:(int, int, int) = (1, 0, 0)
+payload:bin = x'48656C6C6F'
 ```
 
-> **Future consideration**: Struct streams (a sequence of delimited struct values for data feeds) may be added in a future version.
-
-## 2. Encoding
-
-A PAKT document is a sequence of Unicode code points encoded as **UTF-8**. No other encodings are permitted.
-
-A UTF-8 BOM (`U+FEFF`) at the start of a document is accepted and ignored. Implementations must not reject a document that begins with a BOM, and must not emit a BOM when writing.
-
-## 3. Lexical Grammar
-
-### 3.1 Characters
-
-```
-ALPHA   = 'a'-'z' | 'A'-'Z'
-DIGIT   = '0'-'9'
-IDENT   = (ALPHA | '_') (ALPHA | DIGIT | '_' | '-')*
-WS      = ' ' | '\t'
-NL      = '\n' | '\r\n'
-SEP     = ',' | NL
-```
-
-### 3.2 Comments
-
-```
-COMMENT = '#' (any char except NL)* NL
-```
-
-Line comments begin with `#` and extend to end of line. May appear on their own line or after a value. No block comments.
-
-### 3.3 Scalar Literals
-
-```
-DIGIT_SEP = DIGIT (DIGIT | '_')*
-HEX_DIGIT = DIGIT | 'a'-'f' | 'A'-'F'
-HEX_SEP   = HEX_DIGIT (HEX_DIGIT | '_')*
-BIN_DIGIT = '0' | '1'
-OCT_DIGIT = '0'-'7'
-
-INT      = ['-'] DIGIT_SEP
-         | ['-'] '0x' HEX_SEP
-         | ['-'] '0b' BIN_DIGIT (BIN_DIGIT | '_')*
-         | ['-'] '0o' OCT_DIGIT (OCT_DIGIT | '_')*
-DEC      = ['-'] DIGIT_SEP '.' DIGIT_SEP
-FLOAT    = ['-'] DIGIT_SEP ('.' DIGIT_SEP)? ('e' | 'E') [+-]? DIGIT+
-BOOL     = 'true' | 'false'
-NIL      = 'nil'
-DATE     = DIGIT{4} '-' DIGIT{2} '-' DIGIT{2}
-TZ       = 'Z' | [+-] DIGIT{2} ':' DIGIT{2}
-TIME     = DIGIT{2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)? TZ
-DATETIME = DATE 'T' TIME
-UUID     = HEX{8} '-' HEX{4} '-' HEX{4} '-' HEX{4} '-' HEX{12}
-STRING   = "'" string_char* "'"
-         | '"' string_char* '"'
-ML_STR   = "'''" ML_BODY "'''"
-         | '"""' ML_BODY '"""'
-ATOM     = IDENT
-```
-
-- Leading zeros on decimal `INT` are permitted and ignored (`01` evaluates to `1`).
-- `_` in numeric literals is a visual separator, ignored by the parser.
-- `ATOM` is syntactically identical to `IDENT`. It is valid as a value only when the type is an atom set.
-- Strings are always quoted. There are no unquoted string values.
-
-### 3.4 Multi-line Strings
-
-A multi-line string is delimited by triple quotes (`'''` or `"""`).
-
-**Opening**: The opening `'''` must be followed immediately by a newline. Content begins on the next line. The first newline after the opening delimiter is stripped.
-
-**Closing**: The closing `'''` must appear on its own line, preceded only by whitespace. The last newline before the closing delimiter is stripped.
-
-**Indentation stripping**: The column of the closing delimiter defines the baseline indentation. That many characters of leading whitespace are removed from each content line. A non-blank content line with fewer leading whitespace characters than the baseline is a parse error.
-
-**Escapes**: The same escape sequences as single-line strings are recognized inside multi-line strings.
-
-```
-# Closing delimiter at column 4 → strip 4 spaces from each line
-query:str = '''
-    SELECT id, name
-    FROM users
-    WHERE active = true
-    '''
-# Result: "SELECT id, name\nFROM users\nWHERE active = true"
-```
-
-```
-# Closing delimiter at column 0 → no stripping
-raw:str = '''
-line one
-line two
-'''
-# Result: "line one\nline two"
-```
-
-### 3.5 String Escapes
-
-Within a quoted string, the following escape sequences are recognized:
-
-| Escape | Meaning |
-|--------|---------|
-| `\\` | Backslash |
-| `\'` | Single quote |
-| `\"` | Double quote |
-| `\n` | Newline (U+000A) |
-| `\r` | Carriage return (U+000D) |
-| `\t` | Tab (U+0009) |
-| `\uXXXX` | Unicode BMP code point (4 hex digits) |
-| `\UXXXXXXXX` | Unicode code point (8 hex digits) |
-
-Any other `\` followed by a character is a parse error. Null bytes (`U+0000`) are not permitted in strings, whether literal or escaped.
-
-### 3.6 Tokens
-
-```
-HASH    = '#'
-ASSIGN  = '='
-COLON   = ':'
-AT      = '@'                       ; reserved for future constraints
-COMMA   = ','
-PIPE    = '|'
-LBRACE  = '{'    RBRACE = '}'
-LPAREN  = '('    RPAREN = ')'
-LBRACK  = '['    RBRACK = ']'
-LANGLE  = '<'    RANGLE = '>'
-```
-
-## 4. Type System
-
-Every value must have a type. There is no default type and no type inference.
-
-### 4.1 Scalar Types
+## Scalar Types
 
 | Type | Literal | Example |
 |------|---------|---------|
-| `str` | Quoted string | `'hello'` |
+| `str` | Quoted or raw string | `'hello'`, `r'C:\tmp'` |
 | `int` | Signed 64-bit integer | `42`, `-7`, `0xFF`, `0b1010`, `0o77`, `1_000` |
 | `dec` | Exact decimal | `3.14`, `1_000.50` |
 | `float` | IEEE 754 binary64 | `6.022e23`, `1.5E-10` |
@@ -171,157 +54,84 @@ Every value must have a type. There is no default type and no type inference.
 | `date` | ISO date | `2026-06-01` |
 | `time` | ISO time (tz required) | `14:30:00Z`, `14:30:00-04:00` |
 | `datetime` | ISO datetime (tz required) | `2026-06-01T14:30:00Z` |
+| `bin` | Binary data | `x'48656C6C6F'`, `b'SGVsbG8='` |
 
-**Numeric precision:**
+`bin` literals accept hexadecimal (`x'...'`) and RFC 4648 base64 with padding (`b'...'`). Both forms produce the same bytes.
 
-- **`int`**: Signed 64-bit integer. Range: −9,223,372,036,854,775,808 to 9,223,372,036,854,775,807. Values outside this range are a parse error.
-- **`float`**: IEEE 754 binary64 (double precision). Implementations must parse and round per IEEE 754.
-- **`dec`**: Arbitrary-precision decimal in the text representation. Implementations must support at least 34 significant digits (equivalent to IEEE 754 decimal128). An implementation may reject values exceeding its supported precision with a clear error.
+## Strings
 
-`true`, `false`, and `nil` are reserved keywords, not atoms.
+PAKT supports:
 
-### 4.2 Nullable Types
+- quoted strings: `'hello'`, `"hello"`
+- raw strings: `r'C:\Users\alice'`, `r"^\d{3}-\d{4}$"`
+- triple-quoted strings: `''' ... '''`, `""" ... """`
+- raw triple-quoted strings: `r''' ... '''`, `r""" ... """`
 
-Any type may be made nullable by appending `?`:
+### Multi-line indentation
 
-```
-nullable_type = type '?'
-```
+The opening triple quote must be followed immediately by a newline. The closing triple quote must appear on its own line.
 
-A nullable type accepts all values of the base type plus `nil`. A non-nullable type receiving `nil` is a parse error.
+The **first non-blank content line** defines the indentation baseline. That much leading whitespace is stripped from each non-blank content line.
 
-### 4.3 Atom Sets
-
-An atom set constrains a value to one of a fixed set of bareword identifiers:
-
-```
-atom_set = PIPE IDENT (COMMA IDENT)* PIPE
-```
-
-Example: `|dev, staging, prod|`
-
-`true`, `false`, and `nil` are reserved keywords and cannot be used as atoms.
-
-### 4.4 Composite Types
-
-| Kind | Type syntax | Delimiter | Keys | Values |
-|------|-------------|-----------|------|--------|
-| Struct | `{field:type, ...}` | `{ }` | Atom (static) | Heterogeneous |
-| Tuple | `(type, ...)` | `( )` | None (positional) | Heterogeneous |
-| List | `[type]` | `[ ]` | None (ordered) | Homogeneous |
-| Map | `<keytype = valtype>` | `< >` | Any typed value | Homogeneous |
-
-Five unique delimiter pairs — no overloads:
-
-| First token after `=` | Kind |
-|-----------------------|------|
-| `{` | Struct |
-| `(` | Tuple |
-| `[` | List |
-| `<` | Map |
-| anything else | Scalar or atom |
-
-Empty lists (`[]`) and empty maps (`<>`) are valid. Empty structs, tuples, and atom sets are parse errors — these types require at least one member.
-
-### 4.5 Reserved
-
-The `@` token is reserved for future constraint syntax (e.g., `@len`, `@range`, `@pattern`).
-
-## 5. Syntactic Grammar
-
-### 5.1 Document
-
-```
-document = assignment*
+```pakt
+query:str = '''
+    SELECT id, name
+    FROM users
+    WHERE active = true
+    '''
 ```
 
-### 5.2 Assignment
+### Raw strings
 
-```
-assignment = IDENT type_annot ASSIGN value
-```
+Raw strings disable escape processing:
 
-### 5.3 Type Annotation
-
-```
-type_annot = COLON type '?'?
-```
-
-### 5.4 Type
-
-```
-type = scalar_type | atom_set | struct_type | tuple_type | list_type | map_type
-
-scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool' | 'uuid' | 'date' | 'time' | 'datetime'
-
-atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
-
-struct_type = LBRACE struct_field_decl (COMMA struct_field_decl)* RBRACE
-
-struct_field_decl = IDENT COLON type '?'?
-
-tuple_type  = LPAREN type (COMMA type)* RPAREN
-
-list_type   = LBRACK type '?'? RBRACK
-
-map_type    = LANGLE type ASSIGN type RANGLE
+```pakt
+path:str     = r'C:\Users\alice\Documents'
+template:str = r'''
+    Hello \n World
+    '''
 ```
 
-### 5.5 Values
+## Composite Types
 
-```
-value = scalar | NIL | atom_val | struct_val | tuple_val | list_val | map_val
+| Kind | Type syntax | Value syntax |
+|------|-------------|--------------|
+| Struct | `{field:type, ...}` | `{ val, ... }` |
+| Tuple | `(type, ...)` | `(val, val, ...)` |
+| List | `[type]` | `[val, ...]` |
+| Map | `<K ; V>` | `<key ; value, ...>` |
 
-scalar    = STRING | INT | DEC | FLOAT | BOOL | UUID | DATE | TIME | DATETIME
-atom_val  = ATOM
-```
+Maps use `;` between the key and value in both the type annotation and each map entry.
 
-`nil` is valid only when the type is nullable (`type?`).
-
-### 5.6 Struct Value
-
-Struct values contain positional values matched left-to-right against the fields declared in the type annotation. The type annotation is required.
-
-```
-struct_val      = LBRACE struct_members RBRACE
-struct_members  = (value (SEP value)* SEP?)?
+```pakt
+users:<int ; str> = <
+    1 ; 'Alice'
+    2 ; 'Bob'
+>
 ```
 
-> **Future consideration**: Self-describing struct members (`name:type = value`) may be added in a future version.
+Duplicate map keys are preserved in decode order. Interpreting them is an application/domain concern above the raw event stream.
 
-### 5.7 Tuple Value
+## Grammar Excerpts
 
-Tuple values contain positional values matched left-to-right against the types declared in the type annotation. The type annotation is required.
-
-```
-tuple_val      = LPAREN tuple_members RPAREN
-tuple_members  = (value (SEP value)* SEP?)?
-```
-
-> **Future consideration**: Self-describing tuple members (`:type value`) may be added in a future version.
-
-### 5.8 List Value
-
-```
-list_val     = LBRACK list_members RBRACK
-list_members = (value (SEP value)* SEP?)?
+```text
+scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool' | 'uuid' | 'date' | 'time' | 'datetime' | 'bin'
+map_type    = LANGLE type SEMI type RANGLE
+value       = scalar | NIL | atom_val | struct_val | tuple_val | list_val | map_val
+scalar      = STRING | RAW_STR | ML_STR | ML_RAW | INT | DEC | FLOAT | BOOL | UUID | DATE | TIME | DATETIME | BIN
+map_entry   = value SEMI value
+stream      = IDENT type_annot STREAM stream_body
 ```
 
-All elements must conform to the declared element type. An empty list (`[]`) is valid.
+## Canonical Specification
 
-### 5.9 Map Value
+For the full normative grammar and semantics, including stream statements and duplicate-key layering, read the canonical spec:
 
-```
-map_val     = LANGLE map_entries RANGLE
-map_entries = (map_entry (SEP map_entry)* SEP?)?
-map_entry   = value ASSIGN value
-```
-
-Keys conform to the declared key type. Values conform to the declared value type. An empty map (`<>`) is valid. Duplicate keys are a parse error.
+- [`spec/pakt-v0.md`](https://github.com/trippwill/pakt/blob/main/spec/pakt-v0.md)
 
 ## 6. Uniqueness
 
-Duplicate names at the document root are a parse error. Duplicate keys within a single map value are a parse error.
+Duplicate names at the document root are a parse error. Duplicate keys within maps are preserved in encounter order; interpreting them is an application/domain concern.
 
 Struct field names are declared in the type, not in the value, so duplicates are caught at the type level.
 

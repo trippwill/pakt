@@ -598,3 +598,152 @@ The following conditions are explicitly **not** parse errors:
 - **Unknown fields during projection** — silently skipped per §9.4.
 
 Website: [usepakt.dev](https://usepakt.dev)
+
+## Appendix A. Collected Formal Grammar
+
+This appendix assembles every grammar rule from the spec body into a single reference. No new rules are introduced — this is a collected view for implementors.
+
+### A.1 Lexical Grammar
+
+```
+; --- Characters and whitespace ---
+
+ALPHA       = 'a'-'z' | 'A'-'Z'
+DIGIT       = '0'-'9'
+HEX_DIGIT   = DIGIT | 'a'-'f' | 'A'-'F'
+BIN_DIGIT   = '0' | '1'
+OCT_DIGIT   = '0'-'7'
+DIGIT_SEP   = DIGIT (DIGIT | '_')*
+HEX_SEP     = HEX_DIGIT (HEX_DIGIT | '_')*
+BASE64_CHAR = ALPHA | DIGIT | '+' | '/' | '='
+
+IDENT       = (ALPHA | '_') (ALPHA | DIGIT | '_' | '-')*
+WS          = ' ' | '\t'
+NL          = '\n' | '\r\n'
+SEP         = ',' | NL
+COMMENT     = '#' (any char except NL)* NL
+
+; --- Tokens ---
+
+ASSIGN  = '='
+COLON   = ':'
+SEMI    = ';'
+STREAM  = '<<'
+COMMA   = ','
+PIPE    = '|'
+LBRACE  = '{'    RBRACE  = '}'
+LPAREN  = '('    RPAREN  = ')'
+LBRACK  = '['    RBRACK  = ']'
+LANGLE  = '<'    RANGLE  = '>'
+AT      = '@'                           ; reserved
+
+; --- Scalar literals ---
+
+INT         = ['-'] DIGIT_SEP
+            | ['-'] '0x' HEX_SEP
+            | ['-'] '0b' BIN_DIGIT (BIN_DIGIT | '_')*
+            | ['-'] '0o' OCT_DIGIT (OCT_DIGIT | '_')*
+DEC         = ['-'] DIGIT_SEP? '.' DIGIT_SEP
+FLOAT       = ['-'] DIGIT_SEP? ('.' DIGIT_SEP)? ('e' | 'E') [+-]? DIGIT+
+BOOL        = 'true' | 'false'
+NIL         = 'nil'
+
+DATE        = DIGIT{4} '-' DIGIT{2} '-' DIGIT{2}
+TZ          = 'Z' | [+-] DIGIT{2} ':' DIGIT{2}
+TIME        = DIGIT{2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)? TZ
+DATETIME    = DATE 'T' TIME
+UUID        = HEX{8} '-' HEX{4} '-' HEX{4} '-' HEX{4} '-' HEX{12}
+
+BIN         = 'x' "'" HEX_DIGIT* "'"
+            | 'b' "'" BASE64_CHAR* "'"
+
+; --- String literals ---
+
+ESCAPE      = '\' ('\' | "'" | '"' | 'n' | 'r' | 't')
+            | '\u' HEX_DIGIT{4}
+            | '\U' HEX_DIGIT{8}
+
+string_char = ESCAPE | any code point except matching_quote, '\', NL, U+0000
+raw_char    = any code point except matching_quote, U+0000
+ml_char     = ESCAPE | any code point except U+0000, not forming closing triple-quote
+raw_ml_char = any code point except U+0000, not forming closing triple-quote
+
+STRING      = "'" string_char* "'"  | '"' string_char* '"'
+RAW_STR     = 'r' "'" raw_char* "'" | 'r' '"' raw_char* '"'
+ML_STR      = "'''" ml_char* "'''"  | '"""' ml_char* '"""'
+ML_RAW      = "r'''" raw_ml_char* "'''" | 'r"""' raw_ml_char* '"""'
+
+ATOM        = PIPE IDENT
+```
+
+### A.2 Syntactic Grammar
+
+```
+; --- Document structure ---
+
+document    = statement*
+statement   = assignment | stream
+
+assignment  = IDENT type_annot ASSIGN value
+stream      = IDENT type_annot STREAM stream_body
+
+; --- Stream body ---
+;     Terminates at EOF or the start of the next statement (IDENT COLON).
+
+stream_body = list_stream_body | map_stream_body
+list_stream_body = (value (SEP value)* SEP?)?
+map_stream_body  = (map_entry (SEP map_entry)* SEP?)?
+
+; --- Type annotations ---
+
+type_annot  = COLON type '?'?
+
+type        = scalar_type
+            | atom_set
+            | struct_type
+            | tuple_type
+            | list_type
+            | map_type
+
+scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool'
+            | 'uuid' | 'date' | 'time' | 'datetime' | 'bin'
+
+atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
+
+struct_type = LBRACE field_decl (COMMA field_decl)* RBRACE
+field_decl  = IDENT COLON type '?'?
+
+tuple_type  = LPAREN type (COMMA type)* RPAREN
+list_type   = LBRACK type '?'? RBRACK
+map_type    = LANGLE type SEMI type RANGLE
+
+; --- Values ---
+
+value       = scalar | NIL | atom_val
+            | struct_val | tuple_val | list_val | map_val
+
+scalar      = STRING | RAW_STR | ML_STR | ML_RAW
+            | INT | DEC | FLOAT | BOOL
+            | UUID | DATE | TIME | DATETIME | BIN
+
+atom_val    = ATOM
+
+struct_val  = LBRACE (value (SEP value)* SEP?)? RBRACE
+tuple_val   = LPAREN (value (SEP value)* SEP?)? RPAREN
+list_val    = LBRACK (value (SEP value)* SEP?)? RBRACK
+map_val     = LANGLE (map_entry (SEP map_entry)* SEP?)? RANGLE
+map_entry   = value SEMI value
+
+; --- Spec files ---
+
+spec        = spec_member*
+spec_member = IDENT type_annot
+```
+
+### A.3 Reserved Keywords
+
+The following identifiers are reserved and cannot be used as statement names or atom set members:
+
+```
+true   false   nil
+```

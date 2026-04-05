@@ -39,7 +39,7 @@ func typeOfReflect(t reflect.Type, seen map[reflect.Type]bool) (Type, error) {
 	}
 
 	// Unwrap pointer: *T → T? (nullable)
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		inner, err := typeOfReflect(t.Elem(), seen)
 		if err != nil {
 			return Type{}, err
@@ -60,9 +60,9 @@ func typeOfReflect(t reflect.Type, seen map[reflect.Type]bool) (Type, error) {
 		return Type{Scalar: &k}, nil
 	}
 
-	// []byte → str
+	// []byte → bin
 	if t == byteSliceType {
-		k := TypeStr
+		k := TypeBin
 		return Type{Scalar: &k}, nil
 	}
 
@@ -140,7 +140,7 @@ func typeOfReflect(t reflect.Type, seen map[reflect.Type]bool) (Type, error) {
 // StructFields returns the PAKT field mapping for a Go struct type.
 // t must be a struct type (or pointer to struct); otherwise an error is returned.
 func StructFields(t reflect.Type) ([]FieldInfo, error) {
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	if t.Kind() != reflect.Struct {
@@ -172,7 +172,7 @@ func structFieldsImpl(t reflect.Type, seen map[reflect.Type]bool) ([]FieldInfo, 
 		// Handle embedded (anonymous) structs: flatten their fields.
 		if sf.Anonymous {
 			ft := sf.Type
-			if ft.Kind() == reflect.Ptr {
+			if ft.Kind() == reflect.Pointer {
 				ft = ft.Elem()
 			}
 			if ft.Kind() == reflect.Struct && ft != timeType {

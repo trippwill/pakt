@@ -31,3 +31,12 @@ poem:str = """
     PAKT is typed,
     And so are you.
     """
+
+# Raw strings
+windows-path:str = r'C:\Users\alice\Documents'
+pattern:str = r"^\d{3}-\d{4}$"
+
+# Raw multi-line string
+template:str = r'''
+    Hello \n World
+    '''

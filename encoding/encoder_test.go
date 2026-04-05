@@ -57,7 +57,7 @@ func roundTrip(t *testing.T, name string, typ Type, v any) []Event {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Scalar encoding — all 9 scalar types
+// 1. Scalar encoding — all 10 scalar types
 // ---------------------------------------------------------------------------
 
 func TestEncodeStr(t *testing.T) {
@@ -154,6 +154,14 @@ func TestEncodeTime(t *testing.T) {
 func TestEncodeDateTime(t *testing.T) {
 	got := encodeCompact(t, "dt", scalarType(TypeDateTime), "2026-06-01T14:30:00Z")
 	want := "dt:datetime = 2026-06-01T14:30:00Z\n"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestEncodeBin(t *testing.T) {
+	got := encodeCompact(t, "payload", scalarType(TypeBin), []byte("Hello"))
+	want := "payload:bin = x'48656c6c6f'\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -326,7 +334,7 @@ func TestEncodeMapInline(t *testing.T) {
 	typ := makeMapType(scalarType(TypeStr), scalarType(TypeInt))
 	v := map[any]any{"a": int64(1)}
 	got := encodeCompact(t, "m", typ, v)
-	want := "m:<str = int> = <'a' = 1>\n"
+	want := "m:<str ; int> = <'a' ; 1>\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -336,7 +344,7 @@ func TestEncodeMapPretty(t *testing.T) {
 	typ := makeMapType(scalarType(TypeStr), scalarType(TypeInt))
 	v := map[any]any{"x": int64(10)}
 	got := encodePretty(t, "m", typ, v, "  ")
-	want := "m:<str = int> = <\n  'x' = 10\n>\n"
+	want := "m:<str ; int> = <\n  'x' ; 10\n>\n"
 	if got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
@@ -346,7 +354,7 @@ func TestEncodeMapEmpty(t *testing.T) {
 	typ := makeMapType(scalarType(TypeStr), scalarType(TypeInt))
 	v := map[any]any{}
 	got := encodeCompact(t, "m", typ, v)
-	want := "m:<str = int> = <>\n"
+	want := "m:<str ; int> = <>\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -422,7 +430,7 @@ func TestEncodeNestedStructWithMap(t *testing.T) {
 		"counts": map[any]any{"hits": int64(42)},
 	}
 	got := encodeCompact(t, "s", typ, v)
-	want := "s:{label:str, counts:<str = int>} = {'stats', <'hits' = 42>}\n"
+	want := "s:{label:str, counts:<str ; int>} = {'stats', <'hits' ; 42>}\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

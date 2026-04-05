@@ -1,0 +1,6 @@
+# Duplicate keys are preserved in encounter order.
+users:<str ; int> = <
+    'alice' ; 1
+    'bob'   ; 2
+    'alice' ; 3
+>

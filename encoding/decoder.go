@@ -8,16 +8,18 @@ import "io"
 // stream against a .spec.pakt definition.
 type Decoder struct {
 	r        *reader
+	sm       *stateMachine
 	spec     *Spec
 	specSeen map[string]struct{} // tracks which spec fields were seen
-	idx      int                 // current position in r.events
 	done     bool                // true after document fully parsed
 }
 
 // NewDecoder returns a Decoder that reads PAKT input from r.
 func NewDecoder(r io.Reader) *Decoder {
+	rd := newReader(r)
 	return &Decoder{
-		r: newReader(r),
+		r:  rd,
+		sm: newStateMachine(rd),
 	}
 }
 
@@ -54,26 +56,18 @@ func (d *Decoder) Decode() (Event, error) {
 	if d.spec != nil {
 		return d.decodeWithSpec()
 	}
+	return d.decodeStreaming()
+}
 
-	// Return any buffered events first.
-	if d.idx < len(d.r.events) {
-		ev := d.r.events[d.idx]
-		d.idx++
-		if ev.Kind == EventError {
-			return ev, ev.Err
-		}
-		return ev, nil
-	}
-
+func (d *Decoder) decodeStreaming() (Event, error) {
 	if d.done {
 		return Event{}, io.EOF
 	}
+	if d.sm == nil {
+		d.sm = newStateMachine(d.r)
+	}
 
-	// Try to produce more events by reading the next assignment.
-	d.r.events = d.r.events[:0]
-	d.idx = 0
-
-	err := d.r.readAssignment()
+	ev, err := d.sm.step()
 	if err != nil {
 		if err == io.EOF {
 			d.done = true
@@ -85,16 +79,5 @@ func (d *Decoder) Decode() (Event, error) {
 		return Event{}, err
 	}
 
-	if len(d.r.events) == 0 {
-		d.done = true
-		d.r.release()
-		return Event{}, io.EOF
-	}
-
-	ev := d.r.events[d.idx]
-	d.idx++
-	if ev.Kind == EventError {
-		return ev, ev.Err
-	}
 	return ev, nil
 }

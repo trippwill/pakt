@@ -1,7 +1,7 @@
 # Simple atom assignment
-level:|dev, staging, prod| = prod
+level:|dev, staging, prod| = |prod
 
 # Multiple atom fields
-status:|active, inactive, suspended| = active
-color:|red, green, blue| = blue
-priority:|low, medium, high, critical| = high
+status:|active, inactive, suspended| = |active
+color:|red, green, blue| = |blue
+priority:|low, medium, high, critical| = |high

@@ -28,6 +28,7 @@ func TestReadScalarTypes(t *testing.T) {
 		{":date", TypeDate},
 		{":time", TypeTime},
 		{":datetime", TypeDateTime},
+		{":bin", TypeBin},
 	}
 	for _, tc := range scalars {
 		r := typeReader(tc.input)
@@ -260,7 +261,7 @@ func TestReadListNullableType(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestReadMapScalar(t *testing.T) {
-	r := typeReader(":<str = int>")
+	r := typeReader(":<str ; int>")
 	got, err := r.readTypeAnnot()
 	if err != nil {
 		t.Fatal(err)
@@ -277,7 +278,7 @@ func TestReadMapScalar(t *testing.T) {
 }
 
 func TestReadMapCompositeValue(t *testing.T) {
-	r := typeReader(":<str = {name:str, age:int}>")
+	r := typeReader(":<str ; {name:str, age:int}>")
 	got, err := r.readTypeAnnot()
 	if err != nil {
 		t.Fatal(err)
@@ -288,7 +289,7 @@ func TestReadMapCompositeValue(t *testing.T) {
 }
 
 func TestReadMapNullable(t *testing.T) {
-	r := typeReader(":<str = int>?")
+	r := typeReader(":<str ; int>?")
 	got, err := r.readTypeAnnot()
 	if err != nil {
 		t.Fatal(err)
@@ -356,7 +357,7 @@ func TestReadTupleOfLists(t *testing.T) {
 }
 
 func TestReadMapOfListToStruct(t *testing.T) {
-	r := typeReader(":<str = [int]>")
+	r := typeReader(":<str ; [int]>")
 	got, err := r.readTypeAnnot()
 	if err != nil {
 		t.Fatal(err)
@@ -439,7 +440,7 @@ func TestReadTypeString(t *testing.T) {
 		{":{x:int}", "{x:int}"},
 		{":(int, str)", "(int, str)"},
 		{":[bool]", "[bool]"},
-		{":<str = int>", "<str = int>"},
+		{":<str ; int>", "<str ; int>"},
 	}
 	for _, tc := range tests {
 		r := typeReader(tc.input)

@@ -25,6 +25,8 @@ func lookupScalarType(name string) (TypeKind, bool) {
 		return TypeTime, true
 	case "datetime":
 		return TypeDateTime, true
+	case "bin":
+		return TypeBin, true
 	default:
 		return 0, false
 	}
@@ -235,7 +237,7 @@ func (r *reader) readListType() (Type, error) {
 	return Type{List: &ListType{Element: elemType}}, nil
 }
 
-// readMapType reads LANGLE type ASSIGN type RANGLE.
+// readMapType reads LANGLE type SEMI type RANGLE.
 func (r *reader) readMapType() (Type, error) {
 	if err := r.expectByte('<'); err != nil {
 		return Type{}, err
@@ -246,7 +248,7 @@ func (r *reader) readMapType() (Type, error) {
 		return Type{}, err
 	}
 	r.skipWSAndNewlines()
-	if err := r.expectByte('='); err != nil {
+	if err := r.expectByte(';'); err != nil {
 		return Type{}, err
 	}
 	r.skipWSAndNewlines()

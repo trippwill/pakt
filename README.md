@@ -5,6 +5,7 @@
 ```
 greeting:str     = 'hello world'
 count:int        = 42
+payload:bin      = x'48656C6C6F'
 active:bool      = true
 server:{host:str, port:int} = { 'localhost', 8080 }
 ```
@@ -14,6 +15,8 @@ server:{host:str, port:int} = { 'localhost', 8080 }
 PAKT is a typed data interchange format where every value carries its type. No inference, no ambiguity. Documents are self-validating — type annotations are producer assertions checked at parse time.
 
 Consumer-side `.spec.pakt` files enable **projections**: a streaming parser materializes only the fields a consumer needs, skipping everything else without allocation.
+
+The current Go library and CLI implement the converged PAKT v0 surface: `;` map syntax, `bin`, raw strings, the first-content-line multi-line string rule, and top-level `<<` stream statements. Duplicate map keys are preserved in decode order; higher-level consumers decide how to interpret them.
 
 ## Repository Structure
 

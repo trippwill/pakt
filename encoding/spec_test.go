@@ -65,7 +65,7 @@ level:|dev, staging, prod|
 config:{host:str, port:int}
 version:(int, int, int)
 tags:[str]
-meta:<str = str>
+meta:<str ; str>
 nickname:str?
 `
 	spec, err := ParseSpec(strings.NewReader(input))
@@ -267,9 +267,9 @@ func TestProjectionSkipMultiLineString(t *testing.T) {
 
 func TestProjectionSkipNestedComposites(t *testing.T) {
 	doc := `simple:int = 1
-nested:{items:[<str = {x:int, y:int}>], count:int} = {
+nested:{items:[<str ; {x:int, y:int}>], count:int} = {
     <
-        'alpha' = { 10, 20 }
+        'alpha' ; { 10, 20 }
         'beta'  = { 30, 40 }
     >
     2
@@ -277,7 +277,7 @@ nested:{items:[<str = {x:int, y:int}>], count:int} = {
 wanted:str = 'found'`
 	spec := "simple:int\nwanted:str"
 	events := decodeAllWithSpec(t, doc, spec)
-	// simple: 3, wanted: 3 = 6
+	// simple: 3, wanted: 3 ; 6
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d: %v", len(events), events)
 	}
@@ -290,7 +290,7 @@ wanted:str = 'found'`
 }
 
 func TestProjectionSkipAtomValue(t *testing.T) {
-	doc := "level:|dev, staging, prod| = prod\ncount:int = 3"
+	doc := "level:|dev, staging, prod| = |prod\ncount:int = 3"
 	spec := "count:int"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -350,9 +350,9 @@ func TestProjectionSkipNegativeNumber(t *testing.T) {
 }
 
 func TestProjectionSkipMapValue(t *testing.T) {
-	doc := `meta:<str = str> = <
-    'owner' = 'team'
-    'region' = 'us-east'
+	doc := `meta:<str ; str> = <
+    'owner' ; 'team'
+    'region' ; 'us-east'
 >
 count:int = 5`
 	spec := "count:int"
@@ -590,7 +590,7 @@ func TestProjectionSkipTripleDoubleQuotedString(t *testing.T) {
 
 func TestProjectionSkipEmptyComposites(t *testing.T) {
 	doc := `items:[str] = []
-meta:<str = str> = <>
+meta:<str ; str> = <>
 count:int = 1`
 	spec := "count:int"
 	events := decodeAllWithSpec(t, doc, spec)
@@ -637,12 +637,12 @@ count:int = 1`
 func TestProjectionSkipTupleWithAllInnerTypes(t *testing.T) {
 	// Tuple containing struct, list, map — exercises
 	// skipComposite('(', ')') hitting '{', '[', '<' and comments.
-	doc := `data:(int, {x:int, y:int}, [int], <str = int>) = (
+	doc := `data:(int, {x:int, y:int}, [int], <str ; int>) = (
     1
     # comment inside tuple
     { 10, 20 }
     [1, 2]
-    <'a' = 5>
+    <'a' ; 5>
 )
 wanted:int = 99`
 	spec := "wanted:int"
@@ -659,12 +659,12 @@ func TestProjectionSkipListWithAllInnerTypes(t *testing.T) {
 	// List containing struct with tuple and map inside — exercises
 	// skipComposite('[', ']') hitting '{' → skipCompositeInner,
 	// then '(' and '<' within inner.
-	doc := `data:[{a:int, b:(int, int), c:<str = int>}] = [
+	doc := `data:[{a:int, b:(int, int), c:<str ; int>}] = [
     # comment inside list
     {
         1
         (2, 3)
-        <'k' = 4>
+        <'k' ; 4>
     }
 ]
 wanted:int = 88`
@@ -682,9 +682,9 @@ func TestProjectionSkipMapWithAllInnerTypes(t *testing.T) {
 	// Map containing struct values with tuple and list — exercises
 	// skipComposite('<', '>') hitting '{' → skipCompositeInner,
 	// then '(' and '[' within inner.
-	doc := `data:<str = {a:int, b:(int, int), c:[int]}> = <
+	doc := `data:<str ; {a:int, b:(int, int), c:[int]}> = <
     # comment inside map
-    'key' = {
+    'key' ; {
         1
         (2, 3)
         [4, 5]
@@ -704,10 +704,10 @@ wanted:int = 77`
 func TestProjectionSkipDeeplyNestedFiveLevels(t *testing.T) {
 	// 5 levels: struct → list → map → struct → tuple
 	// Exercises skipCompositeInner recursively with all delimiter types.
-	doc := `deep:{items:[<str = {point:(int, int)}>]} = {
+	doc := `deep:{items:[<str ; {point:(int, int)}>]} = {
     [
         <
-            'alpha' = { (10, 20) }
+            'alpha' ; { (10, 20) }
             'beta'  = { (30, 40) }
         >
     ]
@@ -725,9 +725,9 @@ wanted:int = 1`
 
 func TestProjectionSkipMixedCompositesAtSameLevel(t *testing.T) {
 	// Struct containing a list, map, and tuple at the same level.
-	doc := `server:{ports:[int], labels:<str = str>, version:(int, int, int)} = {
+	doc := `server:{ports:[int], labels:<str ; str>, version:(int, int, int)} = {
     [8080, 8443]
-    <'env' = 'prod'>
+    <'env' ; 'prod'>
     (1, 2, 3)
 }
 wanted:int = 1`
@@ -744,10 +744,10 @@ wanted:int = 1`
 func TestProjectionSkipInnerCompositeWithStringsAndComments(t *testing.T) {
 	// Struct → list → map → struct with strings containing delimiters
 	// and comments inside skipCompositeInner paths.
-	doc := `deep:{items:[<str = {point:(int, int)}>]} = {
+	doc := `deep:{items:[<str ; {point:(int, int)}>]} = {
     [
         <
-            'key with {brackets} and [more] and (parens) and <angles>' = {
+            'key with {brackets} and [more] and (parens) and <angles>' ; {
                 # comment with > and ) and ] delimiters
                 (10, 20)
             }
@@ -771,7 +771,7 @@ wanted:int = 1`
 
 func TestProjectionSkipTripleQuotedWithEmbeddedQuote(t *testing.T) {
 	// Triple-quoted string containing the quote character inside.
-	doc := "msg:str = '''it's a test'''\nwanted:int = 1"
+	doc := "msg:str = '''\nit's a test\n'''\nwanted:int = 1"
 	spec := "wanted:int"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -784,7 +784,7 @@ func TestProjectionSkipTripleQuotedWithEmbeddedQuote(t *testing.T) {
 
 func TestProjectionSkipTripleQuotedWithEscapedBackslash(t *testing.T) {
 	// Triple-quoted with backslash-escaped backslash before the closing quotes.
-	doc := "msg:str = '''line\\\\'''\nwanted:int = 2"
+	doc := "msg:str = '''\nline\\\\\n'''\nwanted:int = 2"
 	spec := "wanted:int"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -797,7 +797,7 @@ func TestProjectionSkipTripleQuotedWithEscapedBackslash(t *testing.T) {
 
 func TestProjectionSkipTripleQuotedWithEscapedQuoteBeforeClose(t *testing.T) {
 	// Backslash-quote inside triple-quoted — the \' should not start closing.
-	doc := "msg:str = '''don\\'t stop'''\nwanted:int = 3"
+	doc := "msg:str = '''\ndon\\'t stop\n'''\nwanted:int = 3"
 	spec := "wanted:int"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -810,7 +810,7 @@ func TestProjectionSkipTripleQuotedWithEscapedQuoteBeforeClose(t *testing.T) {
 
 func TestProjectionSkipTripleDoubleQuotedWithEmbeddedQuotes(t *testing.T) {
 	// Triple double-quoted string containing a double quote inside.
-	doc := "msg:str = \"\"\"hello \"world\"\n\"\"\"\nwanted:int = 4"
+	doc := "msg:str = \"\"\"\nhello \"world\"\n\"\"\"\nwanted:int = 4"
 	spec := "wanted:int"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -822,8 +822,7 @@ func TestProjectionSkipTripleDoubleQuotedWithEmbeddedQuotes(t *testing.T) {
 }
 
 func TestProjectionSkipEmptyTripleQuotedString(t *testing.T) {
-	// Empty triple-quoted string: six consecutive quotes with nothing inside.
-	doc := "msg:str = ''''''\nwanted:int = 5"
+	doc := "msg:str = '''\n'''\nwanted:int = 5"
 	spec := "wanted:int"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -836,7 +835,7 @@ func TestProjectionSkipEmptyTripleQuotedString(t *testing.T) {
 
 func TestProjectionSkipTripleQuotedWithTwoConsecutiveQuotesThenOther(t *testing.T) {
 	// Two consecutive quotes that don't form a closing triple.
-	doc := "msg:str = '''ab''cd'''\nwanted:int = 6"
+	doc := "msg:str = '''\nab''cd\n'''\nwanted:int = 6"
 	spec := "wanted:int"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -880,9 +879,9 @@ func TestProjectionSkipMultiLineStringInSkippedStruct(t *testing.T) {
 
 func TestProjectionSkipMapWithEqualsInStringValues(t *testing.T) {
 	// Map where string values contain '=' signs.
-	doc := `env:<str = str> = <
-    'PATH' = '/usr/bin=/usr/local/bin'
-    'OPTS' = '--key=value --flag=true'
+	doc := `env:<str ; str> = <
+    'PATH' ; '/usr/bin=/usr/local/bin'
+    'OPTS' ; '--key=value --flag=true'
 >
 wanted:int = 5`
 	spec := "wanted:int"
@@ -938,7 +937,7 @@ id:uuid = 550e8400-e29b-41d4-a716-446655440000
 d:date = 2026-01-15
 t:time = 14:30:00Z
 dt:datetime = 2026-06-01T14:30:00Z
-level:|dev, staging, prod| = staging
+level:|dev, staging, prod| = |staging
 wanted:int = 100`
 	spec := "wanted:int"
 	events := decodeAllWithSpec(t, doc, spec)
@@ -956,10 +955,10 @@ wanted:int = 100`
 
 func TestProjectionFirstFieldSkippedSecondCaptured(t *testing.T) {
 	// The first field is skipped (deeply nested), second is captured.
-	doc := `complex:{items:[<str = {n:int}>]} = {
+	doc := `complex:{items:[<str ; {n:int}>]} = {
     [
         <
-            'key' = { 42 }
+            'key' ; { 42 }
         >
     ]
 }
@@ -980,14 +979,14 @@ wanted:str = 'captured'`
 func TestProjectionComplexDocWithNestedDelimiterStrings(t *testing.T) {
 	// Skipped field has deeply nested composites with strings containing
 	// all delimiter types; the second field is captured.
-	doc := `config:{servers:[<str = {desc:str, port:int}>]} = {
+	doc := `config:{servers:[<str ; {desc:str, port:int}>]} = {
     [
         <
-            'prod' = {
+            'prod' ; {
                 'server {prod} on port [443] via (tls) at <edge>'
                 443
             }
-            'staging' = {
+            'staging' ; {
                 'server {staging} on port [8443]'
                 8443
             }
@@ -1011,9 +1010,9 @@ func TestProjectionSkipMultipleComplexFieldsCaptureMiddle(t *testing.T) {
     [1, 2, 3]
 }
 wanted:str = 'middle'
-after:<str = (int, int)> = <
-    'a' = (1, 2)
-    'b' = (3, 4)
+after:<str ; (int, int)> = <
+    'a' ; (1, 2)
+    'b' ; (3, 4)
 >`
 	spec := "wanted:str"
 	events := decodeAllWithSpec(t, doc, spec)

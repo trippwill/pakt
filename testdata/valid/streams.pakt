@@ -1,0 +1,27 @@
+# Mixed assignment + stream document
+
+app-name:str = 'midwatch'
+region:str = 'us-east-1'
+active:bool = true
+
+# Bare atom values in a list stream
+states:[|queued, running, done|] <<
+    |queued
+    |running
+    |done
+
+# Streamed list of structs
+events:[{ts:datetime, level:|info, warn, error|, msg:str}] <<
+    { 2026-06-01T14:30:00Z, |info, 'starting worker' }
+    { 2026-06-01T14:30:05Z, |warn, 'replica lag detected' }
+    { 2026-06-01T14:30:07Z, |error, 'retry scheduled' }
+
+# Streamed map entries
+metrics:<str ; int> <<
+    'requests' ; 120
+    'errors'   ; 3
+    'retries'  ; 1
+
+# Normal assignments after streams
+build:(int, int, int) = (2, 14, 0)
+owners:[str] = ['platform', 'sre']

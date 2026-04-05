@@ -155,7 +155,7 @@ func TestMarshalMap(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := string(b)
-	if !strings.Contains(got, "scores:<str = int>") {
+	if !strings.Contains(got, "scores:<str ; int>") {
 		t.Errorf("unexpected type: %q", got)
 	}
 	if !strings.Contains(got, "'alice'") || !strings.Contains(got, "100") {
@@ -366,7 +366,7 @@ func TestMarshalComplexNested(t *testing.T) {
 	if !strings.Contains(got, "tags:[{key:str, value:str}]") {
 		t.Errorf("missing tags type: %q", got)
 	}
-	if !strings.Contains(got, "labels:<str = str>") {
+	if !strings.Contains(got, "labels:<str ; str>") {
 		t.Errorf("missing labels type: %q", got)
 	}
 	if !strings.Contains(got, "'myapp'") {
@@ -441,7 +441,7 @@ func TestMarshalTextMarshaler(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Additional: []byte → str
+// Additional: []byte → bin
 // ---------------------------------------------------------------------------
 
 func TestMarshalByteSlice(t *testing.T) {
@@ -450,7 +450,7 @@ func TestMarshalByteSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := string(b)
-	want := "data:str = 'binary'\n"
+	want := "data:bin = x'62696e617279'\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

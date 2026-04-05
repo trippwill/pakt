@@ -6,7 +6,7 @@ version:(int, int, int) = (2, 14, 0)
 
 # Deployment target
 deploy:{level:|dev, staging, prod|, release:int, date:date} = {
-    prod
+    |prod
     26
     2026-06-01
 }
@@ -39,10 +39,10 @@ tls-fingerprint:str? = 'sha256:a1b2c3d4e5f6'
 rollback-version:(int, int, int)? = nil
 
 # Service metadata
-meta:<str = str> = <
-    'owner'  = 'platform-team'
-    'region' = 'us-east-1'
-    'tier'   = 'critical'
+meta:<str ; str> = <
+    'owner'  ; 'platform-team'
+    'region' ; 'us-east-1'
+    'tier'   ; 'critical'
 >
 
 # Health check

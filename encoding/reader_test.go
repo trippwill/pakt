@@ -326,7 +326,7 @@ func TestReadMultiLineStringEscapes(t *testing.T) {
 }
 
 func TestReadMultiLineStringInsufficientIndent(t *testing.T) {
-	input := "'''\n  short\n    '''"
+	input := "'''\n    first\n  second\n    '''"
 	r := mkReader(input)
 	_, err := r.readString()
 	if err == nil {
@@ -353,6 +353,51 @@ func TestReadMultiLineStringBlankLine(t *testing.T) {
 	want := "line1\n\nline2"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestReadRawStringSingleLine(t *testing.T) {
+	r := mkReader(`r'C:\Users\alice\Documents'`)
+	got, err := r.readString()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != `C:\Users\alice\Documents` {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadRawStringMultiLine(t *testing.T) {
+	input := "r'''\n    Hello \\n World\n    '''"
+	r := mkReader(input)
+	got, err := r.readString()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != `Hello \n World` {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadBinHex(t *testing.T) {
+	r := mkReader(`x'48656C6C6F'`)
+	got, err := r.readBin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "48656c6c6f" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadBinBase64(t *testing.T) {
+	r := mkReader(`b'SGVsbG8='`)
+	got, err := r.readBin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "48656c6c6f" {
+		t.Fatalf("got %q", got)
 	}
 }
 
@@ -416,6 +461,9 @@ func TestReadDec(t *testing.T) {
 		{"-1.5", "-1.5"},
 		{"1_000.50", "1_000.50"},
 		{"0.0", "0.0"},
+		{".5", ".5"},
+		{"-.75", "-.75"},
+		{".123", ".123"},
 	}
 	for _, tc := range tests {
 		r := mkReader(tc.input)
@@ -445,6 +493,7 @@ func TestReadFloat(t *testing.T) {
 		{"-3.14e+2", "-3.14e+2"},
 		{"1e0", "1e0"},
 		{"1_000.5e3", "1_000.5e3"},
+		{".5e2", ".5e2"},
 	}
 	for _, tc := range tests {
 		r := mkReader(tc.input)
@@ -606,7 +655,7 @@ func TestReadUUIDBad(t *testing.T) {
 
 func TestReadAtomValid(t *testing.T) {
 	allowed := []string{"dev", "staging", "prod"}
-	r := mkReader("staging")
+	r := mkReader("|staging")
 	got, err := r.readAtom(allowed)
 	if err != nil {
 		t.Fatal(err)
@@ -618,7 +667,7 @@ func TestReadAtomValid(t *testing.T) {
 
 func TestReadAtomInvalid(t *testing.T) {
 	allowed := []string{"dev", "staging", "prod"}
-	r := mkReader("test")
+	r := mkReader("|test")
 	_, err := r.readAtom(allowed)
 	if err == nil {
 		t.Fatal("expected error for atom not in set")

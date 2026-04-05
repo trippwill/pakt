@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"reflect"
@@ -102,6 +103,7 @@ func (e *Encoder) writeValue(typ Type, v any) {
 			e.err = fmt.Errorf("atom set value must be string, got %T", v)
 			return
 		}
+		e.write("|")
 		e.write(s)
 	case typ.Struct != nil:
 		e.writeStructValue(typ.Struct, v)
@@ -194,6 +196,15 @@ func (e *Encoder) writeScalar(kind TypeKind, v any) {
 			return
 		}
 		e.write(s)
+	case TypeBin:
+		switch data := v.(type) {
+		case []byte:
+			e.writeBin(data)
+		case string:
+			e.writeBin([]byte(data))
+		default:
+			e.err = fmt.Errorf("bin value must be []byte or string, got %T", v)
+		}
 	default:
 		e.err = fmt.Errorf("unknown scalar kind: %d", int(kind))
 	}
@@ -245,6 +256,12 @@ func (e *Encoder) writeString(s string) {
 	e.write(string(quote))
 }
 
+func (e *Encoder) writeBin(data []byte) {
+	e.write("x'")
+	e.write(hex.EncodeToString(data))
+	e.write("'")
+}
+
 // writeMultiLineString writes a triple-quoted string with indentation stripping.
 func (e *Encoder) writeMultiLineString(s string) {
 	// Use single-quote triple quotes unless content contains '''.
@@ -258,8 +275,8 @@ func (e *Encoder) writeMultiLineString(s string) {
 	e.write(quote)
 	e.newline()
 
-	lines := strings.Split(s, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(s, "\n")
+	for line := range lines {
 		e.writeIndent()
 		// Escape special chars within the line.
 		for _, r := range line {
@@ -426,7 +443,7 @@ func (e *Encoder) writeMapValue(mt *MapType, v any) {
 		for _, entry := range entries {
 			e.writeIndent()
 			e.writeValue(mt.Key, entry.key)
-			e.write(" = ")
+			e.write(" ; ")
 			e.writeValue(mt.Value, entry.val)
 			e.newline()
 		}
@@ -440,7 +457,7 @@ func (e *Encoder) writeMapValue(mt *MapType, v any) {
 				e.write(", ")
 			}
 			e.writeValue(mt.Key, entry.key)
-			e.write(" = ")
+			e.write(" ; ")
 			e.writeValue(mt.Value, entry.val)
 		}
 		e.write(">")
@@ -457,7 +474,7 @@ type mapEntry struct {
 }
 
 // mapEntries extracts ordered key-value pairs from a map value.
-func mapEntries(mt *MapType, v any) ([]mapEntry, error) {
+func mapEntries(_ *MapType, v any) ([]mapEntry, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Map {
 		return nil, fmt.Errorf("map value must be a map, got %T", v)
@@ -484,7 +501,7 @@ func structValues(st *StructType, v any) ([]any, error) {
 	default:
 		// Try reflection for struct types.
 		rv := reflect.ValueOf(v)
-		if rv.Kind() == reflect.Ptr {
+		if rv.Kind() == reflect.Pointer {
 			rv = rv.Elem()
 		}
 		if rv.Kind() != reflect.Struct {
@@ -547,7 +564,7 @@ func derefPtr(v any) any {
 		return nil
 	}
 	rv := reflect.ValueOf(v)
-	for rv.Kind() == reflect.Ptr {
+	for rv.Kind() == reflect.Pointer {
 		if rv.IsNil() {
 			return nil
 		}

@@ -7,10 +7,15 @@
     <p class="hero-tagline">{{ site.Params.tagline }}</p>
     <p class="hero-desc">A typed data interchange format where every value carries its type.</p>
     <div class="hero-code">
-      <pre><code>greeting:str     = 'hello world'
-count:int        = 42
-active:bool      = true
-server:{host:str, port:int} = { 'localhost', 8080 }</code></pre>
+      <pre><code><span class="pk-name">app-name</span><span class="pk-delim">:</span><span class="pk-type">str</span>     <span class="pk-op">=</span> <span class="pk-str">'midwatch'</span>
+<span class="pk-name">version</span><span class="pk-delim">:</span><span class="pk-delim">(</span><span class="pk-type">int</span><span class="pk-delim">,</span> <span class="pk-type">int</span><span class="pk-delim">,</span> <span class="pk-type">int</span><span class="pk-delim">)</span> <span class="pk-op">=</span> <span class="pk-delim">(</span><span class="pk-num">2</span><span class="pk-delim">,</span> <span class="pk-num">14</span><span class="pk-delim">,</span> <span class="pk-num">0</span><span class="pk-delim">)</span>
+<span class="pk-name">active</span><span class="pk-delim">:</span><span class="pk-type">bool</span>      <span class="pk-op">=</span> <span class="pk-bool">true</span>
+<span class="pk-name">server</span><span class="pk-delim">:</span><span class="pk-delim">{</span><span class="pk-name">host</span><span class="pk-delim">:</span><span class="pk-type">str</span><span class="pk-delim">,</span> <span class="pk-name">port</span><span class="pk-delim">:</span><span class="pk-type">int</span><span class="pk-delim">}</span> <span class="pk-op">=</span> <span class="pk-delim">{</span> <span class="pk-str">'localhost'</span><span class="pk-delim">,</span> <span class="pk-num">8080</span> <span class="pk-delim">}</span>
+
+<span class="pk-comment"># Streamed data — no delimiters needed</span>
+<span class="pk-name">events</span><span class="pk-delim">:</span><span class="pk-delim">[</span><span class="pk-delim">{</span><span class="pk-name">ts</span><span class="pk-delim">:</span><span class="pk-type">datetime</span><span class="pk-delim">,</span> <span class="pk-name">level</span><span class="pk-delim">:</span><span class="pk-type">str</span><span class="pk-delim">}</span><span class="pk-delim">]</span> <span class="pk-op">&lt;&lt;</span>
+    <span class="pk-delim">{</span> <span class="pk-num">2026-06-01T14:30:00Z</span><span class="pk-delim">,</span> <span class="pk-str">'info'</span> <span class="pk-delim">}</span>
+    <span class="pk-delim">{</span> <span class="pk-num">2026-06-01T14:31:00Z</span><span class="pk-delim">,</span> <span class="pk-str">'warn'</span> <span class="pk-delim">}</span></code></pre>
     </div>
     <div class="hero-actions">
       <a href="/docs/" class="btn btn-primary">Read the Docs</a>
@@ -33,6 +38,35 @@ server:{host:str, port:int} = { 'localhost', 8080 }</code></pre>
       <h3>Spec-projected</h3>
       <p>Consumer-side <code>.spec.pakt</code> files enable projections: materialize only the fields you need, skip everything else without allocation.</p>
     </div>
+    <div class="feature-card">
+      <h3>Performance is a feature</h3>
+      <p>LL(0) streaming parser. Integer-typed events. No string dispatch. Zero lookahead for stream termination.</p>
+    </div>
+  </div>
+</section>
+
+<section class="comparison-section">
+  <div class="comparison-inner">
+    <h2>Why PAKT?</h2>
+    <div class="comparison-grid">
+      <div class="comparison-col">
+        <h4>PAKT</h4>
+        <pre><code><span class="pk-name">server</span><span class="pk-delim">:</span><span class="pk-delim">{</span><span class="pk-name">host</span><span class="pk-delim">:</span><span class="pk-type">str</span><span class="pk-delim">,</span> <span class="pk-name">port</span><span class="pk-delim">:</span><span class="pk-type">int</span><span class="pk-delim">}</span> <span class="pk-op">=</span> <span class="pk-delim">{</span>
+    <span class="pk-str">'localhost'</span>
+    <span class="pk-num">8080</span>
+<span class="pk-delim">}</span></code></pre>
+      </div>
+      <div class="comparison-col">
+        <h4>JSON</h4>
+        <pre><code>{
+  "server": {
+    "host": "localhost",
+    "port": 8080
+  }
+}</code></pre>
+      </div>
+    </div>
+    <p class="comparison-caption">Types are built in. Structure is explicit. Projections skip what you don't need.</p>
   </div>
 </section>
 

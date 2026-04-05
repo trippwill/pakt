@@ -8,7 +8,7 @@ score:int? = 42
 role:|admin, user|? = nil
 
 # Nullable atom with actual value
-status:|active, inactive|? = active
+status:|active, inactive|? = |active
 
 # Nullable in composite context: list of nullable ints
 sparse:[int?] = [1, nil, 3, nil, 5]

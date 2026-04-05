@@ -390,19 +390,19 @@ func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
 	var pb strings.Builder
 	pb.WriteString("root:str = '/data/warehouse'\n")
 	pb.WriteString("scanned:datetime = 2026-06-01T14:30:00Z\n")
-	pb.WriteString("entries:[{path:str, size:int, mode:int, mod_time:datetime, is_dir:bool, owner:str, group:str, hash:str}] << ")
+	pb.WriteString("entries:[{path:str, size:int, mode:int, mod_time:datetime, is_dir:bool, owner:str, group:str, hash:str}] <<\n")
 	for i, e := range entries {
 		if i > 0 {
-			pb.WriteString(", ")
+			pb.WriteByte('\n')
 		}
 		boolStr := "false"
 		if e.IsDir {
 			boolStr = "true"
 		}
-		fmt.Fprintf(&pb, "{ '%s', %d, 0o%o, %s, %s, '%s', '%s', '%s' }",
+		fmt.Fprintf(&pb, "    { '%s', %d, %d, %s, %s, '%s', '%s', '%s' }",
 			e.Path, e.Size, e.Mode, e.ModTime, boolStr, e.Owner, e.Group, e.Hash)
 	}
-	pb.WriteString("\n")
+	pb.WriteByte('\n')
 
 	jsonBytes, _ := json.Marshal(val)
 	return val, []byte(pb.String()), jsonBytes

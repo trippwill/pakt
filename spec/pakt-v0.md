@@ -310,9 +310,32 @@ The following tokens are reserved for future use. They must not appear in docume
 | `!` | Assertions or negation |
 | `*` | Wildcards or glob patterns |
 | `$` | Variable references or interpolation |
-| `&` | References or anchors |
+| `&` | Type aliases (see §4.6) |
 | `~` | Approximate matching or home paths |
 | `` ` `` | Alternate string delimiters or template literals |
+
+### 4.6 Future Consideration: Type Aliases
+
+> **Status**: Design sketch only. Not part of PAKT 0. The `&` token is reserved for this purpose.
+
+Type aliases would allow naming a type once and referencing it by name in type positions:
+
+```
+&entry = {path:str, size:int, is_dir:bool, hash:bin?}
+&level = |info, warn, error|
+
+entries:[&entry] << ...
+events:[{ts:datetime, level:&level, msg:str}] << ...
+```
+
+Planned semantics:
+
+- **`&name = type`** defines a type alias. It is not a statement — it emits no events and does not participate in root uniqueness.
+- **`&name`** in type position is a structural substitution — the alias expands to the underlying type. There is no nominal typing.
+- **Must appear before use.** This is the streaming-compatible ordering rule. Forward references are a parse error. In practice, aliases go at the top of the document.
+- **`&` sigil required in both definition and reference.** This keeps alias names and statement names in separate namespaces — a document can have both `&entry` (type alias) and `entry` (statement name) without conflict.
+- **Aliases can reference earlier aliases.** `&log = {ts:datetime, level:&level}` is valid if `&level` is already defined.
+- **Spec files define their own aliases.** Projection is structural, not nominal — a spec's `&entry` must structurally match the document's `&entry`, but they are independent definitions.
 
 ## 5. Syntactic Grammar
 

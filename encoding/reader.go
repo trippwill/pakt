@@ -22,7 +22,8 @@ var bufPool = sync.Pool{
 // reader is the hybrid lexer/parser that reads PAKT input directly from bytes
 // and emits Events. It is unexported; the public API is [Decoder].
 type reader struct {
-	buf     *bufio.Reader
+	src     byteSource
+	bufSrc  *bufioSource // non-nil when src is a bufioSource (for pool return)
 	pos     Pos
 	lastPos Pos
 	seen    map[string]struct{}
@@ -32,8 +33,20 @@ type reader struct {
 func newReader(r io.Reader) *reader {
 	br := bufPool.Get().(*bufio.Reader)
 	br.Reset(r)
+	bs := &bufioSource{br: br}
 	rd := &reader{
-		buf:  br,
+		src:    bs,
+		bufSrc: bs,
+		pos:    Pos{Line: 1, Col: 1},
+		seen:   make(map[string]struct{}, 16),
+	}
+	rd.skipBOM()
+	return rd
+}
+
+func newReaderFromBytes(data []byte) *reader {
+	rd := &reader{
+		src:  newBytesSource(data),
 		pos:  Pos{Line: 1, Col: 1},
 		seen: make(map[string]struct{}, 16),
 	}
@@ -43,11 +56,12 @@ func newReader(r io.Reader) *reader {
 
 // release returns the pooled bufio.Reader.
 func (r *reader) release() {
-	if r.buf != nil {
-		r.buf.Reset(nil)
-		bufPool.Put(r.buf)
-		r.buf = nil
+	if r.bufSrc != nil {
+		r.bufSrc.br.Reset(nil)
+		bufPool.Put(r.bufSrc.br)
+		r.bufSrc = nil
 	}
+	r.src = nil
 }
 
 // ---------------------------------------------------------------------------
@@ -55,25 +69,21 @@ func (r *reader) release() {
 // ---------------------------------------------------------------------------
 
 func (r *reader) skipBOM() {
-	p, err := r.buf.Peek(3)
+	p, err := r.src.Peek(3)
 	if err == nil && p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF {
-		r.buf.Discard(3) //nolint:errcheck
+		r.src.Discard(3) //nolint:errcheck
 	}
 }
 
 // peekByte returns the next byte without consuming it.
 func (r *reader) peekByte() (byte, error) {
-	p, err := r.buf.Peek(1)
-	if err != nil {
-		return 0, err
-	}
-	return p[0], nil
+	return r.src.PeekByte()
 }
 
 // readByte reads and consumes one byte, updating pos.
 // \r\n is normalised to \n; bare \r is also treated as a newline.
 func (r *reader) readByte() (byte, error) {
-	b, err := r.buf.ReadByte()
+	b, err := r.src.ReadByte()
 	if err != nil {
 		return 0, err
 	}
@@ -84,8 +94,8 @@ func (r *reader) readByte() (byte, error) {
 		r.pos.Col = 1
 	case '\r':
 		// Consume a following \n if present (\r\n → single newline).
-		if nb, perr := r.buf.Peek(1); perr == nil && nb[0] == '\n' {
-			r.buf.ReadByte() //nolint:errcheck
+		if nb, perr := r.src.Peek(1); perr == nil && nb[0] == '\n' {
+			r.src.ReadByte() //nolint:errcheck
 		}
 		r.pos.Line++
 		r.pos.Col = 1
@@ -99,7 +109,7 @@ func (r *reader) readByte() (byte, error) {
 // unreadByte pushes the last byte back and restores the previous position.
 // Only valid for one consecutive unread.
 func (r *reader) unreadByte() {
-	_ = r.buf.UnreadByte()
+	_ = r.src.UnreadByte()
 	r.pos = r.lastPos
 }
 
@@ -188,12 +198,12 @@ func (r *reader) expectByte(expected byte) error {
 }
 
 func (r *reader) peekRawStringStart() bool {
-	p, err := r.buf.Peek(2)
+	p, err := r.src.Peek(2)
 	return err == nil && p[0] == 'r' && (p[1] == '\'' || p[1] == '"')
 }
 
 func (r *reader) peekBinLiteralStart() bool {
-	p, err := r.buf.Peek(2)
+	p, err := r.src.Peek(2)
 	return err == nil && (p[0] == 'x' || p[0] == 'b') && p[1] == '\''
 }
 
@@ -282,7 +292,7 @@ func (r *reader) readString() (string, error) {
 	}
 
 	// Check for triple-quote opening.
-	if p, perr := r.buf.Peek(2); perr == nil && p[0] == quote && p[1] == quote {
+	if p, perr := r.src.Peek(2); perr == nil && p[0] == quote && p[1] == quote {
 		r.readByte() //nolint:errcheck // second quote
 		r.readByte() //nolint:errcheck // third quote
 		return r.readMultiLineString(quote, raw)

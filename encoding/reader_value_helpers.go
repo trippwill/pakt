@@ -89,7 +89,7 @@ func (r *reader) readScalarDirect(kind TypeKind) (string, Pos, error) {
 // peekNil checks whether the next non-WS content is the keyword "nil" followed
 // by a non-identifier byte. It does not consume any input.
 func (r *reader) peekNil() bool {
-	p, err := r.buf.Peek(256) // peek a generous amount
+	p, err := r.src.Peek(256) // peek a generous amount
 	if err != nil && len(p) == 0 {
 		return false
 	}

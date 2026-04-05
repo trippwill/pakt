@@ -1,7 +1,6 @@
 package encoding
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -36,19 +35,23 @@ func Unmarshal(data []byte, v any) error {
 		return err
 	}
 
-	dec := NewDecoder(bytes.NewReader(data))
-	defer dec.Close()
+	rd := newReaderFromBytes(data)
+	sm := newStateMachine(rd)
+	defer func() {
+		sm.release()
+		rd.release()
+	}()
 
 	for {
-		dec.r.skipInsignificant(true)
-		if _, err := dec.r.peekByte(); err != nil {
+		rd.skipInsignificant(true)
+		if _, err := rd.peekByte(); err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
 
-		h, err := dec.sm.readStatementHeader()
+		h, err := sm.readStatementHeader()
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -58,7 +61,7 @@ func Unmarshal(data []byte, v any) error {
 
 		fi, ok := info.fieldMap[h.name]
 		if !ok {
-			if err := dec.r.skipStatementBody(h); err != nil {
+			if err := rd.skipStatementBody(h); err != nil {
 				return err
 			}
 			continue
@@ -68,16 +71,16 @@ func Unmarshal(data []byte, v any) error {
 		if h.stream {
 			var serr error
 			if h.typ.List != nil {
-				serr = dec.sm.unmarshalStreamList(h.typ.List, target)
+				serr = sm.unmarshalStreamList(h.typ.List, target)
 			} else {
-				serr = dec.sm.unmarshalStreamMap(h.typ.Map, target)
+				serr = sm.unmarshalStreamMap(h.typ.Map, target)
 			}
 			if serr != nil {
 				return fmt.Errorf("pakt: field %q: %w", h.name, serr)
 			}
 		} else {
-			dec.r.skipWS()
-			if err := dec.sm.unmarshalValue(h.typ, target); err != nil {
+			rd.skipWS()
+			if err := sm.unmarshalValue(h.typ, target); err != nil {
 				return fmt.Errorf("pakt: field %q: %w", h.name, err)
 			}
 		}

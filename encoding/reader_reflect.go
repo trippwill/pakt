@@ -15,7 +15,7 @@ import (
 func (r *reader) readIntInto(target reflect.Value) error {
 	// Peek ahead to decide: fast decimal path or fallback.
 	// We need to check for negative sign and base prefixes without consuming.
-	p, _ := r.buf.Peek(3)
+	p, _ := r.src.Peek(3)
 	offset := 0
 	if len(p) > 0 && p[0] == '-' {
 		offset = 1

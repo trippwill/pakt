@@ -164,7 +164,7 @@ func (sm *stateMachine) readStatementHeader() (statementHeader, error) {
 	case b == '=':
 		sm.r.readByte() //nolint:errcheck
 	case b == '<':
-		p, perr := sm.r.buf.Peek(2)
+		p, perr := sm.r.src.Peek(2)
 		if perr != nil || len(p) < 2 || p[0] != '<' || p[1] != '<' {
 			return statementHeader{}, sm.r.errorf("expected '=' or '<<' after statement header")
 		}
@@ -322,7 +322,7 @@ func (r *reader) canStartValueInStream(b byte) bool {
 // peekKeyword reports whether the next bytes match the given keyword exactly,
 // followed by a non-identifier byte (or EOF).
 func (r *reader) peekKeyword(kw string) bool {
-	p, err := r.buf.Peek(len(kw) + 1)
+	p, err := r.src.Peek(len(kw) + 1)
 	if err != nil && len(p) < len(kw) {
 		return false
 	}

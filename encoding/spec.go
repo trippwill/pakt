@@ -111,7 +111,7 @@ func (r *reader) skipString() error {
 	}
 
 	// Check for triple-quote.
-	if p, perr := r.buf.Peek(2); perr == nil && p[0] == quote && p[1] == quote {
+	if p, perr := r.src.Peek(2); perr == nil && p[0] == quote && p[1] == quote {
 		r.readByte() //nolint:errcheck
 		r.readByte() //nolint:errcheck
 		return r.skipTripleQuotedString(quote, raw)
@@ -177,14 +177,14 @@ func (r *reader) skipComposite(open, close byte) error {
 				return err
 			}
 		case 'r':
-			if p, err := r.buf.Peek(1); err == nil && (p[0] == '\'' || p[0] == '"') {
+			if p, err := r.src.Peek(1); err == nil && (p[0] == '\'' || p[0] == '"') {
 				r.unreadByte()
 				if err := r.skipString(); err != nil {
 					return err
 				}
 			}
 		case 'x', 'b':
-			if p, err := r.buf.Peek(1); err == nil && p[0] == '\'' {
+			if p, err := r.src.Peek(1); err == nil && p[0] == '\'' {
 				r.unreadByte()
 				if err := r.skipBinLiteral(); err != nil {
 					return err
@@ -243,14 +243,14 @@ func (r *reader) skipCompositeInner(open, close byte) error {
 				return err
 			}
 		case 'r':
-			if p, err := r.buf.Peek(1); err == nil && (p[0] == '\'' || p[0] == '"') {
+			if p, err := r.src.Peek(1); err == nil && (p[0] == '\'' || p[0] == '"') {
 				r.unreadByte()
 				if err := r.skipString(); err != nil {
 					return err
 				}
 			}
 		case 'x', 'b':
-			if p, err := r.buf.Peek(1); err == nil && p[0] == '\'' {
+			if p, err := r.src.Peek(1); err == nil && p[0] == '\'' {
 				r.unreadByte()
 				if err := r.skipBinLiteral(); err != nil {
 					return err

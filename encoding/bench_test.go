@@ -4,11 +4,27 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
+
+func runPAKTDecodeBenchmark(b *testing.B, data []byte) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dec := NewDecoder(bytes.NewReader(data))
+		for {
+			_, err := dec.Decode()
+			if err != nil {
+				break
+			}
+		}
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Benchmark struct type (~10 fields, mixed scalars)
@@ -25,6 +41,23 @@ type benchSmallDoc struct {
 	Timeout  int     `pakt:"timeout" json:"timeout"`
 	Verbose  bool    `pakt:"verbose" json:"verbose"`
 	Label    string  `pakt:"label" json:"label"`
+}
+
+type benchFSEntry struct {
+	Path    string `pakt:"path" json:"path"`
+	Size    int64  `pakt:"size" json:"size"`
+	Mode    int64  `pakt:"mode" json:"mode"`
+	ModTime string `pakt:"mod_time" json:"mod_time"`
+	IsDir   bool   `pakt:"is_dir" json:"is_dir"`
+	Owner   string `pakt:"owner" json:"owner"`
+	Group   string `pakt:"group" json:"group"`
+	Hash    string `pakt:"hash" json:"hash"`
+}
+
+type benchFSDataset struct {
+	Root    string         `pakt:"root" json:"root"`
+	Scanned string         `pakt:"scanned" json:"scanned"`
+	Entries []benchFSEntry `pakt:"entries" json:"entries"`
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +98,18 @@ var (
 	benchMapEncType Type
 	benchMapEncVal  any
 	benchMapJSONVal map[string]any
+
+	benchFS1KPAKT  []byte
+	benchFS1KJSON  []byte
+	benchFS1KVal   benchFSDataset
+	benchFS1KEncFs []benchEncField
+
+	benchFS10KPAKT  []byte
+	benchFS10KJSON  []byte
+	benchFS10KVal   benchFSDataset
+	benchFS10KEncFs []benchEncField
+
+	benchFSEntriesType Type
 )
 
 func init() {
@@ -73,6 +118,7 @@ func init() {
 	benchInitDeep()
 	benchInitLargeList()
 	benchInitLargeMap()
+	benchInitFS()
 }
 
 // ---------------------------------------------------------------------------
@@ -203,12 +249,12 @@ func benchInitLargeMap() {
 	const n = 1000
 
 	var pb strings.Builder
-	pb.WriteString("data:<str = int> = <")
+	pb.WriteString("data:<str ; int> = <")
 	for i := 1; i <= n; i++ {
 		if i > 1 {
 			pb.WriteString(", ")
 		}
-		fmt.Fprintf(&pb, "'key_%04d' = %d", i, i)
+		fmt.Fprintf(&pb, "'key_%04d' ; %d", i, i)
 	}
 	pb.WriteString(">\n")
 	benchMapPAKT = []byte(pb.String())
@@ -230,23 +276,144 @@ func benchInitLargeMap() {
 	benchMapEncVal = mv
 }
 
+func benchInitFS() {
+	benchFS1KVal, benchFS1KPAKT, benchFS1KJSON = benchGenerateFS(1000)
+	benchFS10KVal, benchFS10KPAKT, benchFS10KJSON = benchGenerateFS(10000)
+
+	benchFSEntriesType = benchFSBuildEntriesType()
+	benchFS1KEncFs = benchFSBuildEncFields(benchFS1KVal)
+	benchFS10KEncFs = benchFSBuildEncFields(benchFS10KVal)
+}
+
+func benchFSBuildEntriesType() Type {
+	scalar := func(k TypeKind) Type { return Type{Scalar: &k} }
+	return Type{List: &ListType{Element: Type{Struct: &StructType{Fields: []Field{
+		{Name: "path", Type: scalar(TypeStr)},
+		{Name: "size", Type: scalar(TypeInt)},
+		{Name: "mode", Type: scalar(TypeInt)},
+		{Name: "mod_time", Type: scalar(TypeDateTime)},
+		{Name: "is_dir", Type: scalar(TypeBool)},
+		{Name: "owner", Type: scalar(TypeStr)},
+		{Name: "group", Type: scalar(TypeStr)},
+		{Name: "hash", Type: scalar(TypeStr)},
+	}}}}}
+}
+
+func benchFSBuildEncFields(ds benchFSDataset) []benchEncField {
+	sk := TypeStr
+	dk := TypeDateTime
+
+	encEntries := make([]any, len(ds.Entries))
+	for i, e := range ds.Entries {
+		encEntries[i] = map[string]any{
+			"path":     e.Path,
+			"size":     e.Size,
+			"mode":     e.Mode,
+			"mod_time": e.ModTime,
+			"is_dir":   e.IsDir,
+			"owner":    e.Owner,
+			"group":    e.Group,
+			"hash":     e.Hash,
+		}
+	}
+
+	return []benchEncField{
+		{"root", Type{Scalar: &sk}, ds.Root},
+		{"scanned", Type{Scalar: &dk}, ds.Scanned},
+		{"entries", benchFSEntriesType, encEntries},
+	}
+}
+
+func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
+	rng := rand.New(rand.NewSource(42))
+
+	extensions := []string{".csv", ".parquet", ".json", ".log", ".tmp", ".idx"}
+	subdirs := []string{"incoming", "archive", "staging", "reports", "temp", "indexes"}
+	fileModes := []int64{0o644, 0o600, 0o444}
+	owners := []string{"etl", "root", "app", "backup", "deploy"}
+	groups := []string{"data", "root", "apps", "ops"}
+
+	baseTime := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	const dayRange = 151 // Jan 1 to Jun 1
+
+	entries := make([]benchFSEntry, n)
+	for i := 0; i < n; i++ {
+		isDir := rng.Float64() < 0.15
+
+		depth := rng.Intn(4) + 1
+		parts := make([]string, 0, depth+1)
+		parts = append(parts, "/data/warehouse")
+		for d := 0; d < depth-1; d++ {
+			parts = append(parts, subdirs[rng.Intn(len(subdirs))])
+		}
+
+		var path string
+		var size int64
+		var mode int64
+		var hash string
+
+		if isDir {
+			parts = append(parts, subdirs[rng.Intn(len(subdirs))])
+			path = strings.Join(parts, "/") + "/"
+			mode = 0o755
+		} else {
+			name := fmt.Sprintf("file_%05d%s", i, extensions[rng.Intn(len(extensions))])
+			parts = append(parts, name)
+			path = strings.Join(parts, "/")
+			size = int64(rng.Intn(100*1024*1024-1024) + 1024)
+			mode = fileModes[rng.Intn(len(fileModes))]
+			hash = fmt.Sprintf("%08x", i)
+		}
+
+		offset := time.Duration(rng.Intn(dayRange)*24+rng.Intn(24)) * time.Hour
+		modTime := baseTime.Add(offset)
+
+		entries[i] = benchFSEntry{
+			Path:    path,
+			Size:    size,
+			Mode:    mode,
+			ModTime: modTime.Format(time.RFC3339),
+			IsDir:   isDir,
+			Owner:   owners[i%len(owners)],
+			Group:   groups[i%len(groups)],
+			Hash:    hash,
+		}
+	}
+
+	val := benchFSDataset{
+		Root:    "/data/warehouse",
+		Scanned: "2026-06-01T14:30:00Z",
+		Entries: entries,
+	}
+
+	// Build PAKT bytes using stream syntax (<<).
+	var pb strings.Builder
+	pb.WriteString("root:str = '/data/warehouse'\n")
+	pb.WriteString("scanned:datetime = 2026-06-01T14:30:00Z\n")
+	pb.WriteString("entries:[{path:str, size:int, mode:int, mod_time:datetime, is_dir:bool, owner:str, group:str, hash:str}] << ")
+	for i, e := range entries {
+		if i > 0 {
+			pb.WriteString(", ")
+		}
+		boolStr := "false"
+		if e.IsDir {
+			boolStr = "true"
+		}
+		fmt.Fprintf(&pb, "{ '%s', %d, 0o%o, %s, %s, '%s', '%s', '%s' }",
+			e.Path, e.Size, e.Mode, e.ModTime, boolStr, e.Owner, e.Group, e.Hash)
+	}
+	pb.WriteString("\n")
+
+	jsonBytes, _ := json.Marshal(val)
+	return val, []byte(pb.String()), jsonBytes
+}
+
 // ---------------------------------------------------------------------------
 // Small Document Benchmarks (Decode / Encode / Marshal / Unmarshal)
 // ---------------------------------------------------------------------------
 
 func BenchmarkPAKTDecodeSmall(b *testing.B) {
-	data := benchSmallPAKT
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		dec := NewDecoder(bytes.NewReader(data))
-		for {
-			_, err := dec.Decode()
-			if err != nil {
-				break
-			}
-		}
-	}
+	runPAKTDecodeBenchmark(b, benchSmallPAKT)
 }
 
 func BenchmarkJSONDecodeSmall(b *testing.B) {
@@ -327,18 +494,7 @@ func BenchmarkJSONUnmarshalSmall(b *testing.B) {
 // ---------------------------------------------------------------------------
 
 func BenchmarkPAKTDecodeWide(b *testing.B) {
-	data := benchWidePAKT
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		dec := NewDecoder(bytes.NewReader(data))
-		for {
-			_, err := dec.Decode()
-			if err != nil {
-				break
-			}
-		}
-	}
+	runPAKTDecodeBenchmark(b, benchWidePAKT)
 }
 
 func BenchmarkJSONDecodeWide(b *testing.B) {
@@ -381,18 +537,7 @@ func BenchmarkJSONEncodeWide(b *testing.B) {
 // ---------------------------------------------------------------------------
 
 func BenchmarkPAKTDecodeDeep(b *testing.B) {
-	data := benchDeepPAKT
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		dec := NewDecoder(bytes.NewReader(data))
-		for {
-			_, err := dec.Decode()
-			if err != nil {
-				break
-			}
-		}
-	}
+	runPAKTDecodeBenchmark(b, benchDeepPAKT)
 }
 
 func BenchmarkJSONDecodeDeep(b *testing.B) {
@@ -434,18 +579,7 @@ func BenchmarkJSONEncodeDeep(b *testing.B) {
 // ---------------------------------------------------------------------------
 
 func BenchmarkPAKTDecodeLargeList(b *testing.B) {
-	data := benchListPAKT
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		dec := NewDecoder(bytes.NewReader(data))
-		for {
-			_, err := dec.Decode()
-			if err != nil {
-				break
-			}
-		}
-	}
+	runPAKTDecodeBenchmark(b, benchListPAKT)
 }
 
 func BenchmarkJSONDecodeLargeList(b *testing.B) {
@@ -487,18 +621,7 @@ func BenchmarkJSONEncodeLargeList(b *testing.B) {
 // ---------------------------------------------------------------------------
 
 func BenchmarkPAKTDecodeLargeMap(b *testing.B) {
-	data := benchMapPAKT
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		dec := NewDecoder(bytes.NewReader(data))
-		for {
-			_, err := dec.Decode()
-			if err != nil {
-				break
-			}
-		}
-	}
+	runPAKTDecodeBenchmark(b, benchMapPAKT)
 }
 
 func BenchmarkJSONDecodeLargeMap(b *testing.B) {
@@ -526,6 +649,168 @@ func BenchmarkPAKTEncodeLargeMap(b *testing.B) {
 
 func BenchmarkJSONEncodeLargeMap(b *testing.B) {
 	val := benchMapJSONVal
+	var buf bytes.Buffer
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+		json.NewEncoder(&buf).Encode(val) //nolint:errcheck
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Filesystem Metadata Benchmarks — 1K entries (Decode / Unmarshal / Marshal / Encode)
+// ---------------------------------------------------------------------------
+
+func BenchmarkPAKTDecodeFS1K(b *testing.B) {
+	runPAKTDecodeBenchmark(b, benchFS1KPAKT)
+}
+
+func BenchmarkJSONDecodeFS1K(b *testing.B) {
+	data := benchFS1KJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v map[string]any
+		json.Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTUnmarshalFS1K(b *testing.B) {
+	data := benchFS1KPAKT
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v benchFSDataset
+		Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkJSONUnmarshalFS1K(b *testing.B) {
+	data := benchFS1KJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v benchFSDataset
+		json.Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTMarshalFS1K(b *testing.B) {
+	val := benchFS1KVal
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Marshal("doc", val) //nolint:errcheck
+	}
+}
+
+func BenchmarkJSONMarshalFS1K(b *testing.B) {
+	val := benchFS1KVal
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		json.Marshal(val) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTEncodeFS1K(b *testing.B) {
+	fs := benchFS1KEncFs
+	var buf bytes.Buffer
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+		enc := NewEncoder(&buf)
+		for _, f := range fs {
+			enc.Encode(f.name, f.typ, f.val) //nolint:errcheck
+		}
+	}
+}
+
+func BenchmarkJSONEncodeFS1K(b *testing.B) {
+	val := benchFS1KVal
+	var buf bytes.Buffer
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+		json.NewEncoder(&buf).Encode(val) //nolint:errcheck
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Filesystem Metadata Benchmarks — 10K entries (Decode / Unmarshal / Marshal / Encode)
+// ---------------------------------------------------------------------------
+
+func BenchmarkPAKTDecodeFS10K(b *testing.B) {
+	runPAKTDecodeBenchmark(b, benchFS10KPAKT)
+}
+
+func BenchmarkJSONDecodeFS10K(b *testing.B) {
+	data := benchFS10KJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v map[string]any
+		json.Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTUnmarshalFS10K(b *testing.B) {
+	data := benchFS10KPAKT
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v benchFSDataset
+		Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkJSONUnmarshalFS10K(b *testing.B) {
+	data := benchFS10KJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v benchFSDataset
+		json.Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTMarshalFS10K(b *testing.B) {
+	val := benchFS10KVal
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Marshal("doc", val) //nolint:errcheck
+	}
+}
+
+func BenchmarkJSONMarshalFS10K(b *testing.B) {
+	val := benchFS10KVal
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		json.Marshal(val) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTEncodeFS10K(b *testing.B) {
+	fs := benchFS10KEncFs
+	var buf bytes.Buffer
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		buf.Reset()
+		enc := NewEncoder(&buf)
+		for _, f := range fs {
+			enc.Encode(f.name, f.typ, f.val) //nolint:errcheck
+		}
+	}
+}
+
+func BenchmarkJSONEncodeFS10K(b *testing.B) {
+	val := benchFS10KVal
 	var buf bytes.Buffer
 	b.ReportAllocs()
 	b.ResetTimer()

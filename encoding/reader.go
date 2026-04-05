@@ -22,22 +22,23 @@ var bufPool = sync.Pool{
 // reader is the hybrid lexer/parser that reads PAKT input directly from bytes
 // and emits Events. It is unexported; the public API is [Decoder].
 type reader struct {
-	buf        *bufio.Reader
-	pos        Pos
-	lastPos    Pos
-	bomChecked bool
-	seen       map[string]struct{}
-	sb         strings.Builder // reusable builder to avoid per-read allocations
+	buf     *bufio.Reader
+	pos     Pos
+	lastPos Pos
+	seen    map[string]struct{}
+	sb      strings.Builder // reusable builder to avoid per-read allocations
 }
 
 func newReader(r io.Reader) *reader {
 	br := bufPool.Get().(*bufio.Reader)
 	br.Reset(r)
-	return &reader{
+	rd := &reader{
 		buf:  br,
 		pos:  Pos{Line: 1, Col: 1},
 		seen: make(map[string]struct{}, 16),
 	}
+	rd.skipBOM()
+	return rd
 }
 
 // release returns the pooled bufio.Reader.
@@ -60,16 +61,8 @@ func (r *reader) skipBOM() {
 	}
 }
 
-func (r *reader) ensureBOM() {
-	if !r.bomChecked {
-		r.bomChecked = true
-		r.skipBOM()
-	}
-}
-
 // peekByte returns the next byte without consuming it.
 func (r *reader) peekByte() (byte, error) {
-	r.ensureBOM()
 	p, err := r.buf.Peek(1)
 	if err != nil {
 		return 0, err
@@ -80,7 +73,6 @@ func (r *reader) peekByte() (byte, error) {
 // readByte reads and consumes one byte, updating pos.
 // \r\n is normalised to \n; bare \r is also treated as a newline.
 func (r *reader) readByte() (byte, error) {
-	r.ensureBOM()
 	b, err := r.buf.ReadByte()
 	if err != nil {
 		return 0, err
@@ -196,13 +188,11 @@ func (r *reader) expectByte(expected byte) error {
 }
 
 func (r *reader) peekRawStringStart() bool {
-	r.ensureBOM()
 	p, err := r.buf.Peek(2)
 	return err == nil && p[0] == 'r' && (p[1] == '\'' || p[1] == '"')
 }
 
 func (r *reader) peekBinLiteralStart() bool {
-	r.ensureBOM()
 	p, err := r.buf.Peek(2)
 	return err == nil && (p[0] == 'x' || p[0] == 'b') && p[1] == '\''
 }

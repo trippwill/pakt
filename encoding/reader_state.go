@@ -1,6 +1,17 @@
 package encoding
 
-import "io"
+import (
+	"io"
+	"sync"
+)
+
+var smPool = sync.Pool{
+	New: func() any {
+		return &stateMachine{
+			stack: make([]frame, 0, 8),
+		}
+	},
+}
 
 type parserState int
 
@@ -82,11 +93,19 @@ type stateMachine struct {
 }
 
 func newStateMachine(r *reader) *stateMachine {
-	return &stateMachine{
-		r:     r,
-		stack: make([]frame, 0, 8),
-		state: stateTop,
-	}
+	sm := smPool.Get().(*stateMachine)
+	sm.r = r
+	sm.stack = sm.stack[:0]
+	sm.state = stateTop
+	sm.valType = Type{}
+	sm.valName = ""
+	return sm
+}
+
+func (sm *stateMachine) release() {
+	sm.r = nil
+	sm.stack = sm.stack[:0]
+	smPool.Put(sm)
 }
 
 func (sm *stateMachine) atTop() bool {
@@ -303,7 +322,6 @@ func (r *reader) canStartValueInStream(b byte) bool {
 // peekKeyword reports whether the next bytes match the given keyword exactly,
 // followed by a non-identifier byte (or EOF).
 func (r *reader) peekKeyword(kw string) bool {
-	r.ensureBOM()
 	p, err := r.buf.Peek(len(kw) + 1)
 	if err != nil && len(p) < len(kw) {
 		return false

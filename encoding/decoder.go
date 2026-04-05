@@ -41,6 +41,10 @@ func (d *Decoder) SetSpec(r io.Reader) error {
 // pools. Callers should defer Close after creating a Decoder. It is safe to
 // call Close multiple times.
 func (d *Decoder) Close() {
+	if d.sm != nil {
+		d.sm.release()
+		d.sm = nil
+	}
 	if d.r != nil {
 		d.r.release()
 	}

@@ -31,103 +31,61 @@ func Unmarshal(data []byte, v any) error {
 		return fmt.Errorf("pakt: Unmarshal requires a pointer to a struct, got pointer to %s", rv.Type())
 	}
 
-	fields, err := StructFields(rv.Type())
+	info, err := cachedStructFields(rv.Type())
 	if err != nil {
 		return err
 	}
 
-	fieldMap := make(map[string]FieldInfo, len(fields))
-	for _, fi := range fields {
-		fieldMap[fi.Name] = fi
-	}
+	dec := NewDecoder(bytes.NewReader(data))
+	defer dec.Close()
 
-	// Collect all events from the decoder.
-	events, err := unmarshalDecodeAll(data)
-	if err != nil {
-		return err
-	}
+	for {
+		ev, err := dec.Decode()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		if ev.Kind == EventError {
+			return ev.Err
+		}
 
-	// Walk events: find statement start events, collect until the matching end,
-	// and set the destination field.
-	i := 0
-	for i < len(events) {
-		ev := events[i]
 		if ev.Kind != EventAssignStart && !ev.Kind.IsStreamStart() {
-			i++
 			continue
 		}
 
-		assignName := ev.Name
-
-		endIdx := findRootEnd(events, i, assignName)
-		if endIdx < 0 {
-			switch {
-			case ev.Kind == EventAssignStart:
-				return fmt.Errorf("pakt: missing AssignEnd for %q", assignName)
-			case ev.Kind.IsStreamStart():
-				return fmt.Errorf("pakt: missing StreamEnd for %q", assignName)
-			}
-		}
-
-		fi, ok := fieldMap[assignName]
+		fi, ok := info.fieldMap[ev.Name]
 		if !ok {
-			// Unknown field — skip silently.
-			i = endIdx + 1
+			// Unknown field — skip by consuming until matching end.
+			if err := skipStatement(dec, ev); err != nil {
+				return err
+			}
 			continue
 		}
 
 		target := rv.Field(fi.Index)
 		switch ev.Kind {
 		case EventAssignStart:
-			// The value events are between AssignStart and AssignEnd (exclusive).
-			valueEvents := events[i+1 : endIdx]
-			if len(valueEvents) == 0 {
-				i = endIdx + 1
-				continue
-			}
-			if _, err := consumeValue(valueEvents, 0, target); err != nil {
-				return fmt.Errorf("pakt: field %q: %w", assignName, err)
+			if err := streamConsumeAssign(dec, ev.Name, target); err != nil {
+				return fmt.Errorf("pakt: field %q: %w", ev.Name, err)
 			}
 		case EventListStreamStart:
-			if _, err := consumeStreamList(events, i, target); err != nil {
-				return fmt.Errorf("pakt: field %q: %w", assignName, err)
+			if err := streamConsumeListStream(dec, target); err != nil {
+				return fmt.Errorf("pakt: field %q: %w", ev.Name, err)
 			}
 		case EventMapStreamStart:
-			if _, err := consumeStreamMap(events, i, target); err != nil {
-				return fmt.Errorf("pakt: field %q: %w", assignName, err)
+			if err := streamConsumeMapStream(dec, target); err != nil {
+				return fmt.Errorf("pakt: field %q: %w", ev.Name, err)
 			}
 		}
-
-		i = endIdx + 1
 	}
-
-	return nil
 }
 
-// unmarshalDecodeAll reads all events from a PAKT byte slice.
-func unmarshalDecodeAll(data []byte) ([]Event, error) {
-	dec := NewDecoder(bytes.NewReader(data))
-	var events []Event
-	for {
-		ev, err := dec.Decode()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-		if ev.Kind == EventError {
-			return nil, ev.Err
-		}
-		events = append(events, ev)
-	}
-	return events, nil
-}
-
-// findRootEnd finds the index of the root-end event matching the given name.
-func findRootEnd(events []Event, start int, name string) int {
+// skipStatement consumes events until the matching end event for a top-level statement.
+func skipStatement(dec *Decoder, start Event) error {
 	var endKind EventKind
-	switch events[start].Kind {
+	switch start.Kind {
 	case EventAssignStart:
 		endKind = EventAssignEnd
 	case EventListStreamStart:
@@ -135,39 +93,333 @@ func findRootEnd(events []Event, start int, name string) int {
 	case EventMapStreamStart:
 		endKind = EventMapStreamEnd
 	default:
-		return -1
+		return nil
 	}
-	for i := start + 1; i < len(events); i++ {
-		if events[i].Kind == endKind && events[i].Name == name {
-			return i
+	depth := 1
+	for depth > 0 {
+		ev, err := dec.Decode()
+		if err != nil {
+			return err
+		}
+		if ev.Kind == endKind && ev.Name == start.Name {
+			depth--
+		} else if ev.Kind == start.Kind && ev.Name == start.Name {
+			depth++
 		}
 	}
-	return -1
+	return nil
 }
 
-// consumeValue reads a single value from events starting at index i,
-// sets the target reflect.Value, and returns the next index.
-func consumeValue(events []Event, i int, target reflect.Value) (int, error) {
-	if i >= len(events) {
-		return i, fmt.Errorf("unexpected end of events")
+// streamConsumeAssign reads the value(s) between AssignStart and AssignEnd.
+func streamConsumeAssign(dec *Decoder, name string, target reflect.Value) error {
+	ev, err := dec.Decode()
+	if err != nil {
+		return err
 	}
+	if ev.Kind == EventAssignEnd {
+		return nil // empty assignment
+	}
+	if err := streamConsumeValue(dec, ev, target); err != nil {
+		return err
+	}
+	// Consume the AssignEnd
+	ev, err = dec.Decode()
+	if err != nil {
+		return err
+	}
+	if ev.Kind != EventAssignEnd {
+		return fmt.Errorf("expected AssignEnd, got %s", ev.Kind)
+	}
+	return nil
+}
 
-	ev := events[i]
-
+// streamConsumeValue handles a single value event (scalar or composite start).
+func streamConsumeValue(dec *Decoder, ev Event, target reflect.Value) error {
 	switch ev.Kind {
 	case EventScalarValue:
-		return i + 1, setScalar(target, ev.ScalarType, ev.Value)
+		return setScalar(target, ev.ScalarType, ev.Value)
 	case EventStructStart:
-		return consumeStruct(events, i, target)
+		return streamConsumeStruct(dec, target)
 	case EventTupleStart:
-		return consumeTuple(events, i, target)
+		return streamConsumeTuple(dec, target)
 	case EventListStart:
-		return consumeList(events, i, target)
+		return streamConsumeList(dec, target)
 	case EventMapStart:
-		return consumeMap(events, i, target)
+		return streamConsumeMap(dec, target)
 	default:
-		return i + 1, nil
+		return nil
 	}
+}
+
+// streamConsumeStruct reads events between StructStart (already consumed) and StructEnd.
+func streamConsumeStruct(dec *Decoder, target reflect.Value) error {
+	target = allocPtr(target)
+
+	if target.Kind() == reflect.Map {
+		return streamConsumeStructIntoMap(dec, target)
+	}
+
+	if target.Kind() != reflect.Struct {
+		return fmt.Errorf("cannot unmarshal struct into %s", target.Type())
+	}
+
+	info, err := cachedStructFields(target.Type())
+	if err != nil {
+		return err
+	}
+
+	for {
+		ev, err := dec.Decode()
+		if err != nil {
+			return err
+		}
+		if ev.Kind == EventStructEnd {
+			return nil
+		}
+
+		fi, ok := info.fieldMap[ev.Name]
+		if !ok {
+			// Skip unknown field value by consuming the event.
+			if err := streamSkipValue(dec, ev); err != nil {
+				return err
+			}
+			continue
+		}
+
+		field := target.Field(fi.Index)
+		if err := streamConsumeValue(dec, ev, field); err != nil {
+			return fmt.Errorf("field %q: %w", ev.Name, err)
+		}
+	}
+}
+
+// streamConsumeStructIntoMap reads struct events into a map[string]T.
+func streamConsumeStructIntoMap(dec *Decoder, target reflect.Value) error {
+	if target.IsNil() {
+		target.Set(reflect.MakeMap(target.Type()))
+	}
+	valType := target.Type().Elem()
+
+	for {
+		ev, err := dec.Decode()
+		if err != nil {
+			return err
+		}
+		if ev.Kind == EventStructEnd {
+			return nil
+		}
+
+		val := reflect.New(valType).Elem()
+		if err := streamConsumeValue(dec, ev, val); err != nil {
+			return fmt.Errorf("map key %q: %w", ev.Name, err)
+		}
+		target.SetMapIndex(reflect.ValueOf(ev.Name), val)
+	}
+}
+
+// streamConsumeList reads events between ListStart (already consumed) and ListEnd.
+func streamConsumeList(dec *Decoder, target reflect.Value) error {
+	if target.Kind() != reflect.Slice {
+		return fmt.Errorf("cannot unmarshal list into %s", target.Type())
+	}
+
+	elemType := target.Type().Elem()
+	// Set target to an empty slice with initial capacity.
+	target.Set(reflect.MakeSlice(target.Type(), 0, 8))
+
+	for {
+		ev, err := dec.Decode()
+		if err != nil {
+			return err
+		}
+		if ev.Kind == EventListEnd {
+			return nil
+		}
+
+		// Grow by 1 and write directly into the new slot.
+		target.Grow(1)
+		target.SetLen(target.Len() + 1)
+		elem := target.Index(target.Len() - 1)
+		if elemType.Kind() == reflect.Ptr || elemType.Kind() == reflect.Map || elemType.Kind() == reflect.Slice {
+			elem.Set(reflect.New(elemType).Elem())
+		}
+		if err := streamConsumeValue(dec, ev, elem); err != nil {
+			return err
+		}
+	}
+}
+
+// streamConsumeTuple reads events between TupleStart (already consumed) and TupleEnd.
+func streamConsumeTuple(dec *Decoder, target reflect.Value) error {
+	if target.Kind() != reflect.Slice {
+		return fmt.Errorf("cannot unmarshal tuple into %s", target.Type())
+	}
+
+	elemType := target.Type().Elem()
+	target.Set(reflect.MakeSlice(target.Type(), 0, 8))
+
+	for {
+		ev, err := dec.Decode()
+		if err != nil {
+			return err
+		}
+		if ev.Kind == EventTupleEnd {
+			return nil
+		}
+
+		target.Grow(1)
+		target.SetLen(target.Len() + 1)
+		elem := target.Index(target.Len() - 1)
+		if elemType.Kind() == reflect.Ptr || elemType.Kind() == reflect.Map || elemType.Kind() == reflect.Slice {
+			elem.Set(reflect.New(elemType).Elem())
+		}
+		if err := streamConsumeValue(dec, ev, elem); err != nil {
+			return err
+		}
+	}
+}
+
+// streamConsumeMap reads events between MapStart (already consumed) and MapEnd.
+func streamConsumeMap(dec *Decoder, target reflect.Value) error {
+	if target.Kind() != reflect.Map {
+		return fmt.Errorf("cannot unmarshal map into %s", target.Type())
+	}
+
+	if target.IsNil() {
+		target.Set(reflect.MakeMap(target.Type()))
+	}
+
+	keyType := target.Type().Key()
+	valType := target.Type().Elem()
+
+	for {
+		ev, err := dec.Decode()
+		if err != nil {
+			return err
+		}
+		if ev.Kind == EventMapEnd {
+			return nil
+		}
+
+		// Key
+		key := reflect.New(keyType).Elem()
+		if err := streamConsumeValue(dec, ev, key); err != nil {
+			return fmt.Errorf("map key: %w", err)
+		}
+
+		// Value
+		ev, err = dec.Decode()
+		if err != nil {
+			return fmt.Errorf("map value: unexpected end")
+		}
+		val := reflect.New(valType).Elem()
+		if err := streamConsumeValue(dec, ev, val); err != nil {
+			return fmt.Errorf("map value: %w", err)
+		}
+
+		target.SetMapIndex(key, val)
+	}
+}
+
+// streamConsumeListStream reads events for a top-level list stream (<<).
+func streamConsumeListStream(dec *Decoder, target reflect.Value) error {
+	target = allocPtr(target)
+
+	if target.Kind() != reflect.Slice {
+		return fmt.Errorf("cannot unmarshal list stream into %s", target.Type())
+	}
+
+	elemType := target.Type().Elem()
+	target.Set(reflect.MakeSlice(target.Type(), 0, 64))
+
+	for {
+		ev, err := dec.Decode()
+		if err != nil {
+			return err
+		}
+		if ev.Kind == EventListStreamEnd {
+			return nil
+		}
+
+		target.Grow(1)
+		target.SetLen(target.Len() + 1)
+		elem := target.Index(target.Len() - 1)
+		if elemType.Kind() == reflect.Ptr || elemType.Kind() == reflect.Map || elemType.Kind() == reflect.Slice {
+			elem.Set(reflect.New(elemType).Elem())
+		}
+		if err := streamConsumeValue(dec, ev, elem); err != nil {
+			return err
+		}
+	}
+}
+
+// streamConsumeMapStream reads events for a top-level map stream (<<).
+func streamConsumeMapStream(dec *Decoder, target reflect.Value) error {
+	target = allocPtr(target)
+
+	if target.Kind() != reflect.Map {
+		return fmt.Errorf("cannot unmarshal map stream into %s", target.Type())
+	}
+
+	if target.IsNil() {
+		target.Set(reflect.MakeMap(target.Type()))
+	}
+
+	keyType := target.Type().Key()
+	valType := target.Type().Elem()
+
+	for {
+		ev, err := dec.Decode()
+		if err != nil {
+			return err
+		}
+		if ev.Kind == EventMapStreamEnd {
+			return nil
+		}
+
+		key := reflect.New(keyType).Elem()
+		if err := streamConsumeValue(dec, ev, key); err != nil {
+			return fmt.Errorf("stream map key: %w", err)
+		}
+
+		ev, err = dec.Decode()
+		if err != nil {
+			return fmt.Errorf("stream map value: unexpected end")
+		}
+		if ev.Kind == EventMapStreamEnd {
+			return fmt.Errorf("stream map value: unexpected end")
+		}
+
+		val := reflect.New(valType).Elem()
+		if err := streamConsumeValue(dec, ev, val); err != nil {
+			return fmt.Errorf("stream map value: %w", err)
+		}
+
+		target.SetMapIndex(key, val)
+	}
+}
+
+// streamSkipValue skips over one complete value in the event stream.
+func streamSkipValue(dec *Decoder, ev Event) error {
+	if ev.Kind == EventScalarValue {
+		return nil // already consumed
+	}
+	if !ev.Kind.IsCompositeStart() {
+		return nil
+	}
+	depth := 1
+	for depth > 0 {
+		next, err := dec.Decode()
+		if err != nil {
+			return err
+		}
+		if next.Kind.IsCompositeStart() {
+			depth++
+		} else if next.Kind.IsCompositeEnd() {
+			depth--
+		}
+	}
+	return nil
 }
 
 // setScalar sets a reflect.Value from a PAKT scalar event.
@@ -307,7 +559,10 @@ func setInt(target reflect.Value, raw string) error {
 
 // parseIntLiteral parses a PAKT integer literal, handling hex, binary, octal, and underscores.
 func parseIntLiteral(raw string) (int64, error) {
-	s := strings.ReplaceAll(raw, "_", "")
+	s := raw
+	if strings.IndexByte(s, '_') >= 0 {
+		s = strings.ReplaceAll(s, "_", "")
+	}
 	if s == "" {
 		return 0, fmt.Errorf("empty int literal")
 	}
@@ -355,7 +610,10 @@ func setDec(target reflect.Value, raw string) error {
 		target.SetString(raw)
 		return nil
 	case reflect.Float32, reflect.Float64:
-		s := strings.ReplaceAll(raw, "_", "")
+		s := raw
+		if strings.IndexByte(s, '_') >= 0 {
+			s = strings.ReplaceAll(s, "_", "")
+		}
 		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
 			return fmt.Errorf("invalid dec literal %q: %w", raw, err)
@@ -368,7 +626,10 @@ func setDec(target reflect.Value, raw string) error {
 }
 
 func setFloat(target reflect.Value, raw string) error {
-	s := strings.ReplaceAll(raw, "_", "")
+	s := raw
+	if strings.IndexByte(s, '_') >= 0 {
+		s = strings.ReplaceAll(s, "_", "")
+	}
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return fmt.Errorf("invalid float literal %q: %w", raw, err)
@@ -453,285 +714,4 @@ func parseTime(s string) (time.Time, error) {
 	}
 
 	return time.Time{}, fmt.Errorf("cannot parse time %q", s)
-}
-
-func consumeStruct(events []Event, i int, target reflect.Value) (int, error) {
-	i++ // skip StructStart
-
-	target = allocPtr(target)
-
-	if target.Kind() == reflect.Map {
-		return consumeStructIntoMap(events, i, target)
-	}
-
-	if target.Kind() != reflect.Struct {
-		return i, fmt.Errorf("cannot unmarshal struct into %s", target.Type())
-	}
-
-	// Build field name → index mapping for the target struct.
-	fields, err := StructFields(target.Type())
-	if err != nil {
-		return i, err
-	}
-	fmap := make(map[string]FieldInfo, len(fields))
-	for _, fi := range fields {
-		fmap[fi.Name] = fi
-	}
-
-	for i < len(events) {
-		if events[i].Kind == EventStructEnd {
-			return i + 1, nil
-		}
-
-		name := events[i].Name
-		fi, ok := fmap[name]
-		if !ok {
-			// Skip this value.
-			var err error
-			i, err = skipValue(events, i)
-			if err != nil {
-				return i, err
-			}
-			continue
-		}
-
-		field := target.Field(fi.Index)
-		i, err = consumeValue(events, i, field)
-		if err != nil {
-			return i, fmt.Errorf("field %q: %w", name, err)
-		}
-	}
-
-	return i, fmt.Errorf("unexpected end of events in struct")
-}
-
-func consumeStructIntoMap(events []Event, i int, target reflect.Value) (int, error) {
-	if target.IsNil() {
-		target.Set(reflect.MakeMap(target.Type()))
-	}
-
-	valType := target.Type().Elem()
-
-	for i < len(events) {
-		if events[i].Kind == EventStructEnd {
-			return i + 1, nil
-		}
-
-		name := events[i].Name
-		val := reflect.New(valType).Elem()
-		var err error
-		i, err = consumeValue(events, i, val)
-		if err != nil {
-			return i, fmt.Errorf("map key %q: %w", name, err)
-		}
-		target.SetMapIndex(reflect.ValueOf(name), val)
-	}
-
-	return i, fmt.Errorf("unexpected end of events in map-from-struct")
-}
-
-func consumeList(events []Event, i int, target reflect.Value) (int, error) {
-	i++ // skip ListStart
-
-	if target.Kind() != reflect.Slice {
-		return i, fmt.Errorf("cannot unmarshal list into %s", target.Type())
-	}
-
-	elemType := target.Type().Elem()
-	slice := reflect.MakeSlice(target.Type(), 0, 0)
-
-	for i < len(events) {
-		if events[i].Kind == EventListEnd {
-			target.Set(slice)
-			return i + 1, nil
-		}
-
-		elem := reflect.New(elemType).Elem()
-		var err error
-		i, err = consumeValue(events, i, elem)
-		if err != nil {
-			return i, err
-		}
-		slice = reflect.Append(slice, elem)
-	}
-
-	return i, fmt.Errorf("unexpected end of events in list")
-}
-
-func consumeTuple(events []Event, i int, target reflect.Value) (int, error) {
-	i++ // skip TupleStart
-
-	if target.Kind() != reflect.Slice {
-		return i, fmt.Errorf("cannot unmarshal tuple into %s", target.Type())
-	}
-
-	elemType := target.Type().Elem()
-	slice := reflect.MakeSlice(target.Type(), 0, 0)
-
-	for i < len(events) {
-		if events[i].Kind == EventTupleEnd {
-			target.Set(slice)
-			return i + 1, nil
-		}
-
-		elem := reflect.New(elemType).Elem()
-		var err error
-		i, err = consumeValue(events, i, elem)
-		if err != nil {
-			return i, err
-		}
-		slice = reflect.Append(slice, elem)
-	}
-
-	return i, fmt.Errorf("unexpected end of events in tuple")
-}
-
-func consumeMap(events []Event, i int, target reflect.Value) (int, error) {
-	i++ // skip MapStart
-
-	if target.Kind() != reflect.Map {
-		return i, fmt.Errorf("cannot unmarshal map into %s", target.Type())
-	}
-
-	if target.IsNil() {
-		target.Set(reflect.MakeMap(target.Type()))
-	}
-
-	keyType := target.Type().Key()
-	valType := target.Type().Elem()
-
-	for i < len(events) {
-		if events[i].Kind == EventMapEnd {
-			return i + 1, nil
-		}
-
-		// In the event stream, map entries are emitted as key-value pairs:
-		// ScalarValue name=keyStr (key event)
-		// ScalarValue name=keyStr (value event)
-		// We need to consume the key, then the value.
-		key := reflect.New(keyType).Elem()
-		var err error
-		i, err = consumeValue(events, i, key)
-		if err != nil {
-			return i, fmt.Errorf("map key: %w", err)
-		}
-
-		if i >= len(events) {
-			return i, fmt.Errorf("unexpected end of events: missing map value")
-		}
-
-		val := reflect.New(valType).Elem()
-		i, err = consumeValue(events, i, val)
-		if err != nil {
-			return i, fmt.Errorf("map value: %w", err)
-		}
-
-		target.SetMapIndex(key, val)
-	}
-
-	return i, fmt.Errorf("unexpected end of events in map")
-}
-
-func consumeStreamList(events []Event, i int, target reflect.Value) (int, error) {
-	i++ // skip ListStreamStart
-
-	target = allocPtr(target)
-
-	if target.Kind() != reflect.Slice {
-		return i, fmt.Errorf("cannot unmarshal list stream into %s", target.Type())
-	}
-
-	elemType := target.Type().Elem()
-	slice := reflect.MakeSlice(target.Type(), 0, 0)
-
-	for i < len(events) {
-		if events[i].Kind == EventListStreamEnd {
-			target.Set(slice)
-			return i + 1, nil
-		}
-
-		elem := reflect.New(elemType).Elem()
-		var err error
-		i, err = consumeValue(events, i, elem)
-		if err != nil {
-			return i, err
-		}
-		slice = reflect.Append(slice, elem)
-	}
-
-	return i, fmt.Errorf("unexpected end of events in list stream")
-}
-
-func consumeStreamMap(events []Event, i int, target reflect.Value) (int, error) {
-	i++ // skip MapStreamStart
-
-	target = allocPtr(target)
-
-	if target.Kind() != reflect.Map {
-		return i, fmt.Errorf("cannot unmarshal map stream into %s", target.Type())
-	}
-
-	if target.IsNil() {
-		target.Set(reflect.MakeMap(target.Type()))
-	}
-
-	keyType := target.Type().Key()
-	valType := target.Type().Elem()
-
-	for i < len(events) {
-		if events[i].Kind == EventMapStreamEnd {
-			return i + 1, nil
-		}
-
-		key := reflect.New(keyType).Elem()
-		var err error
-		i, err = consumeValue(events, i, key)
-		if err != nil {
-			return i, fmt.Errorf("stream map key: %w", err)
-		}
-
-		if i >= len(events) || events[i].Kind == EventMapStreamEnd {
-			return i, fmt.Errorf("unexpected end of events: missing stream map value")
-		}
-
-		val := reflect.New(valType).Elem()
-		i, err = consumeValue(events, i, val)
-		if err != nil {
-			return i, fmt.Errorf("stream map value: %w", err)
-		}
-
-		target.SetMapIndex(key, val)
-	}
-
-	return i, fmt.Errorf("unexpected end of events in map stream")
-}
-
-// skipValue skips over a single value (scalar or composite) in the event slice.
-func skipValue(events []Event, i int) (int, error) {
-	if i >= len(events) {
-		return i, fmt.Errorf("unexpected end of events during skip")
-	}
-
-	switch {
-	case events[i].Kind == EventScalarValue:
-		return i + 1, nil
-	case events[i].Kind.IsCompositeStart():
-		depth := 1
-		i++
-		for i < len(events) && depth > 0 {
-			switch {
-			case events[i].Kind.IsCompositeStart():
-				depth++
-			case events[i].Kind.IsCompositeEnd():
-				depth--
-			}
-			i++
-		}
-		if depth != 0 {
-			return i, fmt.Errorf("unbalanced composite during skip")
-		}
-		return i, nil
-	default:
-		return i + 1, nil
-	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -13,6 +14,14 @@ var (
 	textMarshalerType = reflect.TypeFor[encoding.TextMarshaler]()
 	byteSliceType     = reflect.TypeFor[[]byte]()
 )
+
+// cachedStructInfo holds precomputed struct field metadata.
+type cachedStructInfo struct {
+	fields   []FieldInfo
+	fieldMap map[string]FieldInfo
+}
+
+var structInfoCache sync.Map // reflect.Type → *cachedStructInfo
 
 // FieldInfo describes a Go struct field's PAKT mapping.
 type FieldInfo struct {
@@ -139,6 +148,7 @@ func typeOfReflect(t reflect.Type, seen map[reflect.Type]bool) (Type, error) {
 
 // StructFields returns the PAKT field mapping for a Go struct type.
 // t must be a struct type (or pointer to struct); otherwise an error is returned.
+// Results are cached per type for subsequent calls.
 func StructFields(t reflect.Type) ([]FieldInfo, error) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
@@ -146,7 +156,31 @@ func StructFields(t reflect.Type) ([]FieldInfo, error) {
 	if t.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("pakt: StructFields requires struct type, got %s", t.Kind())
 	}
-	return structFieldsImpl(t, nil)
+	info, err := cachedStructFields(t)
+	if err != nil {
+		return nil, err
+	}
+	return info.fields, nil
+}
+
+// cachedStructFields returns the cached struct info, computing it on first access.
+func cachedStructFields(t reflect.Type) (*cachedStructInfo, error) {
+	if v, ok := structInfoCache.Load(t); ok {
+		return v.(*cachedStructInfo), nil
+	}
+	fields, err := structFieldsImpl(t, nil)
+	if err != nil {
+		return nil, err
+	}
+	info := &cachedStructInfo{
+		fields:   fields,
+		fieldMap: make(map[string]FieldInfo, len(fields)),
+	}
+	for _, fi := range fields {
+		info.fieldMap[fi.Name] = fi
+	}
+	actual, _ := structInfoCache.LoadOrStore(t, info)
+	return actual.(*cachedStructInfo), nil
 }
 
 // structFieldsImpl collects exported struct fields, flattening embedded structs.

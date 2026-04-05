@@ -23,6 +23,7 @@ func runPAKTDecodeBenchmark(b *testing.B, data []byte) {
 				break
 			}
 		}
+		dec.Close()
 	}
 }
 

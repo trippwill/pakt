@@ -1,6 +1,44 @@
 package encoding
 
 // ---------------------------------------------------------------------------
+// Pre-allocated TypeKind pointers — avoids heap allocation per readScalarType call.
+// ---------------------------------------------------------------------------
+
+var (
+	typeKindStr      = TypeStr
+	typeKindInt      = TypeInt
+	typeKindDec      = TypeDec
+	typeKindFloat    = TypeFloat
+	typeKindBool     = TypeBool
+	typeKindUUID     = TypeUUID
+	typeKindDate     = TypeDate
+	typeKindTime     = TypeTime
+	typeKindDateTime = TypeDateTime
+	typeKindBin      = TypeBin
+)
+
+var scalarTypeKindPtrs = [...](*TypeKind){
+	TypeStr:      &typeKindStr,
+	TypeInt:      &typeKindInt,
+	TypeDec:      &typeKindDec,
+	TypeFloat:    &typeKindFloat,
+	TypeBool:     &typeKindBool,
+	TypeUUID:     &typeKindUUID,
+	TypeDate:     &typeKindDate,
+	TypeTime:     &typeKindTime,
+	TypeDateTime: &typeKindDateTime,
+	TypeBin:      &typeKindBin,
+}
+
+// scalarTypeKindPtr returns a pointer to a pre-allocated TypeKind, avoiding heap allocation.
+func scalarTypeKindPtr(k TypeKind) *TypeKind {
+	if int(k) > 0 && int(k) < len(scalarTypeKindPtrs) {
+		return scalarTypeKindPtrs[k]
+	}
+	return &k
+}
+
+// ---------------------------------------------------------------------------
 // Type annotation reading
 // ---------------------------------------------------------------------------
 
@@ -85,8 +123,7 @@ func (r *reader) readScalarType() (Type, error) {
 	if !ok {
 		return Type{}, r.errorf("unknown scalar type %q", ident)
 	}
-	k := kind // addressable copy
-	return Type{Scalar: &k}, nil
+	return Type{Scalar: scalarTypeKindPtr(kind)}, nil
 }
 
 // readAtomSetType reads PIPE IDENT (COMMA IDENT)* PIPE.

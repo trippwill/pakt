@@ -177,7 +177,7 @@ func (r *reader) errorf(format string, args ...any) *ParseError {
 }
 
 // wrapf creates a *ParseError at the reader's current position wrapping a sentinel.
-func (r *reader) wrapf(sentinel error, format string, args ...any) *ParseError {
+func (r *reader) wrapf(sentinel ErrorCode, format string, args ...any) *ParseError {
 	return Wrapf(r.pos, sentinel, format, args...)
 }
 

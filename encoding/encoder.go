@@ -275,8 +275,8 @@ func (e *Encoder) writeMultiLineString(s string) {
 	e.write(quote)
 	e.newline()
 
-	lines := strings.Split(s, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(s, "\n")
+	for line := range lines {
 		e.writeIndent()
 		// Escape special chars within the line.
 		for _, r := range line {
@@ -474,7 +474,7 @@ type mapEntry struct {
 }
 
 // mapEntries extracts ordered key-value pairs from a map value.
-func mapEntries(mt *MapType, v any) ([]mapEntry, error) {
+func mapEntries(_ *MapType, v any) ([]mapEntry, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Map {
 		return nil, fmt.Errorf("map value must be a map, got %T", v)
@@ -501,7 +501,7 @@ func structValues(st *StructType, v any) ([]any, error) {
 	default:
 		// Try reflection for struct types.
 		rv := reflect.ValueOf(v)
-		if rv.Kind() == reflect.Ptr {
+		if rv.Kind() == reflect.Pointer {
 			rv = rv.Elem()
 		}
 		if rv.Kind() != reflect.Struct {
@@ -564,7 +564,7 @@ func derefPtr(v any) any {
 		return nil
 	}
 	rv := reflect.ValueOf(v)
-	for rv.Kind() == reflect.Ptr {
+	for rv.Kind() == reflect.Pointer {
 		if rv.IsNil() {
 			return nil
 		}

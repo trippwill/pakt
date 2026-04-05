@@ -1,0 +1,121 @@
+# AGENTS.md — PAKT Repository
+
+This file provides guidance for AI coding agents (e.g., GitHub Copilot) working on issues and pull requests in this repository.
+
+## Repository Structure
+
+```
+pakt/
+├── encoding/            # Core Go library — streaming decoder, encoder, marshal/unmarshal
+│   ├── reader.go        # Byte-level I/O, scalar readers
+│   ├── reader_type.go   # Recursive-descent type annotation parser
+│   ├── reader_state.go  # State machine: parserState enum, frame stack, step() loop
+│   ├── decoder.go       # Public Decoder API
+│   ├── spec.go          # Spec projection (.spec.pakt parsing and filtering)
+│   ├── event.go         # Event types and EventKind enum
+│   ├── types.go         # PAKT type system (TypeKind, Type interface, composites)
+│   ├── errors.go        # ParseError with Pos and ErrorCode (spec §11)
+│   ├── encoder.go       # PAKT output writer
+│   ├── marshal.go       # Go struct → PAKT text
+│   ├── unmarshal.go     # PAKT text → Go struct
+│   ├── tags.go          # Struct tag parsing (pakt:"name")
+│   └── *_test.go        # Tests for each component
+├── main.go              # CLI entry point (Kong)
+├── cli.go               # CLI commands: parse, validate, version
+├── cli_test.go          # CLI integration tests (build binary, run against testdata)
+├── spec/pakt-v0.md      # Formal PAKT v0 specification
+├── docs/guide.md        # Human-friendly PAKT guide
+├── design/              # Architecture documents
+│   └── state-machine-rewrite.md  # Decoder state machine design
+├── site/                # Hugo website (usepakt.dev)
+├── testdata/            # Sample .pakt files
+│   ├── valid/           # Valid documents for testing
+│   └── invalid/         # Invalid documents for error testing
+└── .github/
+    ├── workflows/ci.yml # CI: build, test, lint, coverage
+    ├── copilot-instructions.md
+    └── agents/          # Specialized agent definitions
+```
+
+## Commands
+
+```sh
+go build ./...                         # Build all packages
+go test ./... -count=1 -race           # Run tests with race detector
+golangci-lint run                      # Lint (v2 config in .golangci.yml)
+go run . parse testdata/valid/full.pakt        # Run CLI parse
+go run . validate testdata/valid/full.pakt     # Run CLI validate
+```
+
+## Architecture: Streaming State-Machine Decoder
+
+The decoder in `encoding/` uses an explicit-stack state machine rather than recursive descent for value parsing. This enables:
+
+- **True streaming**: one event per `Decode()` call, zero buffering
+- **Constant memory per nesting level**: explicit `frame` stack instead of Go call stack
+- **Immediate event emission**: caller sees events as soon as they are parseable
+
+### How it works
+
+1. `Decoder.Decode()` calls `stateMachine.step()`
+2. `step()` loops through `parserState` values in a `switch`
+3. Each state either **yields** an event (returns) or **transitions** (continues loop)
+4. Composite types push a `frame` onto the stack with their resume state
+5. When a child value completes, the frame is popped and execution resumes at the parent's saved state
+
+### Key files for decoder work
+
+- `reader_state.go` — All state definitions, frame type, `step()` implementation
+- `reader.go` — Helper actions called within state transitions (byte I/O, scalar reads, whitespace)
+- `reader_type.go` — Type annotation parser (recursive descent, bounded depth — stays separate from state machine)
+- `design/state-machine-rewrite.md` — Full design doc with state transition narrative, frame payloads, risky areas, and observable behavior contract
+
+## Spec Compliance
+
+The specification (`spec/pakt-v0.md`) is the authoritative source for PAKT semantics. When working on the parser or event model:
+
+- Error codes must match spec §11 categories (`ErrorCode` in `errors.go`)
+- Event ordering must follow the contract in the spec and `design/state-machine-rewrite.md`
+- Duplicate map keys are preserved in decode order (spec design principle §0.1.3)
+- Type annotations are producer assertions checked at parse time
+- Nil is only valid for nullable types (`?` suffix)
+
+## Testing Requirements
+
+- **All tests must pass with `-race`** before submitting changes
+- **Table-driven tests** are preferred in `encoding/`
+- **Regression tests required** for bug fixes
+- **New features need tests** — both positive and negative cases
+- **CLI tests** (`cli_test.go`) build the binary and run against `testdata/` files
+- **`testdata/valid/`** — Add new `.pakt` files for valid syntax coverage
+- **`testdata/invalid/`** — Add new `.pakt` files for error case coverage
+
+## Error Handling
+
+- Use `ParseError` constructors: `Errorf(pos, format, args...)` or `Wrapf(pos, code, format, args...)`
+- Always include `Pos{Line, Col}` — positions must match what the user would see in their editor
+- Use `ErrorCode` sentinels for spec-defined error categories
+- Callers check errors with `errors.Is(err, encoding.ErrTypeMismatch)` etc.
+
+## CI Pipeline
+
+The CI workflow (`.github/workflows/ci.yml`) runs on every push to `main` and on PRs:
+
+1. **Build** — `go build ./...` (matrix: ubuntu-latest, macos-latest)
+2. **Test** — `go test ./... -count=1 -race -coverprofile=coverage.out`
+3. **Lint** — `golangci-lint-action@v7`
+4. **Coverage summary** — Extracts total coverage percentage
+
+## Resource Management
+
+- `bufio.Reader` instances are pooled via `sync.Pool` — always call `release()` or `Close()`
+- `stateMachine` instances are pooled — always call `release()`
+- `Decoder.Close()` handles both; callers should `defer dec.Close()`
+
+## Style Notes
+
+- Go 1.25; follow standard Go idioms
+- Exported names have doc comments
+- Errors wrapped with context: `fmt.Errorf("opening spec: %w", err)`
+- No magic numbers — use named constants
+- golangci-lint v2 config enforces: govet, errcheck, staticcheck, unused, ineffassign, misspell

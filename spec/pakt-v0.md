@@ -510,8 +510,7 @@ A spec file defines the consumer's requirements.
 | Check | Rule |
 |-------|------|
 | **Structural** | Spec fields missing from the document are errors. Document fields not in the spec are ignored (projection). |
-| **Type compatibility** | Document type must match or be a subtype of the spec type. |
-| **Atom set compatibility** | Document atom set must be a subset of or equal to the spec atom set. |
+| **Type** | The document field type must match the spec field type exactly. |
 
 ### 9.4 Consumer Projections
 

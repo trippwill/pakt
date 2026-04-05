@@ -14,9 +14,19 @@ func TestEventKindMarshalRoundTrip(t *testing.T) {
 	}{
 		{EventAssignStart, `"AssignStart"`},
 		{EventAssignEnd, `"AssignEnd"`},
+		{EventListStreamStart, `"ListStreamStart"`},
+		{EventListStreamEnd, `"ListStreamEnd"`},
+		{EventMapStreamStart, `"MapStreamStart"`},
+		{EventMapStreamEnd, `"MapStreamEnd"`},
 		{EventScalarValue, `"ScalarValue"`},
-		{EventCompositeStart, `"CompositeStart"`},
-		{EventCompositeEnd, `"CompositeEnd"`},
+		{EventStructStart, `"StructStart"`},
+		{EventStructEnd, `"StructEnd"`},
+		{EventTupleStart, `"TupleStart"`},
+		{EventTupleEnd, `"TupleEnd"`},
+		{EventListStart, `"ListStart"`},
+		{EventListEnd, `"ListEnd"`},
+		{EventMapStart, `"MapStart"`},
+		{EventMapEnd, `"MapEnd"`},
 		{EventError, `"Error"`},
 	}
 
@@ -54,11 +64,11 @@ func TestEventKindUnmarshalUnknown(t *testing.T) {
 
 func TestEventMarshalScalar(t *testing.T) {
 	e := Event{
-		Kind:  EventScalarValue,
-		Pos:   Pos{Line: 1, Col: 16},
-		Name:  "greeting",
-		Type:  "str",
-		Value: "'hello world'",
+		Kind:       EventScalarValue,
+		Pos:        Pos{Line: 1, Col: 16},
+		Name:       "greeting",
+		ScalarType: TypeStr,
+		Value:      "'hello world'",
 	}
 
 	data, err := json.Marshal(e)
@@ -66,7 +76,7 @@ func TestEventMarshalScalar(t *testing.T) {
 		t.Fatalf("MarshalJSON: %v", err)
 	}
 
-	want := `{"kind":"ScalarValue","pos":{"line":1,"col":16},"name":"greeting","type":"str","value":"'hello world'"}`
+	want := `{"kind":"ScalarValue","pos":{"line":1,"col":16},"name":"greeting","scalarType":"str","value":"'hello world'"}`
 	if string(data) != want {
 		t.Fatalf("got:\n  %s\nwant:\n  %s", data, want)
 	}
@@ -107,7 +117,7 @@ func TestEventMarshalOmitsErrorWhenNil(t *testing.T) {
 
 func TestEventMarshalOmitsEmptyFields(t *testing.T) {
 	e := Event{
-		Kind: EventCompositeStart,
+		Kind: EventStructStart,
 		Pos:  Pos{Line: 5, Col: 10},
 	}
 
@@ -116,7 +126,7 @@ func TestEventMarshalOmitsEmptyFields(t *testing.T) {
 		t.Fatalf("MarshalJSON: %v", err)
 	}
 	s := string(data)
-	for _, field := range []string{`"name"`, `"type"`, `"value"`} {
+	for _, field := range []string{`"name"`, `"scalarType"`, `"value"`} {
 		if strings.Contains(s, field) {
 			t.Fatalf("expected %s to be omitted, got: %s", field, s)
 		}
@@ -125,11 +135,11 @@ func TestEventMarshalOmitsEmptyFields(t *testing.T) {
 
 func TestEventRoundTrip(t *testing.T) {
 	orig := Event{
-		Kind:  EventScalarValue,
-		Pos:   Pos{Line: 7, Col: 3},
-		Name:  "count",
-		Type:  "int",
-		Value: "42",
+		Kind:       EventScalarValue,
+		Pos:        Pos{Line: 7, Col: 3},
+		Name:       "count",
+		ScalarType: TypeInt,
+		Value:      "42",
 	}
 
 	data, err := json.Marshal(orig)
@@ -152,8 +162,8 @@ func TestEventRoundTrip(t *testing.T) {
 	if got.Name != orig.Name {
 		t.Errorf("Name: got %q, want %q", got.Name, orig.Name)
 	}
-	if got.Type != orig.Type {
-		t.Errorf("Type: got %q, want %q", got.Type, orig.Type)
+	if got.ScalarType != orig.ScalarType {
+		t.Errorf("ScalarType: got %q, want %q", got.ScalarType, orig.ScalarType)
 	}
 	if got.Value != orig.Value {
 		t.Errorf("Value: got %q, want %q", got.Value, orig.Value)

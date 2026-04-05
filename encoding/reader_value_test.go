@@ -41,15 +41,36 @@ func field(name string, typ Type) Field {
 	return Field{Name: name, Type: typ}
 }
 
+func decodeValue(input string, typ Type) ([]Event, error) {
+	r := newReader(strings.NewReader(input))
+	defer r.release()
+
+	sm := newStateMachine(r)
+	sm.state = stateValue
+	sm.valType = typ
+
+	var events []Event
+	for {
+		ev, err := sm.step()
+		if err != nil {
+			return events, err
+		}
+		events = append(events, ev)
+		if sm.atTop() {
+			return events, nil
+		}
+	}
+}
+
 // readValueEvents creates a reader from input, reads a value of the given type,
 // and returns the emitted events.
 func readValueEvents(t *testing.T, input string, typ Type) []Event {
 	t.Helper()
-	r := newReader(strings.NewReader(input))
-	if err := r.readValue(typ, ""); err != nil {
+	events, err := decodeValue(input, typ)
+	if err != nil {
 		t.Fatalf("readValue(%q): %v", input, err)
 	}
-	return r.events
+	return events
 }
 
 // expectEvents asserts that the given events match the expected kinds and values.
@@ -69,8 +90,8 @@ func expectEvents(t *testing.T, events []Event, expected []Event) {
 		if exp.Value != "" && ev.Value != exp.Value {
 			t.Errorf("event[%d]: value=%q, want %q", i, ev.Value, exp.Value)
 		}
-		if exp.Type != "" && ev.Type != exp.Type {
-			t.Errorf("event[%d]: type=%q, want %q", i, ev.Type, exp.Type)
+		if exp.ScalarType != TypeNone && ev.ScalarType != exp.ScalarType {
+			t.Errorf("event[%d]: scalarType=%s, want %s", i, ev.ScalarType, exp.ScalarType)
 		}
 	}
 }
@@ -112,8 +133,8 @@ func TestReadScalarValues(t *testing.T) {
 			if events[0].Value != tc.value {
 				t.Fatalf("value=%q, want %q", events[0].Value, tc.value)
 			}
-			if events[0].Type != tc.kind.String() {
-				t.Fatalf("type=%q, want %q", events[0].Type, tc.kind.String())
+			if events[0].ScalarType != tc.kind {
+				t.Fatalf("scalarType=%s, want %s", events[0].ScalarType, tc.kind)
 			}
 		})
 	}
@@ -151,8 +172,7 @@ func TestReadNilValue(t *testing.T) {
 }
 
 func TestReadNilNonNullableError(t *testing.T) {
-	r := newReader(strings.NewReader("nil"))
-	err := r.readValue(scalarType(TypeStr), "")
+	_, err := decodeValue("nil", scalarType(TypeStr))
 	if err == nil {
 		t.Fatal("expected error for nil on non-nullable type")
 	}
@@ -190,8 +210,7 @@ func TestReadAtomValues(t *testing.T) {
 }
 
 func TestReadAtomValueInvalid(t *testing.T) {
-	r := newReader(strings.NewReader("test"))
-	err := r.readValue(atomSetType("dev", "staging", "prod"), "")
+	_, err := decodeValue("test", atomSetType("dev", "staging", "prod"))
 	if err == nil {
 		t.Fatal("expected error for invalid atom value")
 	}
@@ -208,10 +227,10 @@ func TestReadStructInline(t *testing.T) {
 	)
 	events := readValueEvents(t, "{ 'localhost', 8080 }", typ)
 	expectEvents(t, events, []Event{
-		{Kind: EventCompositeStart, Type: typ.String()},
-		{Kind: EventScalarValue, Name: "host", Value: "localhost", Type: "str"},
-		{Kind: EventScalarValue, Name: "port", Value: "8080", Type: "int"},
-		{Kind: EventCompositeEnd, Type: typ.String()},
+		{Kind: EventStructStart},
+		{Kind: EventScalarValue, Name: "host", Value: "localhost", ScalarType: TypeStr},
+		{Kind: EventScalarValue, Name: "port", Value: "8080", ScalarType: TypeInt},
+		{Kind: EventStructEnd},
 	})
 }
 
@@ -223,10 +242,10 @@ func TestReadStructBlock(t *testing.T) {
 	input := "{\n'platform'\n26\n}"
 	events := readValueEvents(t, input, typ)
 	expectEvents(t, events, []Event{
-		{Kind: EventCompositeStart, Type: typ.String()},
-		{Kind: EventScalarValue, Name: "level", Value: "platform", Type: "str"},
-		{Kind: EventScalarValue, Name: "release", Value: "26", Type: "int"},
-		{Kind: EventCompositeEnd, Type: typ.String()},
+		{Kind: EventStructStart},
+		{Kind: EventScalarValue, Name: "level", Value: "platform", ScalarType: TypeStr},
+		{Kind: EventScalarValue, Name: "release", Value: "26", ScalarType: TypeInt},
+		{Kind: EventStructEnd},
 	})
 }
 
@@ -258,8 +277,7 @@ func TestReadStructTooFewFields(t *testing.T) {
 		field("b", scalarType(TypeInt)),
 		field("c", scalarType(TypeInt)),
 	)
-	r := newReader(strings.NewReader("{ 1, 2 }"))
-	err := r.readValue(typ, "")
+	_, err := decodeValue("{ 1, 2 }", typ)
 	if err == nil {
 		t.Fatal("expected error for too few struct fields")
 	}
@@ -287,11 +305,11 @@ func TestReadTupleInline(t *testing.T) {
 	typ := tupleType(scalarType(TypeInt), scalarType(TypeInt), scalarType(TypeInt))
 	events := readValueEvents(t, "(3, 45, 5678)", typ)
 	expectEvents(t, events, []Event{
-		{Kind: EventCompositeStart, Type: typ.String()},
-		{Kind: EventScalarValue, Name: "[0]", Value: "3", Type: "int"},
-		{Kind: EventScalarValue, Name: "[1]", Value: "45", Type: "int"},
-		{Kind: EventScalarValue, Name: "[2]", Value: "5678", Type: "int"},
-		{Kind: EventCompositeEnd, Type: typ.String()},
+		{Kind: EventTupleStart},
+		{Kind: EventScalarValue, Name: "[0]", Value: "3", ScalarType: TypeInt},
+		{Kind: EventScalarValue, Name: "[1]", Value: "45", ScalarType: TypeInt},
+		{Kind: EventScalarValue, Name: "[2]", Value: "5678", ScalarType: TypeInt},
+		{Kind: EventTupleEnd},
 	})
 }
 
@@ -328,8 +346,7 @@ func TestReadTupleTrailingSep(t *testing.T) {
 
 func TestReadTupleTooFewElements(t *testing.T) {
 	typ := tupleType(scalarType(TypeInt), scalarType(TypeInt), scalarType(TypeInt))
-	r := newReader(strings.NewReader("(1, 2)"))
-	err := r.readValue(typ, "")
+	_, err := decodeValue("(1, 2)", typ)
 	if err == nil {
 		t.Fatal("expected error for too few tuple elements")
 	}
@@ -343,11 +360,11 @@ func TestReadListInline(t *testing.T) {
 	typ := listType(scalarType(TypeInt))
 	events := readValueEvents(t, "[1, 2, 3]", typ)
 	expectEvents(t, events, []Event{
-		{Kind: EventCompositeStart, Type: typ.String()},
-		{Kind: EventScalarValue, Name: "[0]", Value: "1", Type: "int"},
-		{Kind: EventScalarValue, Name: "[1]", Value: "2", Type: "int"},
-		{Kind: EventScalarValue, Name: "[2]", Value: "3", Type: "int"},
-		{Kind: EventCompositeEnd, Type: typ.String()},
+		{Kind: EventListStart},
+		{Kind: EventScalarValue, Name: "[0]", Value: "1", ScalarType: TypeInt},
+		{Kind: EventScalarValue, Name: "[1]", Value: "2", ScalarType: TypeInt},
+		{Kind: EventScalarValue, Name: "[2]", Value: "3", ScalarType: TypeInt},
+		{Kind: EventListEnd},
 	})
 }
 
@@ -366,8 +383,8 @@ func TestReadListEmpty(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("expected 2 events (start+end), got %d", len(events))
 	}
-	if events[0].Kind != EventCompositeStart || events[1].Kind != EventCompositeEnd {
-		t.Fatalf("expected CompositeStart/End, got %s/%s", events[0].Kind, events[1].Kind)
+	if events[0].Kind != EventListStart || events[1].Kind != EventListEnd {
+		t.Fatalf("expected ListStart/End, got %s/%s", events[0].Kind, events[1].Kind)
 	}
 }
 
@@ -396,12 +413,12 @@ func TestReadListTrailingSep(t *testing.T) {
 
 func TestReadMapInline(t *testing.T) {
 	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
-	events := readValueEvents(t, "< 'host' = 8080, 'port' = 9090 >", typ)
+	events := readValueEvents(t, "< 'host' ; 8080, 'port' ; 9090 >", typ)
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d: %v", len(events), events)
 	}
-	if events[0].Kind != EventCompositeStart {
-		t.Fatalf("event[0]: expected CompositeStart, got %s", events[0].Kind)
+	if events[0].Kind != EventMapStart {
+		t.Fatalf("event[0]: expected MapStart, got %s", events[0].Kind)
 	}
 	// Key events
 	if events[1].Kind != EventScalarValue || events[1].Value != "host" {
@@ -416,14 +433,14 @@ func TestReadMapInline(t *testing.T) {
 	if events[4].Kind != EventScalarValue || events[4].Value != "9090" {
 		t.Fatalf("event[4]: %v", events[4])
 	}
-	if events[5].Kind != EventCompositeEnd {
-		t.Fatalf("event[5]: expected CompositeEnd, got %s", events[5].Kind)
+	if events[5].Kind != EventMapEnd {
+		t.Fatalf("event[5]: expected MapEnd, got %s", events[5].Kind)
 	}
 }
 
 func TestReadMapBlock(t *testing.T) {
 	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
-	input := "<\n'a' = 1\n'b' = 2\n>"
+	input := "<\n'a' ; 1\n'b' ; 2\n>"
 	events := readValueEvents(t, input, typ)
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d", len(events))
@@ -440,21 +457,34 @@ func TestReadMapEmpty(t *testing.T) {
 
 func TestReadMapTrailingSep(t *testing.T) {
 	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
-	events := readValueEvents(t, "< 'a' = 1, 'b' = 2, >", typ)
+	events := readValueEvents(t, "< 'a' ; 1, 'b' ; 2, >", typ)
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d", len(events))
 	}
 }
 
-func TestReadMapDuplicateKeyError(t *testing.T) {
+func TestReadMapDuplicateKeysPreserveEntries(t *testing.T) {
 	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
-	r := newReader(strings.NewReader("< 'a' = 1, 'a' = 2 >"))
-	err := r.readValue(typ, "")
-	if err == nil {
-		t.Fatal("expected error for duplicate map key")
-	}
-	if !strings.Contains(err.Error(), "duplicate") {
-		t.Fatalf("error should mention 'duplicate': %v", err)
+	events := readValueEvents(t, "< 'a' ; 1, 'a' ; 2 >", typ)
+	expectEvents(t, events, []Event{
+		{Kind: EventMapStart},
+		{Kind: EventScalarValue, Name: "a", Value: "a", ScalarType: TypeStr},
+		{Kind: EventScalarValue, Name: "a", Value: "1", ScalarType: TypeInt},
+		{Kind: EventScalarValue, Name: "a", Value: "a", ScalarType: TypeStr},
+		{Kind: EventScalarValue, Name: "a", Value: "2", ScalarType: TypeInt},
+		{Kind: EventMapEnd},
+	})
+}
+
+func TestReadMapDuplicateCompositeKeysPreserveEntries(t *testing.T) {
+	keyType := structType(
+		field("host", scalarType(TypeStr)),
+		field("port", scalarType(TypeInt)),
+	)
+	typ := mapType(keyType, scalarType(TypeInt))
+	events := readValueEvents(t, "< { 'a', 1 } ; 10, { 'a', 1 } ; 20 >", typ)
+	if len(events) != 12 {
+		t.Fatalf("expected 12 events, got %d: %v", len(events), events)
 	}
 }
 
@@ -464,7 +494,7 @@ func TestReadMapCompositeStructValue(t *testing.T) {
 		field("age", scalarType(TypeInt)),
 	)
 	typ := mapType(scalarType(TypeStr), valType)
-	input := "< 'alice' = { 'Alice', 30 } >"
+	input := "< 'alice' ; { 'Alice', 30 } >"
 	events := readValueEvents(t, input, typ)
 	// CompositeStart(map), ScalarValue(key), CompositeStart(struct), ScalarValue, ScalarValue, CompositeEnd(struct), CompositeEnd(map)
 	if len(events) != 7 {
@@ -488,13 +518,13 @@ func TestReadNestedStructWithList(t *testing.T) {
 	if len(events) != 8 {
 		t.Fatalf("expected 8 events, got %d: %v", len(events), events)
 	}
-	if events[0].Kind != EventCompositeStart {
+	if events[0].Kind != EventStructStart {
 		t.Fatalf("event[0] kind=%s", events[0].Kind)
 	}
 	if events[1].Name != "name" || events[1].Value != "alice" {
 		t.Fatalf("event[1] = %v", events[1])
 	}
-	if events[2].Kind != EventCompositeStart && events[2].Name != "scores" {
+	if events[2].Kind != EventListStart && events[2].Name != "scores" {
 		t.Fatalf("event[2] = %v", events[2])
 	}
 }
@@ -513,7 +543,7 @@ func TestReadNestedStructWithTuple(t *testing.T) {
 func TestReadMapWithStructValues(t *testing.T) {
 	valType := structType(field("x", scalarType(TypeInt)))
 	typ := mapType(scalarType(TypeStr), valType)
-	input := "<\n'k1' = { 1 }\n'k2' = { 2 }\n>"
+	input := "<\n'k1' ; { 1 }\n'k2' ; { 2 }\n>"
 	events := readValueEvents(t, input, typ)
 	// map start, key1, struct start, int, struct end, key2, struct start, int, struct end, map end
 	if len(events) != 10 {

@@ -39,9 +39,6 @@ func TestDecodeSimpleStr(t *testing.T) {
 	if events[0].Kind != EventAssignStart || events[0].Name != "name" {
 		t.Fatalf("event[0] = %v", events[0])
 	}
-	if events[0].Type != "str" {
-		t.Fatalf("event[0].Type = %q, want %q", events[0].Type, "str")
-	}
 	if events[1].Kind != EventScalarValue || events[1].Value != "hello" {
 		t.Fatalf("event[1] = %v", events[1])
 	}
@@ -107,7 +104,7 @@ func TestDecodeStructAssignment(t *testing.T) {
 	if events[0].Kind != EventAssignStart || events[0].Name != "server" {
 		t.Fatalf("event[0] = %v", events[0])
 	}
-	if events[1].Kind != EventCompositeStart {
+	if events[1].Kind != EventStructStart {
 		t.Fatalf("event[1] = %v", events[1])
 	}
 	if events[2].Kind != EventScalarValue || events[2].Name != "host" || events[2].Value != "localhost" {
@@ -116,7 +113,7 @@ func TestDecodeStructAssignment(t *testing.T) {
 	if events[3].Kind != EventScalarValue || events[3].Name != "port" || events[3].Value != "8080" {
 		t.Fatalf("event[3] = %v", events[3])
 	}
-	if events[4].Kind != EventCompositeEnd {
+	if events[4].Kind != EventStructEnd {
 		t.Fatalf("event[4] = %v", events[4])
 	}
 	if events[5].Kind != EventAssignEnd {
@@ -146,7 +143,7 @@ func TestDecodeListAssignment(t *testing.T) {
 }
 
 func TestDecodeMapAssignment(t *testing.T) {
-	input := "headers:<str = str> = < 'Content-Type' = 'text/html', 'Accept' = '*/*' >"
+	input := "headers:<str ; str> = < 'Content-Type' ; 'text/html', 'Accept' ; '*/*' >"
 	events := decodeAll(t, input)
 	// AssignStart, CompositeStart, key1, val1, key2, val2, CompositeEnd, AssignEnd
 	if len(events) != 8 {
@@ -248,8 +245,8 @@ func TestDecodeBlockInlineEquivalence(t *testing.T) {
 		if inlineEvents[i].Value != blockEvents[i].Value {
 			t.Errorf("event[%d] value: inline=%q, block=%q", i, inlineEvents[i].Value, blockEvents[i].Value)
 		}
-		if inlineEvents[i].Type != blockEvents[i].Type {
-			t.Errorf("event[%d] type: inline=%q, block=%q", i, inlineEvents[i].Type, blockEvents[i].Type)
+		if inlineEvents[i].ScalarType != blockEvents[i].ScalarType {
+			t.Errorf("event[%d] type: inline=%q, block=%q", i, inlineEvents[i].ScalarType, blockEvents[i].ScalarType)
 		}
 	}
 }
@@ -288,9 +285,9 @@ server:{host:str, port:int} = {
   8080
 }
 tags:[str] = ['web', 'api', 'v1']
-headers:<str = str> = <
-  'Content-Type' = 'application/json'
-  'Accept' = '*/*'
+headers:<str ; str> = <
+  'Content-Type' ; 'application/json'
+  'Accept' ; '*/*'
 >
 `
 	events := decodeAll(t, input)
@@ -332,8 +329,8 @@ func TestDecodeNullableScalar(t *testing.T) {
 	if events[1].Value != "nil" {
 		t.Fatalf("value = %q, want %q", events[1].Value, "nil")
 	}
-	if events[1].Type != "str?" {
-		t.Fatalf("type = %q, want %q", events[1].Type, "str?")
+	if events[1].ScalarType != TypeStr {
+		t.Fatalf("scalarType = %s, want TypeStr", events[1].ScalarType)
 	}
 }
 
@@ -357,17 +354,17 @@ func TestDecodeEventStream(t *testing.T) {
 	events := decodeAll(t, input)
 
 	expected := []struct {
-		kind  EventKind
-		name  string
-		typ   string
-		value string
+		kind       EventKind
+		name       string
+		scalarType TypeKind
+		value      string
 	}{
-		{EventAssignStart, "point", "{x:int, y:int}", ""},
-		{EventCompositeStart, "point", "{x:int, y:int}", ""},
-		{EventScalarValue, "x", "int", "10"},
-		{EventScalarValue, "y", "int", "20"},
-		{EventCompositeEnd, "", "{x:int, y:int}", ""},
-		{EventAssignEnd, "point", "{x:int, y:int}", ""},
+		{EventAssignStart, "point", TypeNone, ""},
+		{EventStructStart, "point", TypeNone, ""},
+		{EventScalarValue, "x", TypeInt, "10"},
+		{EventScalarValue, "y", TypeInt, "20"},
+		{EventStructEnd, "", TypeNone, ""},
+		{EventAssignEnd, "point", TypeNone, ""},
 	}
 
 	if len(events) != len(expected) {
@@ -381,8 +378,8 @@ func TestDecodeEventStream(t *testing.T) {
 		if exp.name != "" && ev.Name != exp.name {
 			t.Errorf("event[%d]: name=%q, want %q", i, ev.Name, exp.name)
 		}
-		if ev.Type != exp.typ {
-			t.Errorf("event[%d]: type=%q, want %q", i, ev.Type, exp.typ)
+		if ev.ScalarType != exp.scalarType {
+			t.Errorf("event[%d]: scalarType=%s, want %s", i, ev.ScalarType, exp.scalarType)
 		}
 		if ev.Value != exp.value {
 			t.Errorf("event[%d]: value=%q, want %q", i, ev.Value, exp.value)

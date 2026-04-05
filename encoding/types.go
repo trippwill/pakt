@@ -1,12 +1,16 @@
 package encoding
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // TypeKind identifies a scalar type in the PAKT type system.
 type TypeKind int
 
 const (
-	TypeStr      TypeKind = iota // str  — quoted string
+	TypeNone     TypeKind = iota // zero value — not a scalar
+	TypeStr                      // str  — quoted string
 	TypeInt                      // int  — signed 64-bit integer
 	TypeDec                      // dec  — arbitrary-precision decimal
 	TypeFloat                    // float — IEEE 754 binary64
@@ -15,9 +19,12 @@ const (
 	TypeDate                     // date — ISO date
 	TypeTime                     // time — ISO time with timezone
 	TypeDateTime                 // datetime — ISO datetime with timezone
+	TypeBin                      // bin — raw bytes
+	TypeAtom                     // atom set value (treated as string)
 )
 
 var typeKindNames = [...]string{
+	TypeNone:     "",
 	TypeStr:      "str",
 	TypeInt:      "int",
 	TypeDec:      "dec",
@@ -27,6 +34,8 @@ var typeKindNames = [...]string{
 	TypeDate:     "date",
 	TypeTime:     "time",
 	TypeDateTime: "datetime",
+	TypeBin:      "bin",
+	TypeAtom:     "atom",
 }
 
 // String returns the PAKT keyword for the scalar type.
@@ -35,6 +44,26 @@ func (k TypeKind) String() string {
 		return typeKindNames[k]
 	}
 	return fmt.Sprintf("TypeKind(%d)", int(k))
+}
+
+// MarshalJSON serializes TypeKind as its string name.
+func (k TypeKind) MarshalJSON() ([]byte, error) {
+	return json.Marshal(k.String())
+}
+
+// UnmarshalJSON deserializes a TypeKind from its string name.
+func (k *TypeKind) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	for i, name := range typeKindNames {
+		if name == s {
+			*k = TypeKind(i)
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown TypeKind %q", s)
 }
 
 // Type represents any type expressible in PAKT, including scalars,
@@ -167,5 +196,5 @@ type MapType struct {
 
 // String returns the PAKT syntax for the map type.
 func (mt *MapType) String() string {
-	return "<" + mt.Key.String() + " = " + mt.Value.String() + ">"
+	return "<" + mt.Key.String() + " ; " + mt.Value.String() + ">"
 }

@@ -71,6 +71,28 @@ func countKind(events []Event, kind EventKind) int {
 	return n
 }
 
+// countCompositeStarts returns the total number of composite start events.
+func countCompositeStarts(events []Event) int {
+	n := 0
+	for _, ev := range events {
+		if ev.Kind.IsCompositeStart() {
+			n++
+		}
+	}
+	return n
+}
+
+// countCompositeEnds returns the total number of composite end events.
+func countCompositeEnds(events []Event) int {
+	n := 0
+	for _, ev := range events {
+		if ev.Kind.IsCompositeEnd() {
+			n++
+		}
+	}
+	return n
+}
+
 // ---------------------------------------------------------------------------
 // Valid file tests
 // ---------------------------------------------------------------------------
@@ -78,8 +100,8 @@ func countKind(events []Event, kind EventKind) int {
 func TestIntegrationValidScalars(t *testing.T) {
 	events := fileDecodeAll(t, "../testdata/valid/scalars.pakt")
 
-	// scalars.pakt has 15 assignments, each producing 3 events
-	const wantAssignments = 15
+	// scalars.pakt has 17 assignments, each producing 3 events
+	const wantAssignments = 17
 	starts := countKind(events, EventAssignStart)
 	ends := countKind(events, EventAssignEnd)
 	scalars := countKind(events, EventScalarValue)
@@ -114,6 +136,7 @@ func TestIntegrationValidScalars(t *testing.T) {
 	expectedNames := []string{
 		"greeting", "count", "hex", "binary", "octal", "big", "negative",
 		"price", "avogadro", "active", "inactive", "id", "started", "opened", "updated",
+		"payload", "payload64",
 	}
 	for i, name := range expectedNames {
 		if events[i*3].Name != name {
@@ -123,12 +146,14 @@ func TestIntegrationValidScalars(t *testing.T) {
 
 	// Spot-check specific values
 	spotChecks := map[string]string{
-		"greeting": "hello world",
-		"count":    "42",
-		"active":   "true",
-		"inactive": "false",
-		"negative": "-273",
-		"price":    "19.99",
+		"greeting":  "hello world",
+		"count":     "42",
+		"active":    "true",
+		"inactive":  "false",
+		"negative":  "-273",
+		"price":     "19.99",
+		"payload":   "48656c6c6f",
+		"payload64": "48656c6c6f",
 	}
 	for i := 0; i < len(events); i += 3 {
 		name := events[i].Name
@@ -143,8 +168,8 @@ func TestIntegrationValidScalars(t *testing.T) {
 func TestIntegrationValidStrings(t *testing.T) {
 	events := fileDecodeAll(t, "../testdata/valid/strings.pakt")
 
-	// strings.pakt has 10 assignments
-	const wantAssignments = 10
+	// strings.pakt has 13 assignments
+	const wantAssignments = 13
 	starts := countKind(events, EventAssignStart)
 	if starts != wantAssignments {
 		t.Errorf("AssignStart count = %d, want %d", starts, wantAssignments)
@@ -187,6 +212,15 @@ func TestIntegrationValidStrings(t *testing.T) {
 	if _, ok := vals["poem"]; !ok {
 		t.Error("missing 'poem' multi-line string")
 	}
+	if v := vals["windows-path"]; v != `C:\Users\alice\Documents` {
+		t.Errorf("windows-path = %q", v)
+	}
+	if v := vals["pattern"]; v != `^\d{3}-\d{4}$` {
+		t.Errorf("pattern = %q", v)
+	}
+	if v := vals["template"]; v != `Hello \n World` {
+		t.Errorf("template = %q", v)
+	}
 }
 
 func TestIntegrationValidComposites(t *testing.T) {
@@ -200,8 +234,8 @@ func TestIntegrationValidComposites(t *testing.T) {
 	}
 
 	// CompositeStart and CompositeEnd must be balanced
-	compStarts := countKind(events, EventCompositeStart)
-	compEnds := countKind(events, EventCompositeEnd)
+	compStarts := countCompositeStarts(events)
+	compEnds := countCompositeEnds(events)
 	if compStarts != compEnds {
 		t.Errorf("CompositeStart=%d != CompositeEnd=%d", compStarts, compEnds)
 	}
@@ -209,10 +243,9 @@ func TestIntegrationValidComposites(t *testing.T) {
 	// Verify nesting is correct: track depth
 	depth := 0
 	for i, ev := range events {
-		switch ev.Kind {
-		case EventCompositeStart:
+		if ev.Kind.IsCompositeStart() {
 			depth++
-		case EventCompositeEnd:
+		} else if ev.Kind.IsCompositeEnd() {
 			depth--
 			if depth < 0 {
 				t.Fatalf("event[%d]: composite depth went negative", i)
@@ -258,11 +291,11 @@ func TestIntegrationValidNullable(t *testing.T) {
 
 	// Collect scalar values by name
 	vals := make(map[string]string)
-	types := make(map[string]string)
+	scalarTypes := make(map[string]TypeKind)
 	for _, ev := range events {
 		if ev.Kind == EventScalarValue && ev.Name != "" {
 			vals[ev.Name] = ev.Value
-			types[ev.Name] = ev.Type
+			scalarTypes[ev.Name] = ev.ScalarType
 		}
 	}
 
@@ -288,13 +321,13 @@ func TestIntegrationValidNullable(t *testing.T) {
 		t.Errorf("maybe-price = %q, want %q", v, "9.99")
 	}
 
-	// Nullable nil values should carry the nullable type annotation
-	if tp := types["nickname"]; !strings.HasSuffix(tp, "?") {
-		t.Errorf("nickname type = %q, expected nullable suffix", tp)
+	// Nullable nil values should carry the scalar type
+	if tp := scalarTypes["nickname"]; tp != TypeStr {
+		t.Errorf("nickname scalarType = %s, want TypeStr", tp)
 	}
-	// Non-nil nullable values may report either the nullable or inner type
-	if tp := types["score"]; tp != "int?" && tp != "int" {
-		t.Errorf("score type = %q, want %q or %q", tp, "int?", "int")
+	// Non-nil nullable values carry the inner scalar type
+	if tp := scalarTypes["score"]; tp != TypeInt {
+		t.Errorf("score scalarType = %s, want TypeInt", tp)
 	}
 }
 
@@ -343,8 +376,8 @@ func TestIntegrationValidFull(t *testing.T) {
 	}
 
 	// Balanced composites
-	compStarts := countKind(events, EventCompositeStart)
-	compEnds := countKind(events, EventCompositeEnd)
+	compStarts := countCompositeStarts(events)
+	compEnds := countCompositeEnds(events)
 	if compStarts != compEnds {
 		t.Errorf("CompositeStart=%d != CompositeEnd=%d", compStarts, compEnds)
 	}
@@ -383,8 +416,8 @@ func TestIntegrationValidFull(t *testing.T) {
 	if events[deployIdx].Kind != EventAssignStart {
 		t.Errorf("deploy[0]: got %s, want AssignStart", events[deployIdx].Kind)
 	}
-	if events[deployIdx+1].Kind != EventCompositeStart {
-		t.Errorf("deploy[1]: got %s, want CompositeStart", events[deployIdx+1].Kind)
+	if events[deployIdx+1].Kind != EventStructStart {
+		t.Errorf("deploy[1]: got %s, want StructStart", events[deployIdx+1].Kind)
 	}
 	// The struct fields
 	if events[deployIdx+2].Kind != EventScalarValue || events[deployIdx+2].Name != "level" {
@@ -399,8 +432,8 @@ func TestIntegrationValidFull(t *testing.T) {
 	if events[deployIdx+4].Kind != EventScalarValue || events[deployIdx+4].Name != "date" {
 		t.Errorf("deploy[4]: got %s name=%q, want ScalarValue name=date", events[deployIdx+4].Kind, events[deployIdx+4].Name)
 	}
-	if events[deployIdx+5].Kind != EventCompositeEnd {
-		t.Errorf("deploy[5]: got %s, want CompositeEnd", events[deployIdx+5].Kind)
+	if events[deployIdx+5].Kind != EventStructEnd {
+		t.Errorf("deploy[5]: got %s, want StructEnd", events[deployIdx+5].Kind)
 	}
 	if events[deployIdx+6].Kind != EventAssignEnd {
 		t.Errorf("deploy[6]: got %s, want AssignEnd", events[deployIdx+6].Kind)
@@ -415,8 +448,8 @@ func TestIntegrationValidFull(t *testing.T) {
 		}
 	}
 	// AssignStart, CompositeStart, 3×ScalarValue, CompositeEnd, AssignEnd = 7
-	if events[featIdx+1].Kind != EventCompositeStart {
-		t.Errorf("features[1]: got %s, want CompositeStart", events[featIdx+1].Kind)
+	if events[featIdx+1].Kind != EventListStart {
+		t.Errorf("features[1]: got %s, want ListStart", events[featIdx+1].Kind)
 	}
 	featureValues := []string{"dark-mode", "notifications", "audit-log"}
 	for j, want := range featureValues {
@@ -434,12 +467,12 @@ func TestIntegrationValidFull(t *testing.T) {
 			break
 		}
 	}
-	if events[metaIdx+1].Kind != EventCompositeStart {
-		t.Errorf("meta[1]: got %s, want CompositeStart", events[metaIdx+1].Kind)
+	if events[metaIdx+1].Kind != EventMapStart {
+		t.Errorf("meta[1]: got %s, want MapStart", events[metaIdx+1].Kind)
 	}
 	// Map: 3 key-value pairs = 6 scalar events
 	metaScalars := 0
-	for i := metaIdx + 2; i < len(events) && events[i].Kind != EventCompositeEnd; i++ {
+	for i := metaIdx + 2; i < len(events) && !events[i].Kind.IsCompositeEnd(); i++ {
 		if events[i].Kind == EventScalarValue {
 			metaScalars++
 		}
@@ -526,8 +559,8 @@ func TestIntegrationValidAllFiles(t *testing.T) {
 				t.Errorf("AssignStart=%d != AssignEnd=%d", starts, ends)
 			}
 			// Composites must be balanced
-			cs := countKind(events, EventCompositeStart)
-			ce := countKind(events, EventCompositeEnd)
+			cs := countCompositeStarts(events)
+			ce := countCompositeEnds(events)
 			if cs != ce {
 				t.Errorf("CompositeStart=%d != CompositeEnd=%d", cs, ce)
 			}
@@ -555,10 +588,6 @@ func TestIntegrationInvalidFiles(t *testing.T) {
 		{
 			file:     "nil-non-nullable.pakt",
 			keywords: []string{"nil", "nullable", "non-nullable", "expected"},
-		},
-		{
-			file:     "duplicate-map-key.pakt",
-			keywords: []string{"duplicate", "key"},
 		},
 		{
 			file:     "missing-type.pakt",
@@ -631,10 +660,13 @@ func TestSentinelErrDuplicateName(t *testing.T) {
 	}
 }
 
-func TestSentinelErrDuplicateKey(t *testing.T) {
-	gotErr := fileDecodeExpectError(t, filepath.Join("..", "testdata", "invalid", "duplicate-map-key.pakt"))
-	if !errors.Is(gotErr, ErrDuplicateKey) {
-		t.Fatalf("expected errors.Is(err, ErrDuplicateKey), got: %v", gotErr)
+func TestDuplicateMapKeysFixtureParses(t *testing.T) {
+	events := fileDecodeAll(t, filepath.Join("..", "testdata", "valid", "duplicate-map-key.pakt"))
+	if len(events) != 10 {
+		t.Fatalf("expected 10 events, got %d: %v", len(events), events)
+	}
+	if events[2].Value != "alice" || events[3].Value != "1" || events[6].Value != "alice" || events[7].Value != "3" {
+		t.Fatalf("unexpected duplicate-key event sequence: %v", events)
 	}
 }
 
@@ -696,21 +728,22 @@ func TestSentinelErrDuplicateNameViaDecoder(t *testing.T) {
 	}
 }
 
-func TestSentinelErrDuplicateKeyUnit(t *testing.T) {
+func TestDuplicateMapKeysUnit(t *testing.T) {
 	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
-	r := newReader(strings.NewReader("< 'a' = 1, 'a' = 2 >"))
-	err := r.readValue(typ, "")
-	if err == nil {
-		t.Fatal("expected error for duplicate map key")
+	events, err := decodeValue("< 'a' ; 1, 'a' ; 2 >", typ)
+	if err != nil {
+		t.Fatalf("unexpected error for duplicate map keys: %v", err)
 	}
-	if !errors.Is(err, ErrDuplicateKey) {
-		t.Fatalf("expected errors.Is(err, ErrDuplicateKey), got: %v", err)
+	if len(events) != 6 {
+		t.Fatalf("expected 6 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "a" || events[2].Value != "1" || events[3].Value != "a" || events[4].Value != "2" {
+		t.Fatalf("unexpected duplicate-key event sequence: %v", events)
 	}
 }
 
 func TestSentinelErrNilNonNullableUnit(t *testing.T) {
-	r := newReader(strings.NewReader("nil"))
-	err := r.readValue(scalarType(TypeStr), "")
+	_, err := decodeValue("nil", scalarType(TypeStr))
 	if err == nil {
 		t.Fatal("expected error for nil on non-nullable type")
 	}

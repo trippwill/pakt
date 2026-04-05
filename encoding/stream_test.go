@@ -28,7 +28,7 @@ func TestDecodeListStream(t *testing.T) {
 }
 
 func TestDecodeListStreamStopsAtNextStatement(t *testing.T) {
-	input := "states:[|dev, prod|] << dev\nnext:int = 1"
+	input := "states:[|dev, prod|] << |dev\nnext:int = 1"
 	events := decodeAll(t, input)
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d: %v", len(events), events)

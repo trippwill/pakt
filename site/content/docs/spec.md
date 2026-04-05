@@ -180,7 +180,7 @@ Type annotations in a document are assertions by the producer. They are validate
 
 ```
 release:int = 26
-status:|active, inactive| = active
+status:|active, inactive| = |active
 ```
 
 ### 9.2 External Spec Files
@@ -223,7 +223,7 @@ Projections may be defined statically (in `.spec.pakt` files) or constructed dyn
 ```
 # Full document
 {
-level:|dev, staging, prod| = prod
+level:|dev, staging, prod| = |prod
 release:int               = 26
 date:date                 = 2026-06-01
 }

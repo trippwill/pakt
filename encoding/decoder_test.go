@@ -279,7 +279,7 @@ func TestDecodeRealisticDocument(t *testing.T) {
 	input := `# Application config
 name:str = 'midwatch'
 version:(int, int, int) = (1, 0, 0)
-env:|dev, staging, prod| = prod
+env:|dev, staging, prod| = |prod
 server:{host:str, port:int} = {
   'localhost'
   8080
@@ -392,13 +392,28 @@ func TestDecodeEventStream(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDecodeAtomAssignment(t *testing.T) {
-	input := "status:|active, inactive| = active"
+	input := "status:|active, inactive| = |active"
 	events := decodeAll(t, input)
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
 	}
 	if events[1].Value != "active" {
 		t.Fatalf("value = %q, want %q", events[1].Value, "active")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Leading-dot decimal
+// ---------------------------------------------------------------------------
+
+func TestDecodeLeadingDotDecimal(t *testing.T) {
+	input := "price:dec = .99"
+	events := decodeAll(t, input)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
+	}
+	if events[1].Value != ".99" {
+		t.Fatalf("value = %q, want %q", events[1].Value, ".99")
 	}
 }
 

@@ -105,10 +105,10 @@ template:str = r'''
 Atoms are bareword identifiers constrained to a declared set. They're similar to enums — the type declares the allowed values:
 
 ```
-level:|dev, staging, prod| = prod
-status:|active, inactive, suspended| = active
-color:|red, green, blue| = blue
-priority:|low, medium, high, critical| = high
+level:|dev, staging, prod| = |prod
+status:|active, inactive, suspended| = |active
+color:|red, green, blue| = |blue
+priority:|low, medium, high, critical| = |high
 ```
 
 **Note:** `true`, `false`, and `nil` are reserved keywords and cannot be used as atom values.
@@ -223,7 +223,7 @@ score:int?    = 42
 
 # Nullable atoms
 role:|admin, user|?       = nil
-status:|active, inactive|? = active
+status:|active, inactive|? = |active
 
 # Nullable composites
 config:{host:str, port:int}? = nil
@@ -254,7 +254,7 @@ version:(int, int, int) = (2, 14, 0)
 
 # Deployment target
 deploy:{level:|dev, staging, prod|, release:int, date:date} = {
-    prod
+    |prod
     26
     2026-06-01
 }

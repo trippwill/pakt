@@ -6,7 +6,7 @@ version:(int, int, int) = (2, 14, 0)
 
 # Deployment target
 deploy:{level:|dev, staging, prod|, release:int, date:date} = {
-    prod
+    |prod
     26
     2026-06-01
 }

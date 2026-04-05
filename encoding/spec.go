@@ -73,6 +73,10 @@ func (r *reader) skipValue() error {
 		return r.skipComposite('[', ']')
 	case b == '<':
 		return r.skipComposite('<', '>')
+	case b == '|':
+		return r.skipAtom()
+	case b == '.':
+		return r.skipNumberLike()
 	case b == 't', b == 'f', b == 'n':
 		return r.skipKeywordOrAtom()
 	case isDigit(b) || b == '-':
@@ -318,6 +322,14 @@ func (r *reader) skipKeywordOrAtom() error {
 	}
 }
 
+// skipAtom skips a '|'-prefixed atom value.
+func (r *reader) skipAtom() error {
+	if _, err := r.readByte(); err != nil { // consume '|'
+		return err
+	}
+	return r.skipKeywordOrAtom()
+}
+
 // skipNumberLike skips a number, date, time, datetime, or UUID literal.
 // Reads until whitespace, newline, comma, closing delimiter, comment, or EOF.
 func (r *reader) skipNumberLike() error {
@@ -360,10 +372,11 @@ func (r *reader) skipStreamBody(typ Type) error {
 func (r *reader) skipListStreamBody() error {
 	for {
 		r.skipInsignificant(true)
-		if _, err := r.peekByte(); err != nil {
+		b, err := r.peekByte()
+		if err != nil {
 			return nil
 		}
-		if r.peekIdentColon() {
+		if !r.canStartValueInStream(b) {
 			return nil
 		}
 
@@ -380,10 +393,11 @@ func (r *reader) skipListStreamBody() error {
 		}
 
 		r.skipInsignificant(true)
-		if _, err := r.peekByte(); err != nil {
+		b, err = r.peekByte()
+		if err != nil {
 			return nil
 		}
-		if r.peekIdentColon() {
+		if !r.canStartValueInStream(b) {
 			return nil
 		}
 		return r.errorf("expected separator between stream items")
@@ -393,10 +407,11 @@ func (r *reader) skipListStreamBody() error {
 func (r *reader) skipMapStreamBody() error {
 	for {
 		r.skipInsignificant(true)
-		if _, err := r.peekByte(); err != nil {
+		b, err := r.peekByte()
+		if err != nil {
 			return nil
 		}
-		if r.peekIdentColon() {
+		if !r.canStartValueInStream(b) {
 			return nil
 		}
 
@@ -423,10 +438,11 @@ func (r *reader) skipMapStreamBody() error {
 		}
 
 		r.skipInsignificant(true)
-		if _, err := r.peekByte(); err != nil {
+		b, err = r.peekByte()
+		if err != nil {
 			return nil
 		}
-		if r.peekIdentColon() {
+		if !r.canStartValueInStream(b) {
 			return nil
 		}
 		return r.errorf("expected separator between stream map entries")

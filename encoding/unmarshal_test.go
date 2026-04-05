@@ -629,3 +629,17 @@ func TestUnmarshalIntIntoUint(t *testing.T) {
 		t.Errorf("got Port=%d, want 8080", v.Port)
 	}
 }
+
+func TestUnmarshalLeadingDotDecimal(t *testing.T) {
+	type S struct {
+		Price string `pakt:"price"`
+	}
+	data := []byte("price:dec = .99")
+	var v S
+	if err := Unmarshal(data, &v); err != nil {
+		t.Fatal(err)
+	}
+	if v.Price != ".99" {
+		t.Errorf("got Price=%q, want %q", v.Price, ".99")
+	}
+}

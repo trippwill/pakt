@@ -235,10 +235,9 @@ func (sm *stateMachine) primeNextMatchedStatement(spec *Spec) (string, error) {
 }
 
 // streamTerminated checks whether the stream has ended (EOF or next
-// top-level statement). The element type is needed to distinguish bare
-// identifiers that are atom-set values from identifiers that begin a
-// new statement header (IDENT COLON).
-func (sm *stateMachine) streamTerminated(elemCanBeIdent bool) (bool, error) {
+// top-level statement). With the '|' prefix on atom values and reserved
+// keywords for booleans/nil, a bare identifier always starts a new statement.
+func (sm *stateMachine) streamTerminated() (bool, error) {
 	sm.r.skipInsignificant(true)
 	b, err := sm.r.peekByte()
 	if err != nil {
@@ -247,19 +246,80 @@ func (sm *stateMachine) streamTerminated(elemCanBeIdent bool) (bool, error) {
 		}
 		return false, err
 	}
-	// If the next byte can't start an identifier, it's definitely a value.
-	if !isAlpha(b) && b != '_' {
-		return false, nil
+	return !sm.r.canStartValueInStream(b), nil
+}
+
+// canStartValue reports whether b can be the first byte of any PAKT value.
+// This is the simple single-byte check used in skip paths where two-byte
+// lookahead is handled separately.
+func canStartValue(b byte) bool {
+	switch {
+	case b == '\'' || b == '"':
+		return true // string
+	case b == '{':
+		return true // struct
+	case b == '(':
+		return true // tuple
+	case b == '[':
+		return true // list
+	case b == '<':
+		return true // map
+	case b == '|':
+		return true // atom value
+	case b == '.':
+		return true // leading-dot decimal
+	case b == '-':
+		return true // negative number
+	case isDigit(b):
+		return true // number/date/time/uuid
+	default:
+		return false
 	}
-	// If the element type allows bare identifiers (atom set, bool, nil),
-	// the only way to distinguish "value" from "next statement" is to
-	// check for IDENT COLON. Fall back to a bounded peek.
-	if elemCanBeIdent {
-		return sm.r.peekIdentColon(), nil
+}
+
+// canStartValueInStream reports whether the byte at the reader's current
+// position begins a value (as opposed to a new statement header).
+// For ambiguous single-byte cases (r, b, x, t, f, n), it performs
+// additional lookahead checks.
+func (r *reader) canStartValueInStream(b byte) bool {
+	if canStartValue(b) {
+		return true
 	}
-	// Element type cannot start with a bare identifier, so any IDENT
-	// here must be the start of the next statement.
-	return true, nil
+	switch b {
+	case 't':
+		return r.peekKeyword("true") || r.peekKeyword("false") // 't' only valid as true
+	case 'f':
+		return r.peekKeyword("false")
+	case 'n':
+		return r.peekKeyword("nil")
+	case 'r':
+		return r.peekRawStringStart()
+	case 'b', 'x':
+		return r.peekBinLiteralStart()
+	}
+	return false
+}
+
+// peekKeyword reports whether the next bytes match the given keyword exactly,
+// followed by a non-identifier byte (or EOF).
+func (r *reader) peekKeyword(kw string) bool {
+	r.ensureBOM()
+	p, err := r.buf.Peek(len(kw) + 1)
+	if err != nil && len(p) < len(kw) {
+		return false
+	}
+	for i := 0; i < len(kw); i++ {
+		if p[i] != kw[i] {
+			return false
+		}
+	}
+	if len(p) > len(kw) {
+		next := p[len(kw)]
+		if isAlpha(next) || isDigit(next) || next == '_' || next == '-' {
+			return false
+		}
+	}
+	return true
 }
 
 func (sm *stateMachine) beginMapKeyValue(keyType Type, after parserState) (Event, bool, error) {
@@ -333,21 +393,6 @@ func scalarTypeKind(t Type) TypeKind {
 	default:
 		return TypeNone
 	}
-}
-
-// typeCanStartWithIdent reports whether values of the given type can
-// begin with a bare identifier character (alpha or underscore).
-func typeCanStartWithIdent(t Type) bool {
-	if t.Nullable {
-		return true // nil starts with 'n'
-	}
-	if t.AtomSet != nil {
-		return true
-	}
-	if t.Scalar != nil {
-		return *t.Scalar == TypeBool // true/false start with ident chars
-	}
-	return false
 }
 
 func (sm *stateMachine) step() (Event, error) {
@@ -797,7 +842,7 @@ func (sm *stateMachine) step() (Event, error) {
 
 		case stateStreamListItem:
 			fr := sm.current()
-			done, err := sm.streamTerminated(typeCanStartWithIdent(fr.lt.Element))
+			done, err := sm.streamTerminated()
 			if err != nil {
 				return Event{}, err
 			}
@@ -820,7 +865,7 @@ func (sm *stateMachine) step() (Event, error) {
 				return Event{}, err
 			}
 			if !sep {
-				done, err := sm.streamTerminated(typeCanStartWithIdent(fr.lt.Element))
+				done, err := sm.streamTerminated()
 				if err != nil {
 					return Event{}, err
 				}
@@ -835,7 +880,7 @@ func (sm *stateMachine) step() (Event, error) {
 
 		case stateStreamMapKey:
 			fr := sm.current()
-			done, err := sm.streamTerminated(typeCanStartWithIdent(fr.mt.Key))
+			done, err := sm.streamTerminated()
 			if err != nil {
 				return Event{}, err
 			}
@@ -870,8 +915,7 @@ func (sm *stateMachine) step() (Event, error) {
 				return Event{}, err
 			}
 			if !sep {
-				fr := sm.current()
-				done, err := sm.streamTerminated(typeCanStartWithIdent(fr.mt.Key))
+				done, err := sm.streamTerminated()
 				if err != nil {
 					return Event{}, err
 				}

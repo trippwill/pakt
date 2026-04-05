@@ -103,6 +103,7 @@ func (e *Encoder) writeValue(typ Type, v any) {
 			e.err = fmt.Errorf("atom set value must be string, got %T", v)
 			return
 		}
+		e.write("|")
 		e.write(s)
 	case typ.Struct != nil:
 		e.writeStructValue(typ.Struct, v)

@@ -189,9 +189,9 @@ func TestReadAtomValues(t *testing.T) {
 		members []string
 		value   string
 	}{
-		{"valid_first", "dev", []string{"dev", "staging", "prod"}, "dev"},
-		{"valid_last", "prod", []string{"dev", "staging", "prod"}, "prod"},
-		{"single_member", "only", []string{"only"}, "only"},
+		{"valid_first", "|dev", []string{"dev", "staging", "prod"}, "dev"},
+		{"valid_last", "|prod", []string{"dev", "staging", "prod"}, "prod"},
+		{"single_member", "|only", []string{"only"}, "only"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -210,7 +210,7 @@ func TestReadAtomValues(t *testing.T) {
 }
 
 func TestReadAtomValueInvalid(t *testing.T) {
-	_, err := decodeValue("test", atomSetType("dev", "staging", "prod"))
+	_, err := decodeValue("|test", atomSetType("dev", "staging", "prod"))
 	if err == nil {
 		t.Fatal("expected error for invalid atom value")
 	}

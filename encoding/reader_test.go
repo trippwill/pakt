@@ -461,6 +461,9 @@ func TestReadDec(t *testing.T) {
 		{"-1.5", "-1.5"},
 		{"1_000.50", "1_000.50"},
 		{"0.0", "0.0"},
+		{".5", ".5"},
+		{"-.75", "-.75"},
+		{".123", ".123"},
 	}
 	for _, tc := range tests {
 		r := mkReader(tc.input)
@@ -490,6 +493,7 @@ func TestReadFloat(t *testing.T) {
 		{"-3.14e+2", "-3.14e+2"},
 		{"1e0", "1e0"},
 		{"1_000.5e3", "1_000.5e3"},
+		{".5e2", ".5e2"},
 	}
 	for _, tc := range tests {
 		r := mkReader(tc.input)
@@ -651,7 +655,7 @@ func TestReadUUIDBad(t *testing.T) {
 
 func TestReadAtomValid(t *testing.T) {
 	allowed := []string{"dev", "staging", "prod"}
-	r := mkReader("staging")
+	r := mkReader("|staging")
 	got, err := r.readAtom(allowed)
 	if err != nil {
 		t.Fatal(err)
@@ -663,7 +667,7 @@ func TestReadAtomValid(t *testing.T) {
 
 func TestReadAtomInvalid(t *testing.T) {
 	allowed := []string{"dev", "staging", "prod"}
-	r := mkReader("test")
+	r := mkReader("|test")
 	_, err := r.readAtom(allowed)
 	if err == nil {
 		t.Fatal("expected error for atom not in set")

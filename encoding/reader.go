@@ -206,29 +206,6 @@ func (r *reader) peekBinLiteralStart() bool {
 	return err == nil && (p[0] == 'x' || p[0] == 'b') && p[1] == '\''
 }
 
-// peekIdentColon reports whether the next bytes are IDENT followed
-// immediately by ':'. Used only for the atom-set ambiguity case in
-// stream termination where a bare identifier could be a value or a
-// new statement header.
-func (r *reader) peekIdentColon() bool {
-	r.ensureBOM()
-	p, err := r.buf.Peek(256)
-	if err != nil && len(p) == 0 {
-		return false
-	}
-	if len(p) == 0 {
-		return false
-	}
-	if !isAlpha(p[0]) && p[0] != '_' {
-		return false
-	}
-	i := 1
-	for i < len(p) && (isAlpha(p[i]) || isDigit(p[i]) || p[i] == '_' || p[i] == '-') {
-		i++
-	}
-	return i < len(p) && p[i] == ':'
-}
-
 // ---------------------------------------------------------------------------
 // Character classification helpers
 // ---------------------------------------------------------------------------
@@ -825,7 +802,7 @@ func (r *reader) readInt() (string, error) {
 // Decimal reading
 // ---------------------------------------------------------------------------
 
-// readDec reads DEC = ['-'] DIGIT_SEP '.' DIGIT_SEP.
+// readDec reads DEC = ['-'] DIGIT_SEP? '.' DIGIT_SEP.
 func (r *reader) readDec() (string, error) {
 	r.sb.Reset()
 
@@ -833,8 +810,11 @@ func (r *reader) readDec() (string, error) {
 		r.readByte() //nolint:errcheck
 		r.sb.WriteByte('-')
 	}
-	if err := r.readDigitSep(&r.sb); err != nil {
-		return "", err
+	// Leading digits are optional: .5 is valid
+	if b, err := r.peekByte(); err == nil && b != '.' {
+		if err := r.readDigitSep(&r.sb); err != nil {
+			return "", err
+		}
 	}
 	if err := r.expectByte('.'); err != nil {
 		return "", err
@@ -850,7 +830,7 @@ func (r *reader) readDec() (string, error) {
 // Float reading
 // ---------------------------------------------------------------------------
 
-// readFloat reads FLOAT = ['-'] DIGIT_SEP ('.' DIGIT_SEP)? ('e'|'E') [+-]? DIGIT+.
+// readFloat reads FLOAT = ['-'] DIGIT_SEP? ('.' DIGIT_SEP)? ('e'|'E') [+-]? DIGIT+.
 func (r *reader) readFloat() (string, error) {
 	r.sb.Reset()
 
@@ -858,8 +838,11 @@ func (r *reader) readFloat() (string, error) {
 		r.readByte() //nolint:errcheck
 		r.sb.WriteByte('-')
 	}
-	if err := r.readDigitSep(&r.sb); err != nil {
-		return "", err
+	// Leading digits are optional when followed by '.' or exponent.
+	if b, err := r.peekByte(); err == nil && b != '.' && b != 'e' && b != 'E' {
+		if err := r.readDigitSep(&r.sb); err != nil {
+			return "", err
+		}
 	}
 
 	// Optional '.' DIGIT_SEP.
@@ -1082,8 +1065,11 @@ func (r *reader) readUUID() (string, error) {
 // Atom reading
 // ---------------------------------------------------------------------------
 
-// readAtom reads an identifier and validates it against the allowed set.
+// readAtom expects a '|' prefix, reads an identifier, and validates it against the allowed set.
 func (r *reader) readAtom(allowed []string) (string, error) {
+	if err := r.expectByte('|'); err != nil {
+		return "", err
+	}
 	id, err := r.readIdent()
 	if err != nil {
 		return "", err

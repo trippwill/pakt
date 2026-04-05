@@ -131,8 +131,8 @@ greeting:str = 'hello'   # Inline comment
 Atoms are bareword identifiers — unquoted, constrained to a declared set:
 
 ```
-level:|dev, staging, prod| = prod
-status:|active, inactive|  = active
+level:|dev, staging, prod| = |prod
+status:|active, inactive|  = |active
 ```
 
 Atoms are distinct from booleans — `true`, `false`, and `nil` are reserved keywords, not atoms.
@@ -287,7 +287,7 @@ Type annotations in a document are promises by the producer:
 
 ```
 release:int = 26
-status:|active, inactive| = active
+status:|active, inactive| = |active
 ```
 
 The parser validates the promise immediately.
@@ -313,7 +313,7 @@ A consumer supplies a spec at parse time as a filter. The streaming parser only 
 
 ```
 # Full document
-level:|dev, staging, prod| = prod
+level:|dev, staging, prod| = |prod
 release:int = 26
 date:date   = 2026-06-01
 ```
@@ -348,7 +348,7 @@ Specs can be static files or constructed dynamically at runtime. File extension:
 | Date | `:date` | `2026-06-01` |
 | Time | `:time` | `14:30:00Z`, `14:30:00-04:00` |
 | Datetime | `:datetime` | `2026-06-01T14:30:00Z` |
-| Atom | `:\|a, b, c\|` | `b` |
+| Atom | `:\|a, b, c\|` | `\|b` |
 | Struct | `:{field:type, ...}` | `{ val, ... }` (positional) |
 | Tuple | `:(type, ...)` | `(val, val, ...)` |
 | List | `:[type]` | `[val, ...]` |

@@ -84,8 +84,8 @@ INT      = ['-'] DIGIT_SEP
          | ['-'] '0x' HEX_SEP
          | ['-'] '0b' BIN_DIGIT (BIN_DIGIT | '_')*
          | ['-'] '0o' OCT_DIGIT (OCT_DIGIT | '_')*
-DEC      = ['-'] DIGIT_SEP '.' DIGIT_SEP
-FLOAT    = ['-'] DIGIT_SEP ('.' DIGIT_SEP)? ('e' | 'E') [+-]? DIGIT+
+DEC      = ['-'] DIGIT_SEP? '.' DIGIT_SEP
+FLOAT    = ['-'] DIGIT_SEP? ('.' DIGIT_SEP)? ('e' | 'E') [+-]? DIGIT+
 BOOL     = 'true' | 'false'
 NIL      = 'nil'
 DATE     = DIGIT{4} '-' DIGIT{2} '-' DIGIT{2}
@@ -116,12 +116,12 @@ ML_STR   = "'''" ML_BODY "'''"
          | '"""' ML_BODY '"""'
 ML_RAW   = 'r' "'''" raw_ml_char* "'''"
          | 'r' '"""' raw_ml_char* '"""'
-ATOM     = IDENT
+ATOM     = '|' IDENT
 ```
 
 - Leading zeros on decimal `INT` are permitted and ignored (`01` evaluates to `1`).
 - `_` in numeric literals is a visual separator, ignored by the parser.
-- `ATOM` is syntactically identical to `IDENT`. It is valid as a value only when the type is an atom set.
+- `ATOM` values use a `|` prefix to distinguish them from identifiers. Atom set type declarations use bare names inside pipe delimiters (`|dev, staging, prod|`), while atom values use the prefix (`|dev`).
 - `bin` literals use a prefix to indicate encoding: `x'...'` for hexadecimal, `b'...'` for base64.
 - Hex literals must contain an even number of hex digits (each pair is one byte); an odd count is a parse error. Whitespace within hex literals is not permitted.
 - Base64 literals follow RFC 4648 standard encoding. Padding (`=`) is required. Invalid base64 characters or incorrect padding are parse errors.
@@ -268,6 +268,7 @@ atom_set = PIPE IDENT (COMMA IDENT)* PIPE
 Example: `|dev, staging, prod|`
 
 `true`, `false`, and `nil` are reserved keywords and cannot be used as atoms.
+Atom values in data position use the `|` prefix: `|dev`, `|staging`, `|prod`.
 
 ### 4.4 Composite Types
 
@@ -333,7 +334,7 @@ stream_body = (map_entry (SEP map_entry)* SEP?)?
 
 Each entry is `key ; value` conforming to the map's key and value types.
 
-**Termination**: A stream ends at EOF or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(1)-decidable: values may begin with a bare identifier (for atom sets), but values never require `:` after that leading identifier, and the map association operator is `;`, not `:`.
+**Termination**: A stream ends at EOF or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(0)-decidable: atom values begin with `|`, booleans and `nil` are reserved keywords that cannot be statement names, and all other value forms begin with non-identifier characters (digits, quotes, delimiters). Therefore a bare identifier at stream level always begins a new statement.
 
 **Duplicate keys**: Repeated map entries are preserved in encounter order. Interpreting duplicate keys is an application/domain concern (see §6).
 
@@ -424,6 +425,7 @@ Keys conform to the declared key type. Values conform to the declared value type
 ## 6. Uniqueness
 
 Duplicate names at the document root are a parse error — this applies to both assignments and streams.
+The reserved keywords `true`, `false`, and `nil` cannot be used as statement names.
 
 ### 6.1 Map Duplicate Keys
 
@@ -480,7 +482,7 @@ Type annotations in a document are assertions by the producer. They are validate
 
 ```
 release:int = 26
-status:|active, inactive| = active
+status:|active, inactive| = |active
 ```
 
 ### 9.2 External Spec Files
@@ -523,7 +525,7 @@ Projections may be defined statically (in `.spec.pakt` files) or constructed dyn
 ```
 # Full document
 {
-level:|dev, staging, prod| = prod
+level:|dev, staging, prod| = |prod
 release:int               = 26
 date:date                 = 2026-06-01
 }

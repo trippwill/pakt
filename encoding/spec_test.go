@@ -290,7 +290,7 @@ wanted:str = 'found'`
 }
 
 func TestProjectionSkipAtomValue(t *testing.T) {
-	doc := "level:|dev, staging, prod| = prod\ncount:int = 3"
+	doc := "level:|dev, staging, prod| = |prod\ncount:int = 3"
 	spec := "count:int"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -937,7 +937,7 @@ id:uuid = 550e8400-e29b-41d4-a716-446655440000
 d:date = 2026-01-15
 t:time = 14:30:00Z
 dt:datetime = 2026-06-01T14:30:00Z
-level:|dev, staging, prod| = staging
+level:|dev, staging, prod| = |staging
 wanted:int = 100`
 	spec := "wanted:int"
 	events := decodeAllWithSpec(t, doc, spec)

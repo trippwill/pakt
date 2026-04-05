@@ -211,13 +211,21 @@ ASSIGN  = '='
 COLON   = ':'                       ; type annotation only
 SEMI    = ';'                       ; map key-value association
 STREAM  = '<<'
-AT      = '@'                       ; reserved for future constraints
 COMMA   = ','
 PIPE    = '|'
 LBRACE  = '{'    RBRACE = '}'
 LPAREN  = '('    RPAREN = ')'
 LBRACK  = '['    RBRACK = ']'
 LANGLE  = '<'    RANGLE = '>'
+
+; Reserved tokens (see §4.5)
+AT      = '@'
+BANG    = '!'
+STAR    = '*'
+DOLLAR  = '$'
+AMP     = '&'
+TILDE   = '~'
+BTICK   = '`'
 ```
 
 ## 4. Type System
@@ -294,7 +302,17 @@ Empty lists (`[]`) and empty maps (`<>`) are valid. Empty structs, tuples, and a
 
 ### 4.5 Reserved
 
-The `@` token is reserved for future constraint syntax (e.g., `@len`, `@range`, `@pattern`).
+The following tokens are reserved for future use. They must not appear in documents outside of string literals. A conforming parser encountering a reserved token in an unexpected position should report a syntax error.
+
+| Token | Possible future use |
+|-------|-------------------|
+| `@` | Constraints (`@len`, `@range`, `@pattern`) |
+| `!` | Assertions or negation |
+| `*` | Wildcards or glob patterns |
+| `$` | Variable references or interpolation |
+| `&` | References or anchors |
+| `~` | Approximate matching or home paths |
+| `` ` `` | Alternate string delimiters or template literals |
 
 ## 5. Syntactic Grammar
 
@@ -634,7 +652,15 @@ LBRACE  = '{'    RBRACE  = '}'
 LPAREN  = '('    RPAREN  = ')'
 LBRACK  = '['    RBRACK  = ']'
 LANGLE  = '<'    RANGLE  = '>'
-AT      = '@'                           ; reserved
+
+; Reserved tokens (§4.5)
+AT      = '@'
+BANG    = '!'
+STAR    = '*'
+DOLLAR  = '$'
+AMP     = '&'
+TILDE   = '~'
+BTICK   = '`'
 
 ; --- Scalar literals ---
 

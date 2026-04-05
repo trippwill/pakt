@@ -8,10 +8,11 @@ This document defines **PAKT 0** (draft). The specification is not yet stable â€
 
 PAKT uses single-integer versioning. Each version is a complete specification. Parser libraries advertise which spec versions they support.
 
-| Version | Status |
-|---------|--------|
-| PAKT 0 | Draft â€” in development |
-| PAKT 1 | (future) First stable release |
+| Version | Status | Meaning |
+|---------|--------|---------|
+| PAKT 0 | Draft | In active development; breaking changes expected |
+| PAKT 0 | Accepted | Feature-complete; only clarifications and bug fixes |
+| PAKT 1 | (future) | First stable release; no breaking changes within major version |
 
 ### 0.1 Design Principles
 

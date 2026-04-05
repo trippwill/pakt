@@ -14,10 +14,11 @@ This site page is a synchronized overview of the current **PAKT v0** surface. Th
 
 PAKT uses single-integer versioning. Each version is a complete specification.
 
-| Version | Status |
-|---------|--------|
-| PAKT 0 | Draft — in development |
-| PAKT 1 | (future) First stable release |
+| Version | Status | Meaning |
+|---------|--------|---------|
+| PAKT 0 | Draft | In active development; breaking changes expected |
+| PAKT 0 | Accepted | Feature-complete; only clarifications and bug fixes |
+| PAKT 1 | (future) | First stable release; no breaking changes within major version |
 
 ## Document Model
 

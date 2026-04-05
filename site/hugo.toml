@@ -34,3 +34,8 @@ title = 'PAKT'
 
 [markup.highlight]
   style = 'monokai'
+
+[markup.tableOfContents]
+  startLevel = 2
+  endLevel = 3
+  ordered = false

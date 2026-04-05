@@ -5,20 +5,69 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ block "title" . }}{{ with .Title }}{{ . }} — {{ end }}{{ site.Title }}{{ end }}</title>
   <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="{{ with .Title }}{{ . }} — {{ end }}{{ site.Title }}">
+  <meta property="og:description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ .Permalink }}">
+
+  <!-- Favicon -->
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Theme initialization (runs before paint to prevent flash) -->
+  <script>
+  (function() {
+    var saved = localStorage.getItem('pakt-theme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+  </script>
 </head>
 <body>
   <nav class="site-nav">
     <div class="nav-inner">
-      <a href="/" class="nav-brand">PAKT</a>
-      <button class="nav-toggle" aria-label="Toggle navigation" onclick="this.parentElement.classList.toggle('open')">&#9776;</button>
-      <ul class="nav-links">
-        {{ range .Site.Menus.main }}
-        <li><a href="{{ .URL }}"{{ if strings.HasPrefix .URL "https" }} target="_blank" rel="noopener"{{ end }}>{{ .Name }}</a></li>
-        {{ end }}
-      </ul>
+      <a href="/" class="nav-brand" aria-label="PAKT home">
+        <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+          <path d="M9 5 L2.5 16 L9 27" fill="none" stroke="#e87040" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="16" cy="11.5" r="2.4" fill="currentColor"/>
+          <circle cx="16" cy="20.5" r="2.4" fill="currentColor"/>
+          <path d="M23 5 L29.5 16 L23 27" fill="none" stroke="#4ecdc4" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        PAKT
+      </a>
+      <div class="nav-right">
+        <ul class="nav-links">
+          {{ range .Site.Menus.main }}
+          <li><a href="{{ .URL }}"{{ if strings.HasPrefix .URL "https" }} target="_blank" rel="noopener"{{ end }}>{{ .Name }}</a></li>
+          {{ end }}
+        </ul>
+        <button class="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark theme">
+          <svg class="icon-sun" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="4"/><path d="M10 1v2M10 17v2M1 10h2M17 10h2M3.93 3.93l1.41 1.41M14.66 14.66l1.41 1.41M3.93 16.07l1.41-1.41M14.66 5.34l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <svg class="icon-moon" viewBox="0 0 20 20" fill="currentColor"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+        </button>
+        <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
+      </div>
     </div>
   </nav>
+
+  <div class="nav-overlay" id="nav-overlay">
+    {{ range .Site.Menus.main }}
+    <a href="{{ .URL }}"{{ if strings.HasPrefix .URL "https" }} target="_blank" rel="noopener"{{ end }}>{{ .Name }}</a>
+    {{ end }}
+  </div>
 
   <main>
     {{ block "main" . }}{{ end }}
@@ -26,14 +75,57 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <p><span class="spec-badge">PAKT 0 Draft</span> &middot; &copy; {{ now.Year }} PAKT contributors &middot; <a href="{{ site.Params.repo }}">GitHub</a> &middot; <a href="https://opensource.org/licenses/MIT">MIT License</a></p>
+      <div class="footer-brand">
+        <svg viewBox="0 0 32 32" width="20" height="20" aria-hidden="true">
+          <path d="M9 5 L2.5 16 L9 27" fill="none" stroke="#e87040" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="16" cy="11.5" r="2.4" fill="currentColor"/>
+          <circle cx="16" cy="20.5" r="2.4" fill="currentColor"/>
+          <path d="M23 5 L29.5 16 L23 27" fill="none" stroke="#4ecdc4" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        PAKT
+        <span class="spec-badge">v0 Draft</span>
+      </div>
+      <div class="footer-links">
+        <a href="/docs/">Docs</a>
+        <a href="{{ site.Params.repo }}" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://opensource.org/licenses/MIT">MIT License</a>
+        <span>&copy; {{ now.Year }} PAKT contributors</span>
+      </div>
     </div>
   </footer>
 
   <script>
-  /* Code block copy buttons */
   (function() {
+    /* Theme toggle */
+    var toggle = document.querySelector('.theme-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', function() {
+        var html = document.documentElement;
+        var current = html.getAttribute('data-theme');
+        var isDark = current === 'dark' ||
+          (!current && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var next = isDark ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('pakt-theme', next);
+      });
+    }
+
+    /* Mobile nav */
+    var navToggle = document.querySelector('.nav-toggle');
+    var navOverlay = document.getElementById('nav-overlay');
+    if (navToggle && navOverlay) {
+      navToggle.addEventListener('click', function() {
+        navOverlay.classList.toggle('open');
+        navToggle.setAttribute('aria-expanded', navOverlay.classList.contains('open'));
+      });
+      navOverlay.querySelectorAll('a').forEach(function(a) {
+        a.addEventListener('click', function() { navOverlay.classList.remove('open'); });
+      });
+    }
+
+    /* Copy buttons on code blocks */
     document.querySelectorAll('.docs-content pre, .install-section pre, .content-inner pre').forEach(function(pre) {
+      if (pre.querySelector('.copy-btn')) return;
       var btn = document.createElement('button');
       btn.className = 'copy-btn';
       btn.textContent = 'Copy';
@@ -46,10 +138,7 @@
         navigator.clipboard.writeText(text).then(function() {
           btn.textContent = 'Copied!';
           btn.classList.add('copied');
-          setTimeout(function() {
-            btn.textContent = 'Copy';
-            btn.classList.remove('copied');
-          }, 1500);
+          setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
         });
       });
     });

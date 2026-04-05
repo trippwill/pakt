@@ -1,0 +1,19 @@
+{{ define "main" }}
+<section class="error-page">
+  <div class="error-inner">
+    <div class="error-code">404</div>
+    <h1 class="error-title">This path doesn't resolve.</h1>
+    <div class="error-pakt">
+      <code>
+        <span class="pk-name">request</span><span class="pk-delim">:</span><span class="pk-delim">{</span><span class="pk-name">status</span><span class="pk-delim">:</span><span class="pk-type">int</span><span class="pk-delim">,</span> <span class="pk-name">found</span><span class="pk-delim">:</span><span class="pk-type">bool</span><span class="pk-delim">}</span> <span class="pk-op">=</span> <span class="pk-delim">{</span><br>
+        &nbsp;&nbsp;<span class="pk-num">404</span><span class="pk-delim">,</span> <span class="pk-bool">false</span><br>
+        <span class="pk-delim">}</span>
+      </code>
+    </div>
+    <div class="error-actions">
+      <a href="/" class="btn btn-primary">Back to Home</a>
+      <a href="/docs/" class="btn btn-secondary light-bg" style="border-color: var(--border); color: var(--text-secondary);">Read the Docs</a>
+    </div>
+  </div>
+</section>
+{{ end }}

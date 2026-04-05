@@ -15,10 +15,28 @@
   </aside>
   <article class="docs-content">
     <h1>{{ .Title }}</h1>
+    {{ if .TableOfContents }}
+    <details class="docs-toc" open>
+      <summary>On this page</summary>
+      <nav>
+        {{ .TableOfContents }}
+      </nav>
+    </details>
+    {{ end }}
     {{ .Content }}
     <nav class="docs-prevnext">
-      {{ with .PrevInSection }}<a href="{{ .RelPermalink }}" class="prev">&larr; {{ .Title }}</a>{{ end }}
-      {{ with .NextInSection }}<a href="{{ .RelPermalink }}" class="next">{{ .Title }} &rarr;</a>{{ end }}
+      {{ with .PrevInSection }}
+      <a href="{{ .RelPermalink }}" class="prev">
+        <span class="pn-label">← Previous</span>
+        <span class="pn-title">{{ .Title }}</span>
+      </a>
+      {{ end }}
+      {{ with .NextInSection }}
+      <a href="{{ .RelPermalink }}" class="next">
+        <span class="pn-label">Next →</span>
+        <span class="pn-title">{{ .Title }}</span>
+      </a>
+      {{ end }}
     </nav>
   </article>
 </div>

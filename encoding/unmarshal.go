@@ -40,436 +40,47 @@ func Unmarshal(data []byte, v any) error {
 	defer dec.Close()
 
 	for {
-		ev, err := dec.Decode()
+		dec.r.skipInsignificant(true)
+		if _, err := dec.r.peekByte(); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		h, err := dec.sm.readStatementHeader()
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
-		if ev.Kind == EventError {
-			return ev.Err
-		}
 
-		if ev.Kind != EventAssignStart && !ev.Kind.IsStreamStart() {
-			continue
-		}
-
-		fi, ok := info.fieldMap[ev.Name]
+		fi, ok := info.fieldMap[h.name]
 		if !ok {
-			// Unknown field — skip by consuming until matching end.
-			if err := skipStatement(dec, ev); err != nil {
+			if err := dec.r.skipStatementBody(h); err != nil {
 				return err
 			}
 			continue
 		}
 
 		target := rv.Field(fi.Index)
-		switch ev.Kind {
-		case EventAssignStart:
-			if err := streamConsumeAssign(dec, ev.Name, target); err != nil {
-				return fmt.Errorf("pakt: field %q: %w", ev.Name, err)
+		if h.stream {
+			var serr error
+			if h.typ.List != nil {
+				serr = dec.sm.unmarshalStreamList(h.typ.List, target)
+			} else {
+				serr = dec.sm.unmarshalStreamMap(h.typ.Map, target)
 			}
-		case EventListStreamStart:
-			if err := streamConsumeListStream(dec, target); err != nil {
-				return fmt.Errorf("pakt: field %q: %w", ev.Name, err)
+			if serr != nil {
+				return fmt.Errorf("pakt: field %q: %w", h.name, serr)
 			}
-		case EventMapStreamStart:
-			if err := streamConsumeMapStream(dec, target); err != nil {
-				return fmt.Errorf("pakt: field %q: %w", ev.Name, err)
+		} else {
+			dec.r.skipWS()
+			if err := dec.sm.unmarshalValue(h.typ, target); err != nil {
+				return fmt.Errorf("pakt: field %q: %w", h.name, err)
 			}
 		}
-	}
-}
-
-// skipStatement consumes events until the matching end event for a top-level statement.
-func skipStatement(dec *Decoder, start Event) error {
-	var endKind EventKind
-	switch start.Kind {
-	case EventAssignStart:
-		endKind = EventAssignEnd
-	case EventListStreamStart:
-		endKind = EventListStreamEnd
-	case EventMapStreamStart:
-		endKind = EventMapStreamEnd
-	default:
-		return nil
-	}
-	depth := 1
-	for depth > 0 {
-		ev, err := dec.Decode()
-		if err != nil {
-			return err
-		}
-		if ev.Kind == endKind && ev.Name == start.Name {
-			depth--
-		} else if ev.Kind == start.Kind && ev.Name == start.Name {
-			depth++
-		}
-	}
-	return nil
-}
-
-// streamConsumeAssign reads the value(s) between AssignStart and AssignEnd.
-func streamConsumeAssign(dec *Decoder, name string, target reflect.Value) error {
-	ev, err := dec.Decode()
-	if err != nil {
-		return err
-	}
-	if ev.Kind == EventAssignEnd {
-		return nil // empty assignment
-	}
-	if err := streamConsumeValue(dec, ev, target); err != nil {
-		return err
-	}
-	// Consume the AssignEnd
-	ev, err = dec.Decode()
-	if err != nil {
-		return err
-	}
-	if ev.Kind != EventAssignEnd {
-		return fmt.Errorf("expected AssignEnd, got %s", ev.Kind)
-	}
-	return nil
-}
-
-// streamConsumeValue handles a single value event (scalar or composite start).
-func streamConsumeValue(dec *Decoder, ev Event, target reflect.Value) error {
-	switch ev.Kind {
-	case EventScalarValue:
-		return setScalar(target, ev.ScalarType, ev.Value)
-	case EventStructStart:
-		return streamConsumeStruct(dec, target)
-	case EventTupleStart:
-		return streamConsumeTuple(dec, target)
-	case EventListStart:
-		return streamConsumeList(dec, target)
-	case EventMapStart:
-		return streamConsumeMap(dec, target)
-	default:
-		return nil
-	}
-}
-
-// streamConsumeStruct reads events between StructStart (already consumed) and StructEnd.
-func streamConsumeStruct(dec *Decoder, target reflect.Value) error {
-	target = allocPtr(target)
-
-	if target.Kind() == reflect.Map {
-		return streamConsumeStructIntoMap(dec, target)
-	}
-
-	if target.Kind() != reflect.Struct {
-		return fmt.Errorf("cannot unmarshal struct into %s", target.Type())
-	}
-
-	info, err := cachedStructFields(target.Type())
-	if err != nil {
-		return err
-	}
-
-	for {
-		ev, err := dec.Decode()
-		if err != nil {
-			return err
-		}
-		if ev.Kind == EventStructEnd {
-			return nil
-		}
-
-		fi, ok := info.fieldMap[ev.Name]
-		if !ok {
-			// Skip unknown field value by consuming the event.
-			if err := streamSkipValue(dec, ev); err != nil {
-				return err
-			}
-			continue
-		}
-
-		field := target.Field(fi.Index)
-		if err := streamConsumeValue(dec, ev, field); err != nil {
-			return fmt.Errorf("field %q: %w", ev.Name, err)
-		}
-	}
-}
-
-// streamConsumeStructIntoMap reads struct events into a map[string]T.
-func streamConsumeStructIntoMap(dec *Decoder, target reflect.Value) error {
-	if target.IsNil() {
-		target.Set(reflect.MakeMap(target.Type()))
-	}
-	valType := target.Type().Elem()
-
-	for {
-		ev, err := dec.Decode()
-		if err != nil {
-			return err
-		}
-		if ev.Kind == EventStructEnd {
-			return nil
-		}
-
-		val := reflect.New(valType).Elem()
-		if err := streamConsumeValue(dec, ev, val); err != nil {
-			return fmt.Errorf("map key %q: %w", ev.Name, err)
-		}
-		target.SetMapIndex(reflect.ValueOf(ev.Name), val)
-	}
-}
-
-// streamConsumeList reads events between ListStart (already consumed) and ListEnd.
-func streamConsumeList(dec *Decoder, target reflect.Value) error {
-	if target.Kind() != reflect.Slice {
-		return fmt.Errorf("cannot unmarshal list into %s", target.Type())
-	}
-
-	elemType := target.Type().Elem()
-	// Set target to an empty slice with initial capacity.
-	target.Set(reflect.MakeSlice(target.Type(), 0, 8))
-
-	for {
-		ev, err := dec.Decode()
-		if err != nil {
-			return err
-		}
-		if ev.Kind == EventListEnd {
-			return nil
-		}
-
-		// Grow by 1 and write directly into the new slot.
-		target.Grow(1)
-		target.SetLen(target.Len() + 1)
-		elem := target.Index(target.Len() - 1)
-		if elemType.Kind() == reflect.Ptr || elemType.Kind() == reflect.Map || elemType.Kind() == reflect.Slice {
-			elem.Set(reflect.New(elemType).Elem())
-		}
-		if err := streamConsumeValue(dec, ev, elem); err != nil {
-			return err
-		}
-	}
-}
-
-// streamConsumeTuple reads events between TupleStart (already consumed) and TupleEnd.
-func streamConsumeTuple(dec *Decoder, target reflect.Value) error {
-	if target.Kind() != reflect.Slice {
-		return fmt.Errorf("cannot unmarshal tuple into %s", target.Type())
-	}
-
-	elemType := target.Type().Elem()
-	target.Set(reflect.MakeSlice(target.Type(), 0, 8))
-
-	for {
-		ev, err := dec.Decode()
-		if err != nil {
-			return err
-		}
-		if ev.Kind == EventTupleEnd {
-			return nil
-		}
-
-		target.Grow(1)
-		target.SetLen(target.Len() + 1)
-		elem := target.Index(target.Len() - 1)
-		if elemType.Kind() == reflect.Ptr || elemType.Kind() == reflect.Map || elemType.Kind() == reflect.Slice {
-			elem.Set(reflect.New(elemType).Elem())
-		}
-		if err := streamConsumeValue(dec, ev, elem); err != nil {
-			return err
-		}
-	}
-}
-
-// streamConsumeMap reads events between MapStart (already consumed) and MapEnd.
-func streamConsumeMap(dec *Decoder, target reflect.Value) error {
-	if target.Kind() != reflect.Map {
-		return fmt.Errorf("cannot unmarshal map into %s", target.Type())
-	}
-
-	if target.IsNil() {
-		target.Set(reflect.MakeMap(target.Type()))
-	}
-
-	keyType := target.Type().Key()
-	valType := target.Type().Elem()
-
-	for {
-		ev, err := dec.Decode()
-		if err != nil {
-			return err
-		}
-		if ev.Kind == EventMapEnd {
-			return nil
-		}
-
-		// Key
-		key := reflect.New(keyType).Elem()
-		if err := streamConsumeValue(dec, ev, key); err != nil {
-			return fmt.Errorf("map key: %w", err)
-		}
-
-		// Value
-		ev, err = dec.Decode()
-		if err != nil {
-			return fmt.Errorf("map value: unexpected end")
-		}
-		val := reflect.New(valType).Elem()
-		if err := streamConsumeValue(dec, ev, val); err != nil {
-			return fmt.Errorf("map value: %w", err)
-		}
-
-		target.SetMapIndex(key, val)
-	}
-}
-
-// streamConsumeListStream reads events for a top-level list stream (<<).
-func streamConsumeListStream(dec *Decoder, target reflect.Value) error {
-	target = allocPtr(target)
-
-	if target.Kind() != reflect.Slice {
-		return fmt.Errorf("cannot unmarshal list stream into %s", target.Type())
-	}
-
-	elemType := target.Type().Elem()
-	target.Set(reflect.MakeSlice(target.Type(), 0, 64))
-
-	for {
-		ev, err := dec.Decode()
-		if err != nil {
-			return err
-		}
-		if ev.Kind == EventListStreamEnd {
-			return nil
-		}
-
-		target.Grow(1)
-		target.SetLen(target.Len() + 1)
-		elem := target.Index(target.Len() - 1)
-		if elemType.Kind() == reflect.Ptr || elemType.Kind() == reflect.Map || elemType.Kind() == reflect.Slice {
-			elem.Set(reflect.New(elemType).Elem())
-		}
-		if err := streamConsumeValue(dec, ev, elem); err != nil {
-			return err
-		}
-	}
-}
-
-// streamConsumeMapStream reads events for a top-level map stream (<<).
-func streamConsumeMapStream(dec *Decoder, target reflect.Value) error {
-	target = allocPtr(target)
-
-	if target.Kind() != reflect.Map {
-		return fmt.Errorf("cannot unmarshal map stream into %s", target.Type())
-	}
-
-	if target.IsNil() {
-		target.Set(reflect.MakeMap(target.Type()))
-	}
-
-	keyType := target.Type().Key()
-	valType := target.Type().Elem()
-
-	for {
-		ev, err := dec.Decode()
-		if err != nil {
-			return err
-		}
-		if ev.Kind == EventMapStreamEnd {
-			return nil
-		}
-
-		key := reflect.New(keyType).Elem()
-		if err := streamConsumeValue(dec, ev, key); err != nil {
-			return fmt.Errorf("stream map key: %w", err)
-		}
-
-		ev, err = dec.Decode()
-		if err != nil {
-			return fmt.Errorf("stream map value: unexpected end")
-		}
-		if ev.Kind == EventMapStreamEnd {
-			return fmt.Errorf("stream map value: unexpected end")
-		}
-
-		val := reflect.New(valType).Elem()
-		if err := streamConsumeValue(dec, ev, val); err != nil {
-			return fmt.Errorf("stream map value: %w", err)
-		}
-
-		target.SetMapIndex(key, val)
-	}
-}
-
-// streamSkipValue skips over one complete value in the event stream.
-func streamSkipValue(dec *Decoder, ev Event) error {
-	if ev.Kind == EventScalarValue {
-		return nil // already consumed
-	}
-	if !ev.Kind.IsCompositeStart() {
-		return nil
-	}
-	depth := 1
-	for depth > 0 {
-		next, err := dec.Decode()
-		if err != nil {
-			return err
-		}
-		if next.Kind.IsCompositeStart() {
-			depth++
-		} else if next.Kind.IsCompositeEnd() {
-			depth--
-		}
-	}
-	return nil
-}
-
-// setScalar sets a reflect.Value from a PAKT scalar event.
-func setScalar(target reflect.Value, scalarType TypeKind, rawValue string) error {
-	// Handle nil.
-	if rawValue == "nil" {
-		return setNil(target)
-	}
-
-	// Allocate pointer if needed.
-	target = allocPtr(target)
-
-	kind := target.Kind()
-
-	switch scalarType {
-	case TypeStr:
-		return setString(target, rawValue)
-
-	case TypeInt:
-		return setInt(target, rawValue)
-
-	case TypeDec:
-		return setDec(target, rawValue)
-
-	case TypeFloat:
-		return setFloat(target, rawValue)
-
-	case TypeBool:
-		return setBool(target, rawValue)
-
-	case TypeUUID:
-		return setString(target, rawValue)
-
-	case TypeDate:
-		return setDateTimeString(target, rawValue, kind)
-
-	case TypeTime:
-		return setDateTimeString(target, rawValue, kind)
-
-	case TypeDateTime:
-		return setDateTimeString(target, rawValue, kind)
-
-	case TypeBin:
-		return setBin(target, rawValue)
-
-	case TypeAtom:
-		return setString(target, rawValue)
-
-	default:
-		return fmt.Errorf("unsupported PAKT type %s", scalarType)
 	}
 }
 
@@ -622,43 +233,6 @@ func setDec(target reflect.Value, raw string) error {
 		return nil
 	default:
 		return fmt.Errorf("cannot set dec into %s", target.Type())
-	}
-}
-
-func setFloat(target reflect.Value, raw string) error {
-	s := raw
-	if strings.IndexByte(s, '_') >= 0 {
-		s = strings.ReplaceAll(s, "_", "")
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return fmt.Errorf("invalid float literal %q: %w", raw, err)
-	}
-
-	switch target.Kind() {
-	case reflect.Float32, reflect.Float64:
-		target.SetFloat(f)
-		return nil
-	case reflect.String:
-		target.SetString(raw)
-		return nil
-	default:
-		return fmt.Errorf("cannot set float into %s", target.Type())
-	}
-}
-
-func setBool(target reflect.Value, raw string) error {
-	b := raw == "true"
-	if raw != "true" && raw != "false" {
-		return fmt.Errorf("invalid bool literal %q", raw)
-	}
-
-	switch target.Kind() {
-	case reflect.Bool:
-		target.SetBool(b)
-		return nil
-	default:
-		return fmt.Errorf("cannot set bool into %s", target.Type())
 	}
 }
 

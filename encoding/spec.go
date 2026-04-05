@@ -1,7 +1,6 @@
 package encoding
 
 import (
-	"fmt"
 	"io"
 )
 
@@ -472,14 +471,9 @@ func (d *Decoder) decodeWithSpec() (Event, error) {
 			return ev, nil
 		}
 
-		name, err := d.sm.primeNextMatchedStatement(d.spec)
+		_, err := d.sm.primeNextMatchedStatement(d.spec)
 		if err != nil {
 			if err == io.EOF {
-				if missingErr := d.checkMissingSpecFields(); missingErr != nil {
-					d.done = true
-					d.r.release()
-					return Event{}, missingErr
-				}
 				d.done = true
 				d.r.release()
 				return Event{}, io.EOF
@@ -488,21 +482,5 @@ func (d *Decoder) decodeWithSpec() (Event, error) {
 			d.r.release()
 			return Event{}, err
 		}
-
-		d.specSeen[name] = struct{}{}
 	}
-}
-
-// checkMissingSpecFields returns an error if any spec field was not seen
-// in the document.
-func (d *Decoder) checkMissingSpecFields() error {
-	for name := range d.spec.Fields {
-		if _, seen := d.specSeen[name]; !seen {
-			return &ParseError{
-				Pos:     Pos{},
-				Message: fmt.Sprintf("spec field %q not found in document", name),
-			}
-		}
-	}
-	return nil
 }

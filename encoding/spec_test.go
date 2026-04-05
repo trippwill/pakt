@@ -206,15 +206,18 @@ func TestProjectionSubsetFields(t *testing.T) {
 	}
 }
 
-func TestProjectionMissingFieldError(t *testing.T) {
+func TestProjectionMissingFieldNoError(t *testing.T) {
+	// Spec is advisory — missing fields are not an error.
+	// Callers use pointer struct fields to detect absent values.
 	doc := "name:str = 'hello'"
 	spec := "name:str\ncount:int"
-	err := decodeExpectErrorWithSpec(t, doc, spec)
-	if err == nil {
-		t.Fatal("expected error for missing spec field")
+	events := decodeAllWithSpec(t, doc, spec)
+	// Only name field emitted: 3 events (AssignStart, ScalarValue, AssignEnd)
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
 	}
-	if !strings.Contains(err.Error(), "count") {
-		t.Fatalf("expected error about 'count', got: %v", err)
+	if events[0].Kind != EventAssignStart || events[0].Name != "name" {
+		t.Fatalf("event[0] = %v", events[0])
 	}
 }
 

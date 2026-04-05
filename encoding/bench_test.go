@@ -1,5 +1,24 @@
 package encoding
 
+// ⚠️  PERFORMANCE REGRESSION GUARD
+//
+// PAKT Unmarshal must remain competitive with encoding/json for streaming
+// workloads. The FS1K and FS10K benchmarks are the key metrics — PAKT should
+// match or beat JSON on these. Run the following before merging changes that
+// touch the decode/unmarshal hot path:
+//
+//   go test ./encoding/ -bench='Benchmark(PAKT|JSON)(Decode|Unmarshal)' -benchmem -count=5
+//
+// Baseline targets (April 2025, Intel Ultra 5 228V):
+//
+//   UnmarshalFS1K:   PAKT ≤ JSON  (currently PAKT wins by ~5%)
+//   UnmarshalFS10K:  PAKT ≤ JSON  (currently PAKT wins by ~3%)
+//   DecodeFS10K:     PAKT ≤ 1.2× JSON
+//   UnmarshalSmall:  PAKT ≤ 2.5× JSON  (limited by reflection vs JSON's precompiled decoders)
+//
+// If PAKT Unmarshal regresses to >1.2× JSON on the FS benchmarks, investigate
+// before merging.
+
 import (
 	"bytes"
 	"encoding/json"

@@ -100,6 +100,9 @@ public ref partial struct PaktReader
     /// <summary>Whether the current value is nil.</summary>
     public readonly bool IsNullValue => _isNullValue;
 
+    /// <summary>The total number of bytes consumed so far from the input buffer.</summary>
+    public readonly int BytesConsumed => _consumed;
+
     /// <summary>
     /// Reads the next token from the PAKT data.
     /// </summary>

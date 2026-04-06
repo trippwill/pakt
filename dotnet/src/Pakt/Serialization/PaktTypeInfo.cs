@@ -9,6 +9,17 @@ namespace Pakt.Serialization;
 public sealed class PaktTypeInfo<T>
 {
     /// <summary>
+    /// Delegate that deserializes a value of <typeparamref name="T"/> from a <see cref="PaktReader"/>.
+    /// The reader should be positioned at the composite start token (e.g., StructStart).
+    /// </summary>
+    public delegate T DeserializeFunc(ref PaktReader reader);
+
+    /// <summary>
+    /// Delegate that serializes a value of <typeparamref name="T"/> to a <see cref="PaktWriter"/>.
+    /// </summary>
+    public delegate void SerializeAction(PaktWriter writer, T value);
+
+    /// <summary>
     /// Initializes a new <see cref="PaktTypeInfo{T}"/>.
     /// </summary>
     public PaktTypeInfo(
@@ -25,7 +36,13 @@ public sealed class PaktTypeInfo<T>
     /// <summary>Per-property metadata for serialization.</summary>
     public IReadOnlyList<PaktPropertyInfo> Properties { get; }
 
-    // TODO: Add serialize/deserialize delegates when reader/writer are implemented.
-    // public Func<ref PaktReader, T>? Deserialize { get; init; }
-    // public Action<PaktWriter, T>? Serialize { get; init; }
+    /// <summary>
+    /// Source-generated delegate that deserializes a value from a <see cref="PaktReader"/>.
+    /// </summary>
+    public DeserializeFunc? Deserialize { get; init; }
+
+    /// <summary>
+    /// Source-generated delegate that serializes a value to a <see cref="PaktWriter"/>.
+    /// </summary>
+    public SerializeAction? Serialize { get; init; }
 }

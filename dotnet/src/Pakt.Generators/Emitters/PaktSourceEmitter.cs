@@ -111,7 +111,11 @@ namespace Pakt.Generators.Emitters
             sb.CloseBrace();
 
             sb.Dedent();
-            sb.AppendLine(");");
+            sb.AppendLine(")");
+            sb.OpenBrace();
+            sb.AppendLine($"Deserialize = Deserialize{name},");
+            sb.AppendLine($"Serialize = Serialize{name},");
+            sb.CloseBrace(";");
             sb.CloseBrace();
             sb.AppendLine();
         }

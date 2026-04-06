@@ -14,7 +14,7 @@ server:{host:str, port:int} = { 'localhost', 8080 }
 
 PAKT is a typed data interchange format where every value carries its type. No inference, no ambiguity. Units are self-validating — type annotations are producer assertions checked at parse time.
 
-The current Go library and CLI implement the PAKT v0 surface: `;` map syntax, `bin`, raw strings, the first-content-line multi-line string rule, and top-level `<<` feed statements. Duplicate statement names and map keys are preserved in decode order; higher-level consumers decide how to interpret them.
+The current Go library and CLI implement the PAKT v0 surface: `;` map syntax, `bin`, raw strings, the first-content-line multi-line string rule, and top-level `<<` collect statements. Duplicate statement names and map keys are preserved in decode order; higher-level consumers decide how to interpret them.
 
 ## Repository Structure
 

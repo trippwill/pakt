@@ -8,7 +8,7 @@ weight: 2
 
 This site page is a synchronized overview of the current **PAKT v0** surface. The normative source remains [`spec/pakt-v0.md`](https://github.com/trippwill/pakt/blob/main/spec/pakt-v0.md).
 
-> **Implementation note:** The current Go library and CLI implement top-level `<<` feed statements as first-class root events (`FeedStart` / `FeedEnd`). Event names in the Go code currently use `ListStreamStart/End` and `MapStreamStart/End` — a renaming alignment is planned.
+> **Implementation note:** The current Go library and CLI implement top-level `<<` collect statements as first-class root events (`FeedStart` / `FeedEnd`). Event names in the Go code currently use `ListStreamStart/End` and `MapStreamStart/End` — a renaming alignment is planned.
 
 ## Version
 
@@ -26,13 +26,13 @@ The canonical unit grammar is:
 
 ```text
 unit      = statement*
-statement = assignment | feed
+statement = assignment | collect
 ```
 
 Current Go implementation support:
 
 - `assignment = IDENT type_annot ASSIGN value`
-- `feed = IDENT type_annot FEED feed_body`
+- `collect = IDENT type_annot COLLECT collect_body`
 
 Assignments look like:
 
@@ -120,12 +120,12 @@ map_type    = LANGLE type SEMI type RANGLE
 value       = scalar | NIL | atom_val | struct_val | tuple_val | list_val | map_val
 scalar      = STRING | RAW_STR | ML_STR | ML_RAW | INT | DEC | FLOAT | BOOL | UUID | DATE | TS | BIN
 map_entry   = value SEMI value
-feed        = IDENT type_annot FEED feed_body
+collect        = IDENT type_annot COLLECT collect_body
 ```
 
 ## Canonical Specification
 
-For the full normative grammar and semantics, including feed statements and duplicate-key handling, read the canonical spec:
+For the full normative grammar and semantics, including collect statements and duplicate-key handling, read the canonical spec:
 
 - [`spec/pakt-v0.md`](https://github.com/trippwill/pakt/blob/main/spec/pakt-v0.md)
 

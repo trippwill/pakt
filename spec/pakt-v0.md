@@ -24,11 +24,11 @@ PAKT uses single-integer versioning. Each version is a complete specification. P
 
 4. **Presentation is an application concern.** Human-readable formatting, event enrichment, and display transformations (such as CLI output or JSON projection) are not encoder or decoder responsibilities. The core event contract is minimal and machine-oriented.
 
-5. **The grammar is the event model.** Each grammatical construct — assignment, feed, struct, tuple, list, map, scalar — maps to a distinct event kind. Consumers should not need to inspect payload strings to determine structural context.
+5. **The grammar is the event model.** Each grammatical construct — assignment, collect, struct, tuple, list, map, scalar — maps to a distinct event kind. Consumers should not need to inspect payload strings to determine structural context.
 
 ## 1. Data Model
 
-A PAKT unit is a sequence of **statements** at the top level. A statement is either an **assignment** (a named, typed, single value) or a **feed** (a named, typed, open-ended sequence of values).
+A PAKT unit is a sequence of **statements** at the top level. A statement is either an **assignment** (a named, typed, single value) or a **collect** (a named, typed, open-ended sequence of values).
 
 The unit root uses self-describing statements (`name:type = value` or `name:type << values...`) rather than positional values. This is the system boundary where data enters without a parent type context.
 
@@ -37,7 +37,7 @@ name:str = 'midwatch'
 version:(int, int, int) = (1, 0, 0)
 ```
 
-Feeds deliver zero or more values of a collection type, terminated by end-of-unit or the start of the next statement:
+Collects deliver zero or more values of a collection type, terminated by end-of-unit or the start of the next statement:
 
 ```
 events:[{ts:ts, level:str, msg:str}] <<
@@ -207,7 +207,7 @@ HASH    = '#'
 ASSIGN  = '='
 COLON   = ':'                       ; type annotation only
 SEMI    = ';'                       ; map key-value association
-FEED    = '<<'
+COLLECT    = '<<'
 COMMA   = ','
 PIPE    = '|'
 LBRACE  = '{'    RBRACE = '}'
@@ -338,7 +338,7 @@ Planned semantics:
 
 ```
 unit      = statement*
-statement = assignment | feed
+statement = assignment | collect
 ```
 
 ### 5.2 Assignment
@@ -347,27 +347,27 @@ statement = assignment | feed
 assignment = IDENT type_annot ASSIGN value
 ```
 
-### 5.3 Feed
+### 5.3 Collect
 
 ```
-feed = IDENT type_annot FEED feed_body
+collect = IDENT type_annot COLLECT collect_body
 ```
 
-A feed delivers zero or more bare values of the annotated collection type. The type must be a list type or map type.
+A collect delivers zero or more bare values of the annotated collection type. The type must be a list type or map type.
 
 ```
-feed_body        = list_feed_body | map_feed_body
-list_feed_body   = (value (SEP value)* SEP?)?
-map_feed_body    = (map_entry (SEP map_entry)* SEP?)?
+collect_body        = list_collect_body | map_collect_body
+list_collect_body   = (value (SEP value)* SEP?)?
+map_collect_body    = (map_entry (SEP map_entry)* SEP?)?
 ```
 
-For list feeds, each value conforms to the list's element type. For map feeds, each entry is `key ; value` conforming to the map's key and value types.
+For list collects, each value conforms to the list's element type. For map collects, each entry is `key ; value` conforming to the map's key and value types.
 
-**Termination**: A feed ends at end-of-unit (EOF or NUL terminator per §10.1) or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(0)-decidable: atom values begin with `|`, booleans and `nil` are reserved keywords that cannot be statement names, and all other value forms begin with non-identifier characters (digits, quotes, delimiters). Therefore a bare identifier at feed level always begins a new statement.
+**Termination**: A collect ends at end-of-unit (EOF or NUL terminator per §10.1) or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(0)-decidable: atom values begin with `|`, booleans and `nil` are reserved keywords that cannot be statement names, and all other value forms begin with non-identifier characters (digits, quotes, delimiters). Therefore a bare identifier at collect level always begins a new statement.
 
 **Duplicate keys**: Repeated map entries are preserved in encounter order. Interpreting duplicate keys is an application/domain concern (see §6).
 
-**Root duplicates**: Feed names participate in root duplicate handling — see §6.
+**Root duplicates**: Collect names participate in root duplicate handling — see §6.
 
 ### 5.4 Type Annotation
 
@@ -463,7 +463,7 @@ The reserved keywords `true`, `false`, and `nil` cannot be used as statement nam
 
 ### 6.2 Map Duplicate Keys
 
-Duplicate keys in either a **map value** (`= <...>`) or a **map feed** (`<<`) are not a format-level parse error and do not carry built-in replacement semantics in the format itself.
+Duplicate keys in either a **map value** (`= <...>`) or a **map collect** (`<<`) are not a format-level parse error and do not carry built-in replacement semantics in the format itself.
 
 A conforming decoder preserves repeated map entries in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
 
@@ -475,7 +475,7 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Whitespace around `<<` is optional: `name:[int] << 1, 2` and `name:[int]<<1, 2` are equivalent.
 - Whitespace around `:` in type annotations is **not** permitted: `name:int`, not `name : int`.
 - Whitespace around `;` in map entries is optional: `'key' ; value` and `'key';value` are equivalent.
-- Members are separated by commas, newlines, or both (`SEP`). At least one separator is required between feed items or between members inside delimited composites.
+- Members are separated by commas, newlines, or both (`SEP`). At least one separator is required between collect items or between members inside delimited composites.
 - Consecutive newlines (blank lines) are ignored.
 - Indentation is insignificant — cosmetic only.
 
@@ -606,7 +606,7 @@ COMMENT     = '#' (any char except NL)* NL
 ASSIGN  = '='
 COLON   = ':'
 SEMI    = ';'
-FEED    = '<<'
+COLLECT    = '<<'
 COMMA   = ','
 PIPE    = '|'
 LBRACE  = '{'    RBRACE  = '}'
@@ -666,17 +666,17 @@ ATOM        = PIPE IDENT
 ; --- Unit structure ---
 
 unit        = statement*
-statement   = assignment | feed
+statement   = assignment | collect
 
 assignment  = IDENT type_annot ASSIGN value
-feed        = IDENT type_annot FEED feed_body
+collect        = IDENT type_annot COLLECT collect_body
 
-; --- Feed body ---
+; --- Collect body ---
 ;     Terminates at end-of-unit (EOF or NUL) or the start of the next statement (IDENT COLON).
 
-feed_body = list_feed_body | map_feed_body
-list_feed_body = (value (SEP value)* SEP?)?
-map_feed_body  = (map_entry (SEP map_entry)* SEP?)?
+collect_body = list_collect_body | map_collect_body
+list_collect_body = (value (SEP value)* SEP?)?
+map_collect_body  = (map_entry (SEP map_entry)* SEP?)?
 
 ; --- Type annotations ---
 

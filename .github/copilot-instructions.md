@@ -44,7 +44,7 @@ Nullable: any type with `?` suffix (e.g., `str?`)
 
 Atom sets: `|a, b, c|` — enumerated string constants
 
-Feeds: `name:type << value, value, ...` — open-ended top-level sequences
+Collects: `name:type << value, value, ...` — open-ended top-level sequences
 
 ## Build, Test, Lint
 
@@ -90,7 +90,7 @@ For composites:
 
 For maps, children alternate: key (`ScalarValue`) → value → key → value → ...
 
-For feeds: `ListFeedStart/MapFeedStart` → items → `ListFeedEnd/MapFeedEnd`
+For collects: `ListFeedStart/MapFeedStart` → items → `ListFeedEnd/MapFeedEnd`
 
 > **Note**: The Go implementation currently uses `ListStreamStart/End` and `MapStreamStart/End` event names. These will be renamed to `ListFeedStart/End` and `MapFeedStart/End` in a future alignment pass.
 

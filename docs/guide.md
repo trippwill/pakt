@@ -8,7 +8,7 @@
 
 PAKT units are UTF-8. A BOM at the start is accepted but ignored.
 
-At the top level, a PAKT unit is a sequence of statements. A statement is either an assignment or a feed.
+At the top level, a PAKT unit is a sequence of statements. A statement is either an assignment or a collect.
 
 ```
 greeting:str     = 'hello world'
@@ -39,7 +39,7 @@ Every value must have a type. No exceptions.
 - `dec` is arbitrary-precision in the text. Implementations must support at least 28 significant digits.
 - `bin` is raw byte data. The decoder accepts both hex (`x'...'`) and base64 (`b'...'`) literals.
 
-`<<` feeds are parsed by the current Go library and CLI. In the event model they surface as explicit `FeedStart` / `FeedEnd` root events rather than pretending to be delimited collections.
+`<<` collects are parsed by the current Go library and CLI. In the event model they surface as explicit `FeedStart` / `FeedEnd` root events rather than pretending to be delimited collections.
 
 ---
 

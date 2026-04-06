@@ -154,6 +154,8 @@ public static class BenchmarkData
         new PaktField("hash", PaktType.Scalar(PaktScalarType.Str))
     ));
 
+    public static readonly PaktType FSEntryListPaktType = PaktType.List(FSEntryPaktType);
+
     static BenchmarkData()
     {
         InitSmall();
@@ -383,7 +385,7 @@ public static class BenchmarkData
         var pb = new StringBuilder();
         pb.AppendLine("root:str = '/data/warehouse'");
         pb.AppendLine("scanned:str = '2026-06-01T14:30:00Z'");
-        pb.Append("entries:{path:str, size:int, mode:int, mod_time:str, is_dir:bool, owner:str, group:str, hash:str} <<");
+        pb.Append("entries:[{path:str, size:int, mode:int, mod_time:str, is_dir:bool, owner:str, group:str, hash:str}] <<");
         pb.AppendLine();
         for (int i = 0; i < entries.Count; i++)
         {

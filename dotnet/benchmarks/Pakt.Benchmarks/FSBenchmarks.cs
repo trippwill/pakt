@@ -124,7 +124,7 @@ public class FSBenchmarks
         writer.WriteStringValue(_dataset.Scanned);
         writer.WriteAssignmentEnd();
 
-        writer.WriteStreamStart("entries", BenchmarkData.FSEntryPaktType);
+        writer.WriteStreamStart("entries", BenchmarkData.FSEntryListPaktType);
         var serialize = BenchmarkPaktContext.Default.FSEntry.Serialize!;
         foreach (var entry in _dataset.Entries)
             serialize(writer, entry);

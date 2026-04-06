@@ -9,6 +9,9 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
 
+    <!-- Benchmarks -->
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+
     <!-- Source Generator Dependencies -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />

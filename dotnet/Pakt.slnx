@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Pakt.Benchmarks/Pakt.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Pakt.Generators/Pakt.Generators.csproj" />
     <Project Path="src/Pakt/Pakt.csproj" />

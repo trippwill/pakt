@@ -26,8 +26,7 @@ active:bool      = true
 inactive:bool    = false
 id:uuid          = 550e8400-e29b-41d4-a716-446655440000
 started:date     = 2026-06-01
-opened:time      = 09:30:00-04:00
-updated:datetime = 2026-06-01T14:30:00Z
+updated:ts       = 2026-06-01T14:30:00Z
 payload:bin      = x'48656C6C6F'
 ```
 
@@ -37,7 +36,7 @@ payload:bin      = x'48656C6C6F'
 - Underscores (`_`) are visual separators — `1_000_000` is the same as `1000000`
 - `dec` is arbitrary-precision decimal; `float` is IEEE 754 binary64
 - `bin` accepts both hex (`x'...'`) and base64 (`b'...'`) forms
-- Time and datetime values require a timezone (`Z` or offset like `-04:00`)
+- Timestamp values require a timezone (`Z` or offset like `-04:00`)
 
 ---
 
@@ -57,7 +56,7 @@ backslash:str = 'C:\\Users\\alice'
 
 # Unicode escapes
 bmp-escape:str  = '\u2603'        # snowman ☃
-full-escape:str = '\U0001F600'    # grinning face 😀
+emoji:str       = '😀'            # literal UTF-8 for supplementary plane
 
 # Raw strings
 windows-path:str = r'C:\Users\alice\Documents'
@@ -234,14 +233,14 @@ sparse:[int?] = [1, nil, 3, nil, 5]
 # Various nullable types
 maybe-flag:bool?      = nil
 maybe-price:dec?      = 9.99
-maybe-stamp:datetime? = nil
+maybe-stamp:ts? = nil
 ```
 
 Using `nil` with a non-nullable type is a parse error — you must opt in with `?`.
 
 ---
 
-## A Realistic Document
+## A Realistic Unit
 
 This example shows a production deployment configuration using structs, lists, maps, tuples, nullable types, and atoms together:
 
@@ -301,37 +300,7 @@ health:{endpoint:str, interval-sec:int, timeout-sec:int, healthy-threshold:int} 
 
 active:bool        = true
 instance-count:int = 4
-started:datetime   = 2026-06-01T14:30:00Z
+started:ts         = 2026-06-01T14:30:00Z
 ```
 
-This document uses nearly every PAKT feature: scalars, strings, atoms, structs, tuples, lists, maps, nullable types, and comments. Every field is self-describing — the type annotation tells you exactly what to expect.
-
----
-
-## Spec File
-
-A `.spec.pakt` file declares what a consumer expects — types without values:
-
-```
-# deploy.spec.pakt
-deploy:{level:|dev, staging, prod|, release:int, date:date}
-version:(int, int, int)
-```
-
-When used as a projection, only `deploy` and `version` are materialized from the data stream. All other fields are skipped without allocation or processing.
-
-Different consumers can define different specs against the same document:
-
-```
-# audit.spec.pakt — only cares about the release number
-deploy:{release:int}
-```
-
-```
-# ops.spec.pakt — cares about deploy details and health
-deploy:{level:|dev, staging, prod|, date:date}
-health:{endpoint:str, interval-sec:int}
-active:bool
-```
-
-One document, multiple projections — each consumer sees exactly what it needs.
+This unit uses nearly every PAKT feature: scalars, strings, atoms, structs, tuples, lists, maps, nullable types, and comments. Every field is self-describing — the type annotation tells you exactly what to expect.

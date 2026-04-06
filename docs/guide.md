@@ -1,14 +1,14 @@
 # PAKT Guide
 
-> **PAKT** — a typed data interchange format. Human-authorable. Stream-parseable. Spec-projected.
+> **PAKT** — a typed data interchange format. Human-authorable. Streaming. Self-describing.
 
 ---
 
 ## The Basics
 
-PAKT documents are UTF-8. A BOM at the start is accepted but ignored.
+PAKT units are UTF-8. A BOM at the start is accepted but ignored.
 
-At the top level, a PAKT document is a sequence of statements. A statement is either an assignment or a stream.
+At the top level, a PAKT unit is a sequence of statements. A statement is either an assignment or a feed.
 
 ```
 greeting:str     = 'hello world'
@@ -21,8 +21,7 @@ avogadro:float   = 6.022e23
 active:bool      = true
 id:uuid          = 550e8400-e29b-41d4-a716-446655440000
 started:date     = 2026-06-01
-opened:time      = 09:30:00-04:00
-updated:datetime = 2026-06-01T14:30:00Z
+updated:ts       = 2026-06-01T14:30:00Z
 payload:bin      = x'48656C6C6F'
 ```
 
@@ -37,10 +36,10 @@ Every value must have a type. No exceptions.
 
 - `int` is a signed 64-bit integer (−9.2 × 10¹⁸ to 9.2 × 10¹⁸). Out-of-range values are a parse error.
 - `float` is IEEE 754 binary64 (double precision).
-- `dec` is arbitrary-precision in the text. Implementations must support at least 34 significant digits.
+- `dec` is arbitrary-precision in the text. Implementations must support at least 28 significant digits.
 - `bin` is raw byte data. The decoder accepts both hex (`x'...'`) and base64 (`b'...'`) literals.
 
-`<<` streams are parsed by the current Go library and CLI. In the event stream they surface as explicit `StreamStart` / `StreamEnd` root events rather than pretending to be delimited collections.
+`<<` feeds are parsed by the current Go library and CLI. In the event model they surface as explicit `FeedStart` / `FeedEnd` root events rather than pretending to be delimited collections.
 
 ---
 
@@ -53,7 +52,7 @@ message:str = 'hello\nworld'
 path:str    = 'C:\\Users\\alice'
 tab:str     = "col1\tcol2"
 emoji:str   = '\u2603'           # snowman
-flag:str    = '\U0001F600'       # grinning face
+flag:str    = '😀'               # grinning face (literal UTF-8)
 ```
 
 | Escape | Meaning |
@@ -65,9 +64,8 @@ flag:str    = '\U0001F600'       # grinning face
 | `\r` | Carriage return |
 | `\t` | Tab |
 | `\uXXXX` | Unicode BMP code point |
-| `\UXXXXXXXX` | Unicode code point (full range) |
 
-Null bytes are not allowed in strings.
+Null bytes are not allowed in strings. Surrogate code points (`U+D800`–`U+DFFF`) are not valid in `\u` escapes — use literal UTF-8 for supplementary-plane characters.
 
 ### Raw Strings
 
@@ -261,72 +259,28 @@ Whitespace around `=` in assignments and `;` in maps is optional. Indentation is
 
 ## Duplicates
 
-Duplicate names at the document root are an error:
+Duplicate names at the unit root are preserved in encounter order:
 
 ```
-# ERROR — 'name' appears twice
+# Both statements are preserved — the consumer decides how to handle them
 name:str = 'Alice'
 name:str = 'Bob'
 ```
 
-Duplicate map keys are preserved in encounter order. Interpreting them is an application/domain concern above the raw decode stream.
+Duplicate map keys are also preserved in encounter order. Interpreting them is an application/domain concern above the raw decode.
 
 ---
 
-## Specs
+## Type Assertions
 
-PAKT's spec syntax is the same as the data — just without values.
-
-### Producer assertions
-
-Type annotations in a document are promises by the producer:
+Type annotations in a PAKT unit are promises by the producer. The parser validates them at parse time:
 
 ```
 release:int = 26
 status:|active, inactive| = |active
 ```
 
-The parser validates the promise immediately.
-
-### Consumer requirements
-
-A `.spec.pakt` file defines what a consumer expects:
-
-```
-# deploy.spec.pakt
-deploy:{level:|dev, staging, prod|, release:int, date:date}
-```
-
-Validation rules:
-
-- Missing required fields → error
-- Type mismatches → error
-- Extra fields not in spec → ignored
-
-### Projections
-
-A consumer supplies a spec at parse time as a filter. The streaming parser only materializes matching fields. Everything else is skipped — no allocation, no processing.
-
-```
-# Full document
-level:|dev, staging, prod| = |prod
-release:int = 26
-date:date   = 2026-06-01
-```
-
-```
-# Deployment service spec — sees level and date only:
-deploy:{level:|dev, staging, prod|, date:date}
-```
-
-```
-# Audit service spec — sees release only:
-deploy:{release:int}
-```
-
-One document. Multiple consumers. Each sees exactly what it asked for, validated to its own requirements.
-
-Specs can be static files or constructed dynamically at runtime. File extension: `.spec.pakt`.
+A value that doesn't conform to its declared type is an immediate parse error.
 
 ---
 
@@ -342,8 +296,7 @@ Specs can be static files or constructed dynamically at runtime. File extension:
 | Binary | `:bin` | `x'48656C6C6F'`, `b'SGVsbG8='` |
 | UUID | `:uuid` | `550e8400-e29b-...` |
 | Date | `:date` | `2026-06-01` |
-| Time | `:time` | `14:30:00Z`, `14:30:00-04:00` |
-| Datetime | `:datetime` | `2026-06-01T14:30:00Z` |
+| Timestamp | `:ts` | `2026-06-01T14:30:00Z` |
 | Atom | `:\|a, b, c\|` | `\|b` |
 | Struct | `:{field:type, ...}` | `{ val, ... }` (positional) |
 | Tuple | `:(type, ...)` | `(val, val, ...)` |

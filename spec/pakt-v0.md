@@ -1,6 +1,6 @@
 # PAKT Specification
 
-> **PAKT** — a typed data interchange format. Human-authorable. Stream-parseable. Spec-projected.
+> **PAKT** — a typed data interchange format. Human-authorable. Streaming. Self-describing.
 
 ## 0. Version
 
@@ -20,36 +20,36 @@ PAKT uses single-integer versioning. Each version is a complete specification. P
 
 2. **Type context flows with the data.** Every value carries or inherits its type. The parser never guesses. This enables type-directed scanning and projection without schema negotiation.
 
-3. **The decoder is lossless; interpretation is layered.** A conforming decoder preserves all information present in the source — including duplicate map keys and encounter order. Policy decisions such as rejecting duplicates, applying last-wins, or accumulating values belong to higher-level consumers, not the core decoder.
+3. **The decoder is lossless; interpretation is layered.** A conforming decoder preserves all information present in the source — including duplicate statement names, duplicate map keys, and encounter order. Policy decisions such as rejecting duplicates, applying last-wins, or accumulating values belong to higher-level consumers, not the core decoder.
 
 4. **Presentation is an application concern.** Human-readable formatting, event enrichment, and display transformations (such as CLI output or JSON projection) are not encoder or decoder responsibilities. The core event contract is minimal and machine-oriented.
 
-5. **The grammar is the event model.** Each grammatical construct — assignment, stream, struct, tuple, list, map, scalar — maps to a distinct event kind. Consumers should not need to inspect payload strings to determine structural context.
+5. **The grammar is the event model.** Each grammatical construct — assignment, feed, struct, tuple, list, map, scalar — maps to a distinct event kind. Consumers should not need to inspect payload strings to determine structural context.
 
-## 1. Document Model
+## 1. Data Model
 
-A PAKT document is a sequence of **statements** at the top level. A statement is either an **assignment** (a named, typed, single value) or a **stream** (a named, typed, open-ended sequence of values).
+A PAKT unit is a sequence of **statements** at the top level. A statement is either an **assignment** (a named, typed, single value) or a **feed** (a named, typed, open-ended sequence of values).
 
-The document root uses self-describing statements (`name:type = value` or `name:type << values...`) rather than positional values. This is the system boundary where data enters without a parent type context.
+The unit root uses self-describing statements (`name:type = value` or `name:type << values...`) rather than positional values. This is the system boundary where data enters without a parent type context.
 
 ```
 name:str = 'midwatch'
 version:(int, int, int) = (1, 0, 0)
 ```
 
-Streams deliver zero or more values of a collection type, terminated by EOF or the start of the next statement:
+Feeds deliver zero or more values of a collection type, terminated by end-of-unit or the start of the next statement:
 
 ```
-events:[{ts:datetime, level:str, msg:str}] <<
+events:[{ts:ts, level:str, msg:str}] <<
 { 2026-06-01T14:30:00Z, 'info', 'server started' }
 { 2026-06-01T14:31:00Z, 'warn', 'high latency' }
 ```
 
 ## 2. Encoding
 
-A PAKT document is a sequence of Unicode code points encoded as **UTF-8**. No other encodings are permitted.
+A PAKT unit is a sequence of Unicode code points encoded as **UTF-8**. No other encodings are permitted.
 
-A UTF-8 BOM (`U+FEFF`) at the start of a document is accepted and ignored. Implementations must not reject a document that begins with a BOM, and must not emit a BOM when writing.
+A UTF-8 BOM (`U+FEFF`) at the start of a unit is accepted and ignored. Implementations must not reject a unit that begins with a BOM, and must not emit a BOM when writing.
 
 ## 3. Lexical Grammar
 
@@ -91,8 +91,7 @@ BOOL     = 'true' | 'false'
 NIL      = 'nil'
 DATE     = DIGIT{4} '-' DIGIT{2} '-' DIGIT{2}
 TZ       = 'Z' | [+-] DIGIT{2} ':' DIGIT{2}
-TIME     = DIGIT{2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)? TZ
-DATETIME = DATE 'T' TIME
+TS       = DATE 'T' DIGIT{2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)? TZ
 UUID     = HEX{8} '-' HEX{4} '-' HEX{4} '-' HEX{4} '-' HEX{12}
 BIN      = 'x' "'" HEX_DIGIT* "'"
          | 'b' "'" BASE64_CHAR* "'"
@@ -100,7 +99,6 @@ BASE64_CHAR = ALPHA | DIGIT | '+' | '/' | '='
 
 ESCAPE      = '\' ('\' | "'" | '"' | 'n' | 'r' | 't')
             | '\u' HEX_DIGIT{4}
-            | '\U' HEX_DIGIT{8}
 string_char = ESCAPE
             | any code point except matching_quote, '\', NL, U+0000
 raw_char    = any code point except matching_quote, U+0000
@@ -199,9 +197,8 @@ Within a quoted string (not raw), the following escape sequences are recognized:
 | `\r` | Carriage return (U+000D) |
 | `\t` | Tab (U+0009) |
 | `\uXXXX` | Unicode BMP code point (4 hex digits) |
-| `\UXXXXXXXX` | Unicode code point (8 hex digits) |
 
-Any other `\` followed by a character is a parse error. Null bytes (`U+0000`) are not permitted in strings, whether literal or escaped.
+Any other `\` followed by a character is a parse error. Null bytes (`U+0000`) are not permitted in strings, whether literal or escaped. Surrogate code points (`U+D800`–`U+DFFF`) are not valid in `\u` escapes — they are an encoding detail, not code points. To include supplementary-plane characters (e.g., emoji), use literal UTF-8.
 
 ### 3.7 Tokens
 
@@ -210,7 +207,7 @@ HASH    = '#'
 ASSIGN  = '='
 COLON   = ':'                       ; type annotation only
 SEMI    = ';'                       ; map key-value association
-STREAM  = '<<'
+FEED    = '<<'
 COMMA   = ','
 PIPE    = '|'
 LBRACE  = '{'    RBRACE = '}'
@@ -243,15 +240,14 @@ Every value must have a type. There is no default type and no type inference.
 | `bool` | Boolean keyword | `true`, `false` |
 | `uuid` | UUID | `550e8400-e29b-41d4-a716-446655440000` |
 | `date` | ISO date | `2026-06-01` |
-| `time` | ISO time (tz required) | `14:30:00Z`, `14:30:00-04:00` |
-| `datetime` | ISO datetime (tz required) | `2026-06-01T14:30:00Z` |
+| `ts` | ISO timestamp (tz required) | `2026-06-01T14:30:00Z` |
 | `bin` | Binary data | `x'48656C6C6F'`, `b'SGVsbG8='` |
 
 **Numeric precision:**
 
 - **`int`**: Signed 64-bit integer. Range: −9,223,372,036,854,775,808 to 9,223,372,036,854,775,807. Values outside this range are a parse error.
 - **`float`**: IEEE 754 binary64 (double precision). Implementations must parse and round per IEEE 754.
-- **`dec`**: Arbitrary-precision decimal in the text representation. Implementations must support at least 34 significant digits (equivalent to IEEE 754 decimal128). An implementation may reject values exceeding its supported precision with a clear error.
+- **`dec`**: Arbitrary-precision decimal in the text representation. Implementations must support at least 28 significant digits. An implementation may reject values exceeding its supported precision with a clear error.
 - **`bin`**: Raw byte sequence. Hex form (`x'...'`) and base64 form (`b'...'`) are semantically equivalent — both produce the same bytes. Implementations represent this as a byte array/slice.
 
 `true`, `false`, and `nil` are reserved keywords, not atoms.
@@ -302,7 +298,7 @@ Empty lists (`[]`) and empty maps (`<>`) are valid. Empty structs, tuples, and a
 
 ### 4.5 Reserved
 
-The following tokens are reserved for future use. They must not appear in documents outside of string literals. A conforming parser encountering a reserved token in an unexpected position should report a syntax error.
+The following tokens are reserved for future use. They must not appear in units outside of string literals. A conforming parser encountering a reserved token in an unexpected position should report a syntax error.
 
 | Token | Possible future use |
 |-------|-------------------|
@@ -325,25 +321,24 @@ Type aliases would allow naming a type once and referencing it by name in type p
 &level = |info, warn, error|
 
 entries:[&entry] << ...
-events:[{ts:datetime, level:&level, msg:str}] << ...
+events:[{ts:ts, level:&level, msg:str}] << ...
 ```
 
 Planned semantics:
 
-- **`&name = type`** defines a type alias. It is not a statement — it emits no events and does not participate in root uniqueness.
+- **`&name = type`** defines a type alias. It is not a statement — it emits no events and does not participate in root duplicate handling.
 - **`&name`** in type position is a structural substitution — the alias expands to the underlying type. There is no nominal typing.
-- **Must appear before use.** This is the streaming-compatible ordering rule. Forward references are a parse error. In practice, aliases go at the top of the document.
-- **`&` sigil required in both definition and reference.** This keeps alias names and statement names in separate namespaces — a document can have both `&entry` (type alias) and `entry` (statement name) without conflict.
-- **Aliases can reference earlier aliases.** `&log = {ts:datetime, level:&level}` is valid if `&level` is already defined.
-- **Spec files define their own aliases.** Projection is structural, not nominal — a spec's `&entry` must structurally match the document's `&entry`, but they are independent definitions.
+- **Must appear before use.** This is the streaming-compatible ordering rule. Forward references are a parse error. In practice, aliases go at the top of the unit.
+- **`&` sigil required in both definition and reference.** This keeps alias names and statement names in separate namespaces — a unit can have both `&entry` (type alias) and `entry` (statement name) without conflict.
+- **Aliases can reference earlier aliases.** `&log = {ts:ts, level:&level}` is valid if `&level` is already defined.
 
 ## 5. Syntactic Grammar
 
-### 5.1 Document
+### 5.1 Unit
 
 ```
-document  = statement*
-statement = assignment | stream
+unit      = statement*
+statement = assignment | feed
 ```
 
 ### 5.2 Assignment
@@ -352,35 +347,27 @@ statement = assignment | stream
 assignment = IDENT type_annot ASSIGN value
 ```
 
-### 5.3 Stream
+### 5.3 Feed
 
 ```
-stream = IDENT type_annot STREAM stream_body
+feed = IDENT type_annot FEED feed_body
 ```
 
-A stream delivers zero or more bare values of the annotated collection type. The type must be a list type, map type, or a list-of-structs type.
-
-Stream body for list types (`[type]`):
+A feed delivers zero or more bare values of the annotated collection type. The type must be a list type or map type.
 
 ```
-stream_body = (value (SEP value)* SEP?)?
+feed_body        = list_feed_body | map_feed_body
+list_feed_body   = (value (SEP value)* SEP?)?
+map_feed_body    = (map_entry (SEP map_entry)* SEP?)?
 ```
 
-Each value conforms to the list's element type.
+For list feeds, each value conforms to the list's element type. For map feeds, each entry is `key ; value` conforming to the map's key and value types.
 
-Stream body for map types (`<K ; V>`):
-
-```
-stream_body = (map_entry (SEP map_entry)* SEP?)?
-```
-
-Each entry is `key ; value` conforming to the map's key and value types.
-
-**Termination**: A stream ends at EOF or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(0)-decidable: atom values begin with `|`, booleans and `nil` are reserved keywords that cannot be statement names, and all other value forms begin with non-identifier characters (digits, quotes, delimiters). Therefore a bare identifier at stream level always begins a new statement.
+**Termination**: A feed ends at end-of-unit (EOF or NUL terminator per §10.1) or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is LL(0)-decidable: atom values begin with `|`, booleans and `nil` are reserved keywords that cannot be statement names, and all other value forms begin with non-identifier characters (digits, quotes, delimiters). Therefore a bare identifier at feed level always begins a new statement.
 
 **Duplicate keys**: Repeated map entries are preserved in encounter order. Interpreting duplicate keys is an application/domain concern (see §6).
 
-**Root uniqueness**: Stream names participate in root uniqueness — a document may not have two statements (assignments or streams) with the same name.
+**Root duplicates**: Feed names participate in root duplicate handling — see §6.
 
 ### 5.4 Type Annotation
 
@@ -393,7 +380,7 @@ type_annot = COLON type '?'?
 ```
 type = scalar_type | atom_set | struct_type | tuple_type | list_type | map_type
 
-scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool' | 'uuid' | 'date' | 'time' | 'datetime' | 'bin'
+scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool' | 'uuid' | 'date' | 'ts' | 'bin'
 
 atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
 
@@ -413,7 +400,7 @@ map_type    = LANGLE type SEMI type RANGLE
 ```
 value = scalar | NIL | atom_val | struct_val | tuple_val | list_val | map_val
 
-scalar    = STRING | RAW_STR | ML_STR | ML_RAW | INT | DEC | FLOAT | BOOL | UUID | DATE | TIME | DATETIME | BIN
+scalar    = STRING | RAW_STR | ML_STR | ML_RAW | INT | DEC | FLOAT | BOOL | UUID | DATE | TS | BIN
 atom_val  = ATOM
 ```
 
@@ -464,16 +451,21 @@ map_entry   = value SEMI value
 
 Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are separated by `;`. An empty map (`<>`) is valid. Duplicate keys are preserved in encounter order; interpreting them is an application/domain concern (see §6).
 
-## 6. Uniqueness
+## 6. Duplicates
 
-Duplicate names at the document root are a parse error — this applies to both assignments and streams.
+### 6.1 Root Statement Duplicates
+
+Duplicate names at the unit root are not a format-level parse error and do not carry built-in replacement semantics.
+
+A conforming decoder preserves repeated statements in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
+
 The reserved keywords `true`, `false`, and `nil` cannot be used as statement names.
 
-### 6.1 Map Duplicate Keys
+### 6.2 Map Duplicate Keys
 
-Duplicate keys in either a **map value** (`= <...>`) or a **map stream** (`<<`) are not a format-level parse error and do not carry built-in replacement semantics in the format itself.
+Duplicate keys in either a **map value** (`= <...>`) or a **map feed** (`<<`) are not a format-level parse error and do not carry built-in replacement semantics in the format itself.
 
-A conforming decoder should preserve repeated map entries in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
+A conforming decoder preserves repeated map entries in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
 
 Struct field names are declared in the type, not in the value, so duplicates are caught at the type level.
 
@@ -483,7 +475,7 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Whitespace around `<<` is optional: `name:[int] << 1, 2` and `name:[int]<<1, 2` are equivalent.
 - Whitespace around `:` in type annotations is **not** permitted: `name:int`, not `name : int`.
 - Whitespace around `;` in map entries is optional: `'key' ; value` and `'key';value` are equivalent.
-- Members are separated by commas, newlines, or both (`SEP`). At least one separator is required between stream items or between members inside delimited composites.
+- Members are separated by commas, newlines, or both (`SEP`). At least one separator is required between feed items or between members inside delimited composites.
 - Consecutive newlines (blank lines) are ignored.
 - Indentation is insignificant — cosmetic only.
 
@@ -514,92 +506,38 @@ version:(int, int, int) = (
 version:(int, int, int) = (3, 45, 5678)
 ```
 
-## 9. Spec Model
+## 9. Type Assertions
 
-PAKT has a three-layer spec model: producer assertions, external specs, and consumer projections.
-
-### 9.1 Producer Assertions
-
-Type annotations in a document are assertions by the producer. They are validated during parsing — a document that violates its own assertions is malformed.
+Type annotations in a PAKT unit are assertions by the producer. They are validated during parsing — a unit that violates its own assertions is malformed.
 
 ```
 release:int = 26
 status:|active, inactive| = |active
 ```
 
-### 9.2 External Spec Files
+The parser checks each value against its declared type at parse time. A type mismatch is an immediate error.
 
-A spec file (`.spec.pakt`) uses PAKT type syntax without values:
+### 9.1 Future Consideration: Spec Files and Projections
 
-```
-spec        = spec_member*
-spec_member = IDENT type_annot
-```
+> **Status**: Design sketch only. Not part of PAKT 0.
 
-Example:
-
-```
-# deploy.spec.pakt
-deploy:{level:|dev, staging, prod|, release:int, date:date}
-version:(int, int, int)
-```
-
-A spec file defines the consumer's requirements.
-
-### 9.3 Spec Compatibility
-
-| Check | Rule |
-|-------|------|
-| **Structural** | Spec fields missing from the document are errors. Document fields not in the spec are ignored (projection). |
-| **Type** | The document field type must match the spec field type exactly. |
-
-### 9.4 Consumer Projections
-
-A consumer may supply a spec at parse time as a projection — a filter over the document stream.
-
-- Fields matching the spec are parsed, validated, and emitted.
-- Fields not in the spec are skipped without allocation.
-- Type mismatches on matched fields are immediate errors.
-
-Projections may be defined statically (in `.spec.pakt` files) or constructed dynamically at runtime.
-
-```
-# Full document
-{
-level:|dev, staging, prod| = |prod
-release:int               = 26
-date:date                 = 2026-06-01
-}
-
-# Projection A (deployment service):
-# deploy:{level:|dev, staging, prod|, date:date}
-#   → sees level and date, skips release
-
-# Projection B (audit service):
-# deploy:{release:int}
-#   → sees release only
-```
-
-Projections apply equally to assignments and streams. A spec field that matches a `<<` stream emits the stream's events; a spec field that does not match a stream skips the entire stream body without allocation.
-
-```
-# Document with mixed statements
-name:str = 'midwatch'
-events:[{ts:datetime, level:str}] <<
-    { 2026-06-01T14:30:00Z, 'info' }
-    { 2026-06-01T14:31:00Z, 'warn' }
-metrics:<str ; int> << 'ok' ; 1, 'err' ; 2
-
-# Projection: events:[{ts:datetime, level:str}]
-#   → emits the events stream, skips name and metrics
-```
+External spec files (`.spec.pakt`) and consumer projections may be added in a future version. A spec file would use PAKT type syntax without values to define a consumer's requirements. A projection would let a consumer supply a spec at parse time as a filter — parsing only matching fields and skipping the rest without allocation. These features are deferred until real-world usage patterns are better understood.
 
 ## 10. File Conventions
 
 | Extension | Purpose | MIME Type |
 |-----------|---------|----------|
-| `.pakt` | PAKT data document | `application/vnd.pakt` |
-| `.spec.pakt` | PAKT spec file | `application/vnd.pakt.spec` |
+| `.pakt` | PAKT data unit | `application/vnd.pakt` |
+
+### 10.1 Transport Framing
+
+When transmitting PAKT units over a raw byte stream (e.g., pipes, sockets, serial links), implementations MAY use a NUL byte (`U+0000`, `0x00`) as a unit delimiter. The NUL byte is not part of the PAKT text — it is a framing sentinel.
+
+Since NUL is already forbidden in all PAKT text (strings, identifiers, comments), it is unambiguous as a boundary marker.
+
+A parser encountering a NUL byte at the top level SHOULD treat it as end-of-unit. Behavior on encountering NUL inside a syntactic construct (e.g., mid-string) is already defined as a parse error.
+
+When reading from a file, end-of-file serves as end-of-unit. NUL framing is optional for file-based usage.
 
 ## 11. Error Model
 
@@ -616,13 +554,13 @@ Each error MUST include:
 
 ### 11.2 Normative Error Categories
 
-Codes 1–99 are reserved for the spec. Implementations MUST support at least these categories and MUST allow callers to distinguish them programmatically (via sentinel errors, error codes, typed exceptions, or equivalent).
+Codes 1–99 are reserved for the spec. Implementations MUST support at least the active categories below (those with an identifier) and MUST allow callers to distinguish them programmatically (via sentinel errors, error codes, typed exceptions, or equivalent). Reserved slots are not active categories and impose no implementation requirement.
 
 | Code | Identifier | Condition |
 |------|-----------|-----------|
 | 1 | `unexpected_eof` | Input ends before a syntactic construct is complete |
-| 2 | `duplicate_name` | Two root-level statements share the same identifier |
-| 3 | `type_mismatch` | A value does not conform to its declared type, or a spec projection type does not match the document type |
+| 2 | *(reserved)* | *(formerly `duplicate_name`; removed — see §6.1)* |
+| 3 | `type_mismatch` | A value does not conform to its declared type |
 | 4 | `nil_non_nullable` | `nil` appears where the type is not nullable |
 | 5 | `syntax` | Any lexical or grammatical error not covered by a more specific category |
 
@@ -634,8 +572,8 @@ Implementations MAY define additional error categories with codes ≥ 100. Imple
 
 The following conditions are explicitly **not** parse errors:
 
-- **Duplicate map keys** — preserved in encounter order per §6.1 and principle 3 (lossless decoder). Higher-level consumers decide whether duplicates are meaningful.
-- **Unknown fields during projection** — silently skipped per §9.4.
+- **Duplicate root statement names** — preserved in encounter order per §6.1 and principle 3 (lossless decoder). Higher-level consumers decide whether duplicates are meaningful.
+- **Duplicate map keys** — preserved in encounter order per §6.2 and principle 3 (lossless decoder). Higher-level consumers decide whether duplicates are meaningful.
 
 Website: [usepakt.dev](https://usepakt.dev)
 
@@ -668,7 +606,7 @@ COMMENT     = '#' (any char except NL)* NL
 ASSIGN  = '='
 COLON   = ':'
 SEMI    = ';'
-STREAM  = '<<'
+FEED    = '<<'
 COMMA   = ','
 PIPE    = '|'
 LBRACE  = '{'    RBRACE  = '}'
@@ -698,8 +636,7 @@ NIL         = 'nil'
 
 DATE        = DIGIT{4} '-' DIGIT{2} '-' DIGIT{2}
 TZ          = 'Z' | [+-] DIGIT{2} ':' DIGIT{2}
-TIME        = DIGIT{2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)? TZ
-DATETIME    = DATE 'T' TIME
+TS          = DATE 'T' DIGIT{2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)? TZ
 UUID        = HEX{8} '-' HEX{4} '-' HEX{4} '-' HEX{4} '-' HEX{12}
 
 BIN         = 'x' "'" HEX_DIGIT* "'"
@@ -709,7 +646,6 @@ BIN         = 'x' "'" HEX_DIGIT* "'"
 
 ESCAPE      = '\' ('\' | "'" | '"' | 'n' | 'r' | 't')
             | '\u' HEX_DIGIT{4}
-            | '\U' HEX_DIGIT{8}
 
 string_char = ESCAPE | any code point except matching_quote, '\', NL, U+0000
 raw_char    = any code point except matching_quote, U+0000
@@ -727,20 +663,20 @@ ATOM        = PIPE IDENT
 ### A.2 Syntactic Grammar
 
 ```
-; --- Document structure ---
+; --- Unit structure ---
 
-document    = statement*
-statement   = assignment | stream
+unit        = statement*
+statement   = assignment | feed
 
 assignment  = IDENT type_annot ASSIGN value
-stream      = IDENT type_annot STREAM stream_body
+feed        = IDENT type_annot FEED feed_body
 
-; --- Stream body ---
-;     Terminates at EOF or the start of the next statement (IDENT COLON).
+; --- Feed body ---
+;     Terminates at end-of-unit (EOF or NUL) or the start of the next statement (IDENT COLON).
 
-stream_body = list_stream_body | map_stream_body
-list_stream_body = (value (SEP value)* SEP?)?
-map_stream_body  = (map_entry (SEP map_entry)* SEP?)?
+feed_body = list_feed_body | map_feed_body
+list_feed_body = (value (SEP value)* SEP?)?
+map_feed_body  = (map_entry (SEP map_entry)* SEP?)?
 
 ; --- Type annotations ---
 
@@ -754,7 +690,7 @@ type        = scalar_type
             | map_type
 
 scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool'
-            | 'uuid' | 'date' | 'time' | 'datetime' | 'bin'
+            | 'uuid' | 'date' | 'ts' | 'bin'
 
 atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
 
@@ -772,7 +708,7 @@ value       = scalar | NIL | atom_val
 
 scalar      = STRING | RAW_STR | ML_STR | ML_RAW
             | INT | DEC | FLOAT | BOOL
-            | UUID | DATE | TIME | DATETIME | BIN
+            | UUID | DATE | TS | BIN
 
 atom_val    = ATOM
 
@@ -781,11 +717,6 @@ tuple_val   = LPAREN (value (SEP value)* SEP?)? RPAREN
 list_val    = LBRACK (value (SEP value)* SEP?)? RBRACK
 map_val     = LANGLE (map_entry (SEP map_entry)* SEP?)? RANGLE
 map_entry   = value SEMI value
-
-; --- Spec files ---
-
-spec        = spec_member*
-spec_member = IDENT type_annot
 ```
 
 ### A.3 Reserved Keywords

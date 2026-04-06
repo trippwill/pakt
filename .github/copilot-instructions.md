@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-PAKT is a typed data interchange format: human-authorable, stream-parseable, spec-projected. This repository contains:
+PAKT is a typed data interchange format: human-authorable, streaming, self-describing. This repository contains:
 
-- **`encoding/`** — The canonical Go library (`github.com/trippwill/pakt/encoding`). Streaming decoder, encoder, marshal/unmarshal, spec projection.
+- **`encoding/`** — The canonical Go library (`github.com/trippwill/pakt/encoding`). Streaming decoder, encoder, marshal/unmarshal.
 - **`main.go` / `cli.go`** — CLI tool (`go install github.com/trippwill/pakt@latest`). Uses Kong for command parsing.
 - **`spec/pakt-v0.md`** — Formal PAKT v0 specification (grammar, semantics, error codes).
 - **`docs/guide.md`** — Human-friendly introduction to PAKT.
@@ -20,7 +20,7 @@ The encoding package uses a **streaming state-machine decoder**:
 2. **`reader_type.go`** — Recursive-descent type annotation parser. Bounded depth, not part of the state machine.
 3. **`reader_state.go`** — State machine: `parserState` enum, `frame` stack type, `stateMachine.step()` loop. Each `step()` call either yields an event or transitions internally.
 4. **`decoder.go`** — Public `Decoder` type wrapping the state machine. `Decode()` calls `step()` and returns one `Event` per call.
-5. **`spec.go`** — Spec projection: `ParseSpec()` reads `.spec.pakt` files; `Decoder.SetSpec()` filters the event stream to matched fields.
+5. **`spec.go`** — Spec projection (legacy experimental; being moved to future consideration).
 6. **`event.go`** — `Event` struct and `EventKind` enum. Events: `AssignStart/End`, `ListStreamStart/End`, `MapStreamStart/End`, `ScalarValue`, `StructStart/End`, `TupleStart/End`, `ListStart/End`, `MapStart/End`, `Error`.
 7. **`types.go`** — PAKT type system: `TypeKind` (scalars), `Type` interface, composite types (`StructType`, `TupleType`, `ListType`, `MapType`), `AtomSetType`.
 8. **`errors.go`** — `ParseError` with `Pos{Line, Col}` and `ErrorCode` matching spec §11.
@@ -30,21 +30,21 @@ The encoding package uses a **streaming state-machine decoder**:
 
 ### Key Design Principle
 
-The state machine uses an **explicit stack** (not Go call stack) for nesting. Memory scales with nesting depth, not document size. Each composite type (struct, tuple, list, map) pushes a `frame` with its state. The `step()` function loops through states, yielding events via `return`.
+The state machine uses an **explicit stack** (not Go call stack) for nesting. Memory scales with nesting depth, not unit size. Each composite type (struct, tuple, list, map) pushes a `frame` with its state. The `step()` function loops through states, yielding events via `return`.
 
 Refer to `design/state-machine-rewrite.md` for the full state transition narrative and frame layout.
 
 ## PAKT Type System
 
-Scalar types: `str`, `int`, `dec`, `float`, `bool`, `uuid`, `date`, `time`, `datetime`, `bin`
+Scalar types: `str`, `int`, `dec`, `float`, `bool`, `uuid`, `date`, `ts`, `bin`
 
 Composite types: `{field:type, ...}` (struct), `(type, ...)` (tuple), `[type]` (list), `<keytype ; valuetype>` (map)
 
 Nullable: any type with `?` suffix (e.g., `str?`)
 
-Atom sets: `@(a | b | c)` — enumerated string constants
+Atom sets: `|a, b, c|` — enumerated string constants
 
-Streams: `name:type << value, value, ...` — open-ended top-level sequences
+Feeds: `name:type << value, value, ...` — open-ended top-level sequences
 
 ## Build, Test, Lint
 
@@ -90,7 +90,9 @@ For composites:
 
 For maps, children alternate: key (`ScalarValue`) → value → key → value → ...
 
-For streams: `ListStreamStart/MapStreamStart` → items → `ListStreamEnd/MapStreamEnd`
+For feeds: `ListFeedStart/MapFeedStart` → items → `ListFeedEnd/MapFeedEnd`
+
+> **Note**: The Go implementation currently uses `ListStreamStart/End` and `MapStreamStart/End` event names. These will be renamed to `ListFeedStart/End` and `MapFeedStart/End` in a future alignment pass.
 
 ## PR Expectations
 

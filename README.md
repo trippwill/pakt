@@ -1,6 +1,6 @@
 # PAKT
 
-> **PAKT** — a typed data interchange format. Human-authorable. Stream-parseable. Spec-projected.
+> **PAKT** — a typed data interchange format. Human-authorable. Streaming. Self-describing.
 
 ```
 greeting:str     = 'hello world'
@@ -12,11 +12,9 @@ server:{host:str, port:int} = { 'localhost', 8080 }
 
 ## What is PAKT?
 
-PAKT is a typed data interchange format where every value carries its type. No inference, no ambiguity. Documents are self-validating — type annotations are producer assertions checked at parse time.
+PAKT is a typed data interchange format where every value carries its type. No inference, no ambiguity. Units are self-validating — type annotations are producer assertions checked at parse time.
 
-Consumer-side `.spec.pakt` files enable **projections**: a streaming parser materializes only the fields a consumer needs, skipping everything else without allocation.
-
-The current Go library and CLI implement the converged PAKT v0 surface: `;` map syntax, `bin`, raw strings, the first-content-line multi-line string rule, and top-level `<<` stream statements. Duplicate map keys are preserved in decode order; higher-level consumers decide how to interpret them.
+The current Go library and CLI implement the PAKT v0 surface: `;` map syntax, `bin`, raw strings, the first-content-line multi-line string rule, and top-level `<<` feed statements. Duplicate statement names and map keys are preserved in decode order; higher-level consumers decide how to interpret them.
 
 ## Repository Structure
 
@@ -41,9 +39,6 @@ go install github.com/trippwill/pakt@latest
 ```sh
 # Parse a file and emit structured events
 pakt parse data.pakt
-
-# Parse with spec projection
-pakt parse data.pakt --spec deploy.spec.pakt
 
 # Validate only (exit 0/1)
 pakt validate data.pakt

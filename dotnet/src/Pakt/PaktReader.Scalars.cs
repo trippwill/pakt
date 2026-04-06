@@ -177,7 +177,7 @@ public ref partial struct PaktReader
             {
                 _consumed++;
                 _bytePositionInLine++;
-                sb.Append(ReadEscape());
+                ReadEscapeInto(sb);
                 continue;
             }
             if (b == '\n' || b == '\r')
@@ -350,13 +350,13 @@ public ref partial struct PaktReader
                     case (byte)'u':
                         i++;
                         if (i + 4 > content.Length) ThrowError("Incomplete \\u escape", PaktErrorCode.Syntax);
-                        sb.Append(ParseUnicodeEscape(content.Slice(i, 4)));
+                        AppendUnicodeEscape(sb, content.Slice(i, 4));
                         i += 4;
                         break;
                     case (byte)'U':
                         i++;
                         if (i + 8 > content.Length) ThrowError("Incomplete \\U escape", PaktErrorCode.Syntax);
-                        sb.Append(ParseUnicodeEscape(content.Slice(i, 8)));
+                        AppendUnicodeEscape(sb, content.Slice(i, 8));
                         i += 8;
                         break;
                     default:
@@ -376,7 +376,7 @@ public ref partial struct PaktReader
         }
     }
 
-    private char ReadEscape()
+    private void ReadEscapeInto(StringBuilder sb)
     {
         if (_consumed >= _buffer.Length)
             ThrowError("Unterminated escape sequence", PaktErrorCode.UnexpectedEof);
@@ -384,32 +384,41 @@ public ref partial struct PaktReader
         byte b = _buffer[_consumed++];
         _bytePositionInLine++;
 
-        return b switch
+        switch (b)
         {
-            (byte)'\\' => '\\',
-            (byte)'\'' => '\'',
-            (byte)'"' => '"',
-            (byte)'n' => '\n',
-            (byte)'r' => '\r',
-            (byte)'t' => '\t',
-            (byte)'u' => ReadUnicodeEscapeInline(4),
-            (byte)'U' => ReadUnicodeEscapeInline(8),
-            _ => throw new PaktException($"Invalid escape sequence: \\{(char)b}", Position, PaktErrorCode.Syntax),
-        };
+            case (byte)'\\': sb.Append('\\'); break;
+            case (byte)'\'': sb.Append('\''); break;
+            case (byte)'"': sb.Append('"'); break;
+            case (byte)'n': sb.Append('\n'); break;
+            case (byte)'r': sb.Append('\r'); break;
+            case (byte)'t': sb.Append('\t'); break;
+            case (byte)'u':
+            {
+                if (_consumed + 4 > _buffer.Length)
+                    ThrowError("Incomplete \\u escape", PaktErrorCode.UnexpectedEof);
+                var hexSpan = _buffer.Slice(_consumed, 4);
+                AppendUnicodeEscape(sb, hexSpan);
+                _consumed += 4;
+                _bytePositionInLine += 4;
+                break;
+            }
+            case (byte)'U':
+            {
+                if (_consumed + 8 > _buffer.Length)
+                    ThrowError("Incomplete \\U escape", PaktErrorCode.UnexpectedEof);
+                var hexSpan = _buffer.Slice(_consumed, 8);
+                AppendUnicodeEscape(sb, hexSpan);
+                _consumed += 8;
+                _bytePositionInLine += 8;
+                break;
+            }
+            default:
+                ThrowError($"Invalid escape sequence: \\{(char)b}", PaktErrorCode.Syntax);
+                break;
+        }
     }
 
-    private char ReadUnicodeEscapeInline(int digits)
-    {
-        if (_consumed + digits > _buffer.Length)
-            ThrowError($"Incomplete \\{(digits == 4 ? "u" : "U")} escape", PaktErrorCode.UnexpectedEof);
-        var hexSpan = _buffer.Slice(_consumed, digits);
-        var result = ParseUnicodeEscape(hexSpan);
-        _consumed += digits;
-        _bytePositionInLine += digits;
-        return result;
-    }
-
-    private char ParseUnicodeEscape(ReadOnlySpan<byte> hexDigits)
+    private void AppendUnicodeEscape(StringBuilder sb, ReadOnlySpan<byte> hexDigits)
     {
         int val = 0;
         for (int i = 0; i < hexDigits.Length; i++)
@@ -419,11 +428,19 @@ public ref partial struct PaktReader
             val = val * 16 + d;
         }
         if (val == 0) ThrowError("Null byte (U+0000) not permitted in strings", PaktErrorCode.Syntax);
-        if (val <= 0xFFFF && !char.IsSurrogate((char)val))
-            return (char)val;
         if (val > 0x10FFFF) ThrowError($"Invalid unicode code point: U+{val:X8}", PaktErrorCode.Syntax);
-        ThrowError($"Unicode code point U+{val:X} requires surrogate pair support", PaktErrorCode.Syntax);
-        return default;
+
+        if (val <= 0xFFFF)
+        {
+            if (char.IsSurrogate((char)val))
+                ThrowError($"Surrogate code point U+{val:X4} not permitted", PaktErrorCode.Syntax);
+            sb.Append((char)val);
+        }
+        else
+        {
+            // Supplementary plane — encode as surrogate pair
+            sb.Append(char.ConvertFromUtf32(val));
+        }
     }
 
     private void AppendUtf8Char(StringBuilder sb)

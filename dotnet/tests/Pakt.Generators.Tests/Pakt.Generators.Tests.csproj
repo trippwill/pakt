@@ -10,10 +10,12 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/Pakt.Generators/Pakt.Generators.csproj" />
+    <ProjectReference Include="../../src/Pakt/Pakt.csproj" />
   </ItemGroup>
 
   <ItemGroup>

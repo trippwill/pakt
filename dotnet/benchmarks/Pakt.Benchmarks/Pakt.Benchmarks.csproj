@@ -10,12 +10,5 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="../../../testdata/valid/warehouse.pakt"
-          Link="testdata/warehouse.pakt"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../../testdata/valid/scalars.pakt"
-          Link="testdata/scalars.pakt"
-          CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
+
 </Project>

@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  go:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -33,6 +33,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: coverage.out
+          flags: go
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -46,6 +47,71 @@ jobs:
             const match = output.match(/([\d.]+)%/);
             const pct = match ? match[1] : 'unknown';
             await core.summary
-              .addHeading('Coverage')
+              .addHeading('Go Coverage')
               .addRaw(`Total: **${pct}%**`)
+              .write();
+
+  dotnet:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        working-directory: dotnet
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build
+
+      - name: Test
+        run: dotnet test --collect:"XPlat Code Coverage" --results-directory ./TestResults
+
+      - name: Verify benchmarks compile
+        run: dotnet build benchmarks/Pakt.Benchmarks -c Release
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v5
+        with:
+          directory: dotnet/TestResults
+          flags: dotnet
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Coverage summary
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const resultsDir = 'dotnet/TestResults';
+            let summary = 'Coverage report generated';
+            try {
+              const dirs = fs.readdirSync(resultsDir, { withFileTypes: true })
+                .filter(d => d.isDirectory());
+              if (dirs.length > 0) {
+                const covFile = path.join(resultsDir, dirs[0].name, 'coverage.cobertura.xml');
+                if (fs.existsSync(covFile)) {
+                  const content = fs.readFileSync(covFile, 'utf8');
+                  const match = content.match(/line-rate="([\d.]+)"/);
+                  if (match) {
+                    const pct = (parseFloat(match[1]) * 100).toFixed(1);
+                    summary = `Line coverage: **${pct}%**`;
+                  }
+                }
+              }
+            } catch (e) { /* fallback */ }
+            await core.summary
+              .addHeading('.NET Coverage')
+              .addRaw(summary)
               .write();

@@ -18,7 +18,7 @@ PAKT uses single-integer versioning. Each version is a complete specification. P
 
 1. **Performance is a feature.** The format, grammar, and type system are designed so that a conforming parser can operate in a single streaming pass with minimal allocation. Spec rules must not require unbounded buffering or retroactive reinterpretation.
 
-2. **Type context flows with the data.** Every value carries or inherits its type. The parser never guesses. This enables type-directed scanning and projection without schema negotiation.
+2. **Type context flows with the data.** Every value carries or inherits its type. The parser never guesses. This enables type-directed parsing without schema negotiation.
 
 3. **The decoder is lossless; interpretation is layered.** A conforming decoder preserves all information present in the source — including duplicate statement names, duplicate map keys, and encounter order. Policy decisions such as rejecting duplicates, applying last-wins, or accumulating values belong to higher-level consumers, not the core decoder.
 
@@ -372,13 +372,13 @@ For list collects, each value conforms to the list's element type. For map colle
 ### 5.4 Type Annotation
 
 ```
-type_annot = COLON type '?'?
+type_annot = COLON type
 ```
 
 ### 5.5 Type
 
 ```
-type = scalar_type | atom_set | struct_type | tuple_type | list_type | map_type
+type = (scalar_type | atom_set | struct_type | tuple_type | list_type | map_type) '?'?
 
 scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool' | 'uuid' | 'date' | 'ts' | 'bin'
 
@@ -386,11 +386,11 @@ atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
 
 struct_type = LBRACE struct_field_decl (COMMA struct_field_decl)* RBRACE
 
-struct_field_decl = IDENT COLON type '?'?
+struct_field_decl = IDENT COLON type
 
 tuple_type  = LPAREN type (COMMA type)* RPAREN
 
-list_type   = LBRACK type '?'? RBRACK
+list_type   = LBRACK type RBRACK
 
 map_type    = LANGLE type SEMI type RANGLE
 ```
@@ -535,7 +535,7 @@ When transmitting PAKT units over a raw byte stream (e.g., pipes, sockets, seria
 
 Since NUL is already forbidden in all PAKT text (strings, identifiers, comments), it is unambiguous as a boundary marker.
 
-A parser encountering a NUL byte at the top level SHOULD treat it as end-of-unit. Behavior on encountering NUL inside a syntactic construct (e.g., mid-string) is already defined as a parse error.
+A parser encountering a NUL byte at the top level MUST treat it as end-of-unit. Behavior on encountering NUL inside a syntactic construct (e.g., mid-string) is already defined as a parse error.
 
 When reading from a file, end-of-file serves as end-of-unit. NUL framing is optional for file-based usage.
 
@@ -680,14 +680,14 @@ map_collect_body  = (map_entry (SEP map_entry)* SEP?)?
 
 ; --- Type annotations ---
 
-type_annot  = COLON type '?'?
+type_annot  = COLON type
 
-type        = scalar_type
+type        = (scalar_type
             | atom_set
             | struct_type
             | tuple_type
             | list_type
-            | map_type
+            | map_type) '?'?
 
 scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool'
             | 'uuid' | 'date' | 'ts' | 'bin'
@@ -695,10 +695,10 @@ scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool'
 atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
 
 struct_type = LBRACE field_decl (COMMA field_decl)* RBRACE
-field_decl  = IDENT COLON type '?'?
+field_decl  = IDENT COLON type
 
 tuple_type  = LPAREN type (COMMA type)* RPAREN
-list_type   = LBRACK type '?'? RBRACK
+list_type   = LBRACK type RBRACK
 map_type    = LANGLE type SEMI type RANGLE
 
 ; --- Values ---

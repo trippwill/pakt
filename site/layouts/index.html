@@ -4,7 +4,7 @@
 <section class="hero">
   <div class="hero-inner">
     <span class="hero-label">Typed Data Format</span>
-    <h1 class="hero-title">Data that knows <em>its own type</em></h1>
+    <h1 class="hero-title"><span class="pakt-word"><span class="pakt-copper">PA</span><span class="pakt-teal">KT</span></span> — data that knows <em>its own type</em></h1>
     <p class="hero-tagline">Human-authorable. Streaming. Self-describing. Every value carries its type — no inference, no ambiguity, no surprises.</p>
     <div class="hero-code">
       <pre><code id="hero-code-target"><span class="pk-name">app-name</span><span class="pk-delim">:</span><span class="pk-type">str</span>     <span class="pk-op">=</span> <span class="pk-str">'midwatch'</span>
@@ -109,7 +109,7 @@
 <section class="steps-section">
   <div class="steps-inner">
     <h2>How it works</h2>
-    <p class="steps-desc">Two concepts, one pipeline.</p>
+    <p class="steps-desc">Three steps, one pipeline.</p>
     <div class="steps-grid">
       <div class="step">
         <div class="step-number">1</div>
@@ -119,7 +119,12 @@
       <div class="step">
         <div class="step-number">2</div>
         <h3>Parse</h3>
-        <p>The LL(0) streaming parser emits events as it reads — no full-unit buffering. Integer-typed events, zero string dispatch.</p>
+        <p>The streaming parser emits events as it reads — no full-unit buffering. One event per call, constant memory per nesting level.</p>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <h3>Consume</h3>
+        <p>Unmarshal into typed structs, process events one by one, or pack values into streaming output. Your data, your way.</p>
       </div>
     </div>
   </div>

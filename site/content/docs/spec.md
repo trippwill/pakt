@@ -8,7 +8,7 @@ weight: 2
 
 This site page is a synchronized overview of the current **PAKT v0** surface. The normative source remains [`spec/pakt-v0.md`](https://github.com/trippwill/pakt/blob/main/spec/pakt-v0.md).
 
-> **Implementation note:** The current Go library and CLI implement top-level `<<` collect statements as first-class root events (`FeedStart` / `FeedEnd`). Event names in the Go code currently use `ListStreamStart/End` and `MapStreamStart/End` — a renaming alignment is planned.
+> **Implementation note:** The current Go library and CLI implement top-level `<<` pack statements as first-class root events (`PackStart` / `PackEnd`). Event names in the Go code currently use `ListStreamStart/End` and `MapStreamStart/End` — a renaming alignment is planned.
 
 ## Version
 
@@ -26,15 +26,15 @@ The canonical unit grammar is:
 
 ```text
 unit      = statement*
-statement = assignment | collect
+statement = assign | pack
 ```
 
 Current Go implementation support:
 
-- `assignment = IDENT type_annot ASSIGN value`
-- `collect = IDENT type_annot COLLECT collect_body`
+- `assign = IDENT type_annot ASSIGN value`
+- `pack = IDENT type_annot PACK pack_body`
 
-Assignments look like:
+Assigns look like:
 
 ```pakt
 name:str = 'midwatch'
@@ -120,12 +120,12 @@ map_type    = LANGLE type SEMI type RANGLE
 value       = scalar | NIL | atom_val | struct_val | tuple_val | list_val | map_val
 scalar      = STRING | RAW_STR | ML_STR | ML_RAW | INT | DEC | FLOAT | BOOL | UUID | DATE | TS | BIN
 map_entry   = value SEMI value
-collect        = IDENT type_annot COLLECT collect_body
+pack        = IDENT type_annot PACK pack_body
 ```
 
 ## Canonical Specification
 
-For the full normative grammar and semantics, including collect statements and duplicate-key handling, read the canonical spec:
+For the full normative grammar and semantics, including pack statements and duplicate-key handling, read the canonical spec:
 
 - [`spec/pakt-v0.md`](https://github.com/trippwill/pakt/blob/main/spec/pakt-v0.md)
 

@@ -44,7 +44,7 @@ Nullable: any type with `?` suffix (e.g., `str?`)
 
 Atom sets: `|a, b, c|` — enumerated string constants
 
-Collects: `name:type << value, value, ...` — open-ended top-level sequences
+Packs: `name:type << value, value, ...` — open-ended top-level sequences
 
 ## Build, Test, Lint
 
@@ -82,7 +82,7 @@ go run . validate testdata/valid/full.pakt
 
 ## Event Stream Contract
 
-For any assignment `name:type = value`:
+For any assign `name:type = value`:
 - `AssignStart{Name, Type}` → value events → `AssignEnd{Name, Type}`
 
 For composites:
@@ -90,9 +90,9 @@ For composites:
 
 For maps, children alternate: key (`ScalarValue`) → value → key → value → ...
 
-For collects: `ListFeedStart/MapFeedStart` → items → `ListFeedEnd/MapFeedEnd`
+For packs: `ListPackStart/MapPackStart` → items → `ListPackEnd/MapPackEnd`
 
-> **Note**: The Go implementation currently uses `ListStreamStart/End` and `MapStreamStart/End` event names. These will be renamed to `ListFeedStart/End` and `MapFeedStart/End` in a future alignment pass.
+> **Note**: The Go implementation currently uses `ListStreamStart/End` and `MapStreamStart/End` event names. These will be renamed to `ListPackStart/End` and `MapPackStart/End` in a future alignment pass.
 
 ## PR Expectations
 

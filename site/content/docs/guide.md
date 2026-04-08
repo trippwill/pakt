@@ -13,7 +13,7 @@ weight: 1
 
 PAKT units are UTF-8. A BOM at the start is accepted but ignored.
 
-At the top level, a PAKT unit is a sequence of statements. A statement is either an assignment or a collect.
+At the top level, a PAKT unit is a sequence of statements. A statement is either an assign or a pack.
 
 ```
 greeting:str     = 'hello world'
@@ -44,7 +44,7 @@ Every value must have a type. No exceptions.
 - `dec` is arbitrary-precision in the text. Implementations must support at least 28 significant digits.
 - `bin` is raw byte data. The decoder accepts both hex (`x'...'`) and base64 (`b'...'`) literals.
 
-`<<` collects are parsed by the current Go library and CLI. In the event model they surface as explicit `FeedStart` / `FeedEnd` root events rather than pretending to be delimited collections.
+`<<` packs are parsed by the current Go library and CLI. In the event model they surface as explicit `PackStart` / `PackEnd` root events rather than pretending to be delimited collections.
 
 ---
 
@@ -258,7 +258,7 @@ deploy:{level:str, release:int} = {
 deploy:{level:str, release:int} = { 'platform', 26 }
 ```
 
-Whitespace around `=` in assignments and `;` in maps is optional. Indentation is cosmetic.
+Whitespace around `=` in assigns and `;` in maps is optional. Indentation is cosmetic.
 
 ---
 
@@ -311,7 +311,7 @@ A value that doesn't conform to its declared type is an immediate parse error.
 
 **Five rules:**
 
-1. `=` is only the assignment operator — maps use `;` between key and value
+1. `=` is only the assign operator — maps use `;` between key and value
 2. Every value must have a type — no defaults, no inference
 3. Append `?` for nullable — only nullable types accept `nil`
 4. Block and inline are the same semantics, different whitespace

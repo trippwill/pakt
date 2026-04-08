@@ -77,12 +77,11 @@ Line comments begin with `#` and extend to end of line. May appear on their own 
 ```
 DIGIT_SEP = DIGIT (DIGIT | '_')*
 HEX_DIGIT = DIGIT | 'a'-'f' | 'A'-'F'
-HEX_SEP   = HEX_DIGIT (HEX_DIGIT | '_')*
 BIN_DIGIT = '0' | '1'
 OCT_DIGIT = '0'-'7'
 
 INT      = ['-'] DIGIT_SEP
-         | ['-'] '0x' HEX_SEP
+         | ['-'] '0x' HEX_DIGIT (HEX_DIGIT | '_')*
          | ['-'] '0b' BIN_DIGIT (BIN_DIGIT | '_')*
          | ['-'] '0o' OCT_DIGIT (OCT_DIGIT | '_')*
 DEC      = ['-'] DIGIT_SEP? '.' DIGIT_SEP
@@ -92,7 +91,7 @@ NIL      = 'nil'
 DATE     = DIGIT{4} '-' DIGIT{2} '-' DIGIT{2}
 TZ       = 'Z' | [+-] DIGIT{2} ':' DIGIT{2}
 TS       = DATE 'T' DIGIT{2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)? TZ
-UUID     = HEX{8} '-' HEX{4} '-' HEX{4} '-' HEX{4} '-' HEX{12}
+UUID     = HEX_DIGIT{8} '-' HEX_DIGIT{4} '-' HEX_DIGIT{4} '-' HEX_DIGIT{4} '-' HEX_DIGIT{12}
 BIN      = 'x' "'" HEX_DIGIT* "'"
          | 'b' "'" BASE64_CHAR* "'"
 BASE64_CHAR = ALPHA | DIGIT | '+' | '/' | '='
@@ -294,7 +293,7 @@ Five unique delimiter pairs — no overloads:
 | `<` | Map |
 | anything else | Scalar or atom |
 
-Empty lists (`[]`) and empty maps (`<>`) are valid. Empty structs, tuples, and atom sets are parse errors — these types require at least one member.
+Empty lists (`[]`), empty maps (`<>`), empty structs (`{}`), and empty tuples (`()`) are valid. Empty atom sets are parse errors — an atom set requires at least one member.
 
 ### 4.5 Reserved
 
@@ -312,7 +311,7 @@ The following tokens are reserved for future use. They must not appear in units 
 
 ### 4.6 Future Consideration: Type Aliases
 
-> **Status**: Design sketch only. Not part of PAKT 0. The `&` token is reserved for this purpose.
+> **Status**: Design sketch only. The `&` token is reserved for this purpose.
 
 Type aliases would allow naming a type once and referencing it by name in type positions:
 
@@ -384,11 +383,11 @@ scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool' | 'uuid' | 'date' | 'ts' 
 
 atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
 
-struct_type = LBRACE struct_field_decl (COMMA struct_field_decl)* RBRACE
+struct_type = LBRACE (struct_field_decl (COMMA struct_field_decl)*)? RBRACE
 
 struct_field_decl = IDENT COLON type
 
-tuple_type  = LPAREN type (COMMA type)* RPAREN
+tuple_type  = LPAREN (type (COMMA type)*)? RPAREN
 
 list_type   = LBRACK type RBRACK
 
@@ -519,7 +518,7 @@ The parser checks each value against its declared type at parse time. A type mis
 
 ### 9.1 Future Consideration: Spec Files and Projections
 
-> **Status**: Design sketch only. Not part of PAKT 0.
+> **Status**: Design sketch only.
 
 External spec files (`.spec.pakt`) and consumer projections may be added in a future version. A spec file would use PAKT type syntax without values to define a consumer's requirements. A projection would let a consumer supply a spec at parse time as a filter — parsing only matching fields and skipping the rest without allocation. These features are deferred until real-world usage patterns are better understood.
 
@@ -592,7 +591,6 @@ HEX_DIGIT   = DIGIT | 'a'-'f' | 'A'-'F'
 BIN_DIGIT   = '0' | '1'
 OCT_DIGIT   = '0'-'7'
 DIGIT_SEP   = DIGIT (DIGIT | '_')*
-HEX_SEP     = HEX_DIGIT (HEX_DIGIT | '_')*
 BASE64_CHAR = ALPHA | DIGIT | '+' | '/' | '='
 
 IDENT       = (ALPHA | '_') (ALPHA | DIGIT | '_' | '-')*
@@ -626,7 +624,7 @@ BTICK   = '`'
 ; --- Scalar literals ---
 
 INT         = ['-'] DIGIT_SEP
-            | ['-'] '0x' HEX_SEP
+            | ['-'] '0x' HEX_DIGIT (HEX_DIGIT | '_')*
             | ['-'] '0b' BIN_DIGIT (BIN_DIGIT | '_')*
             | ['-'] '0o' OCT_DIGIT (OCT_DIGIT | '_')*
 DEC         = ['-'] DIGIT_SEP? '.' DIGIT_SEP
@@ -637,7 +635,7 @@ NIL         = 'nil'
 DATE        = DIGIT{4} '-' DIGIT{2} '-' DIGIT{2}
 TZ          = 'Z' | [+-] DIGIT{2} ':' DIGIT{2}
 TS          = DATE 'T' DIGIT{2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)? TZ
-UUID        = HEX{8} '-' HEX{4} '-' HEX{4} '-' HEX{4} '-' HEX{12}
+UUID        = HEX_DIGIT{8} '-' HEX_DIGIT{4} '-' HEX_DIGIT{4} '-' HEX_DIGIT{4} '-' HEX_DIGIT{12}
 
 BIN         = 'x' "'" HEX_DIGIT* "'"
             | 'b' "'" BASE64_CHAR* "'"
@@ -668,7 +666,7 @@ ATOM        = PIPE IDENT
 unit        = statement*
 statement   = assign | pack
 
-assign  = IDENT type_annot ASSIGN value
+assign      = IDENT type_annot ASSIGN value
 pack        = IDENT type_annot PACK pack_body
 
 ; --- Pack body ---
@@ -694,10 +692,10 @@ scalar_type = 'str' | 'int' | 'dec' | 'float' | 'bool'
 
 atom_set    = PIPE IDENT (COMMA IDENT)* PIPE
 
-struct_type = LBRACE field_decl (COMMA field_decl)* RBRACE
+struct_type = LBRACE (field_decl (COMMA field_decl)*)? RBRACE
 field_decl  = IDENT COLON type
 
-tuple_type  = LPAREN type (COMMA type)* RPAREN
+tuple_type  = LPAREN (type (COMMA type)*)? RPAREN
 list_type   = LBRACK type RBRACK
 map_type    = LANGLE type SEMI type RANGLE
 

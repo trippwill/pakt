@@ -175,6 +175,13 @@ ids:[int] = [
 empty-list:[str] = []
 ```
 
+All composite types may be empty except atom sets. Empty structs and tuples are valid:
+
+```
+unit:{} = {}
+empty:() = ()
+```
+
 ---
 
 ## Maps

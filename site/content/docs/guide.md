@@ -201,6 +201,8 @@ ids:[int] = [
 
 Empty lists are valid: `ids:[int] = []`
 
+Empty structs and tuples are also valid: `unit:{} = {}`, `empty:() = ()`
+
 ---
 
 ## Maps
@@ -224,6 +226,8 @@ users:<int ; {gn:str, fn:str, admin:bool, dob:(int, int, int)}> = <
 ```
 
 Empty maps are valid: `cache:<str ; int> = <>`
+
+All composite types may be empty except atom sets, which require at least one member.
 
 Duplicate keys in a map are an error.
 

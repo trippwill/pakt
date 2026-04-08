@@ -129,13 +129,13 @@ For the full normative grammar and semantics, including pack statements and dupl
 
 - [`spec/pakt-v0.md`](https://github.com/trippwill/pakt/blob/main/spec/pakt-v0.md)
 
-## 6. Duplicates
+## Duplicates
 
 Duplicate names at the unit root are preserved in encounter order — this matches the handling of duplicate map keys. Interpreting duplicate statement names is an application/domain concern.
 
 Struct field names are declared in the type, not in the value, so duplicates are caught at the type level.
 
-## 7. Whitespace Rules
+## Whitespace Rules
 
 - Whitespace around `=` is optional: `name:str = 'x'` and `name:str='x'` are equivalent.
 - Whitespace around `:` in type annotations is **not** permitted: `name:int`, not `name : int`.
@@ -143,7 +143,7 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Consecutive newlines (blank lines) are ignored.
 - Indentation is insignificant — cosmetic only.
 
-## 8. Structural Equivalence
+## Structural Equivalence
 
 Block and inline forms are semantically identical. A conforming formatter may freely convert between them:
 
@@ -170,7 +170,7 @@ version:(int, int, int) = (
 version:(int, int, int) = (3, 45, 5678)
 ```
 
-## 9. Type Assertions
+## Type Assertions
 
 Type annotations in a PAKT unit are assertions by the producer. They are validated during parsing — a unit that violates its own assertions is malformed.
 
@@ -181,7 +181,7 @@ status:|active, inactive| = |active
 
 > **Future consideration:** External spec files (`.spec.pakt`) and consumer projections may be added in a future version. These features are deferred until real-world usage patterns are better understood.
 
-## 10. File Conventions
+## File Conventions
 
 | Extension | Purpose | MIME Type |
 |-----------|---------|----------|

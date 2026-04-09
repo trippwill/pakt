@@ -44,7 +44,7 @@ Every value must have a type. No exceptions.
 - `dec` is arbitrary-precision in the text. Implementations must support at least 28 significant digits.
 - `bin` is raw byte data. The decoder accepts both hex (`x'...'`) and base64 (`b'...'`) literals.
 
-`<<` packs are parsed by the current Go library and CLI. In the event model they surface as explicit `PackStart` / `PackEnd` root events rather than pretending to be delimited collections.
+`<<` packs are parsed by the Go library and CLI. In the event model they surface as explicit `ListPackStart` / `ListPackEnd` and `MapPackStart` / `MapPackEnd` root events rather than pretending to be delimited collections.
 
 ---
 

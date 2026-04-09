@@ -32,7 +32,7 @@ func ParseSpec(r io.Reader) (*Spec, error) {
 		}
 
 		if _, dup := fields[name]; dup {
-			return nil, Wrapf(identPos, ErrDuplicateName, "duplicate field %q in spec", name)
+			return nil, Wrapf(identPos, ErrSyntax, "duplicate field %q in spec", name)
 		}
 
 		typ, err := rd.readTypeAnnot()
@@ -329,7 +329,7 @@ func (r *reader) skipAtom() error {
 	return r.skipKeywordOrAtom()
 }
 
-// skipNumberLike skips a number, date, time, datetime, or UUID literal.
+// skipNumberLike skips a number, date, ts, or UUID literal.
 // Reads until whitespace, newline, comma, closing delimiter, comment, or EOF.
 func (r *reader) skipNumberLike() error {
 	count := 0
@@ -351,31 +351,31 @@ func (r *reader) skipNumberLike() error {
 }
 
 func (r *reader) skipStatementBody(h statementHeader) error {
-	if h.stream {
-		return r.skipStreamBody(h.typ)
+	if h.pack {
+		return r.skipPackBody(h.typ)
 	}
 	return r.skipValue()
 }
 
-func (r *reader) skipStreamBody(typ Type) error {
+func (r *reader) skipPackBody(typ Type) error {
 	switch {
 	case typ.List != nil:
-		return r.skipListStreamBody()
+		return r.skipListPackBody()
 	case typ.Map != nil:
-		return r.skipMapStreamBody()
+		return r.skipMapPackBody()
 	default:
-		return r.errorf("stream type must be list or map, got %s", typ.String())
+		return r.errorf("pack type must be list or map, got %s", typ.String())
 	}
 }
 
-func (r *reader) skipListStreamBody() error {
+func (r *reader) skipListPackBody() error {
 	for {
 		r.skipInsignificant(true)
 		b, err := r.peekByte()
 		if err != nil {
 			return nil
 		}
-		if !r.canStartValueInStream(b) {
+		if !r.canStartValueInPack(b) {
 			return nil
 		}
 
@@ -396,21 +396,21 @@ func (r *reader) skipListStreamBody() error {
 		if err != nil {
 			return nil
 		}
-		if !r.canStartValueInStream(b) {
+		if !r.canStartValueInPack(b) {
 			return nil
 		}
-		return r.errorf("expected separator between stream items")
+		return r.errorf("expected separator between pack items")
 	}
 }
 
-func (r *reader) skipMapStreamBody() error {
+func (r *reader) skipMapPackBody() error {
 	for {
 		r.skipInsignificant(true)
 		b, err := r.peekByte()
 		if err != nil {
 			return nil
 		}
-		if !r.canStartValueInStream(b) {
+		if !r.canStartValueInPack(b) {
 			return nil
 		}
 
@@ -441,10 +441,10 @@ func (r *reader) skipMapStreamBody() error {
 		if err != nil {
 			return nil
 		}
-		if !r.canStartValueInStream(b) {
+		if !r.canStartValueInPack(b) {
 			return nil
 		}
-		return r.errorf("expected separator between stream map entries")
+		return r.errorf("expected separator between pack map entries")
 	}
 }
 

@@ -26,7 +26,7 @@ type reader struct {
 	bufSrc  *bufioSource // non-nil when src is a bufioSource (for pool return)
 	pos     Pos
 	lastPos Pos
-	seen    map[string]struct{}
+	hitNUL  bool            // true after consuming a NUL byte (end-of-unit per spec §10.1)
 	sb      strings.Builder // reusable builder to avoid per-read allocations
 }
 
@@ -38,7 +38,6 @@ func newReader(r io.Reader) *reader {
 		src:    bs,
 		bufSrc: bs,
 		pos:    Pos{Line: 1, Col: 1},
-		seen:   make(map[string]struct{}, 16),
 	}
 	rd.skipBOM()
 	return rd
@@ -46,9 +45,8 @@ func newReader(r io.Reader) *reader {
 
 func newReaderFromBytes(data []byte) *reader {
 	rd := &reader{
-		src:  newBytesSource(data),
-		pos:  Pos{Line: 1, Col: 1},
-		seen: make(map[string]struct{}, 16),
+		src: newBytesSource(data),
+		pos: Pos{Line: 1, Col: 1},
 	}
 	rd.skipBOM()
 	return rd
@@ -77,6 +75,9 @@ func (r *reader) skipBOM() {
 
 // peekByte returns the next byte without consuming it.
 func (r *reader) peekByte() (byte, error) {
+	if r.hitNUL {
+		return 0, io.EOF
+	}
 	return r.src.PeekByte()
 }
 
@@ -948,8 +949,8 @@ func (r *reader) readDate() (string, error) {
 	return r.sb.String(), nil
 }
 
-// readTime reads TIME = DIGIT{2}:DIGIT{2}:DIGIT{2}(.DIGIT+)? TZ.
-func (r *reader) readTime() (string, error) {
+// readTimePart reads the time portion: DIGIT{2}:DIGIT{2}:DIGIT{2}(.DIGIT+)? TZ.
+func (r *reader) readTimePart() (string, error) {
 	r.sb.Reset()
 	if err := r.readExactDigits(&r.sb, 2); err != nil {
 		return "", err
@@ -1020,8 +1021,8 @@ func (r *reader) readTime() (string, error) {
 	return r.sb.String(), nil
 }
 
-// readDateTime reads DATETIME = DATE 'T' TIME.
-func (r *reader) readDateTime() (string, error) {
+// readTs reads TS = DATE 'T' TIME.
+func (r *reader) readTs() (string, error) {
 	date, err := r.readDate()
 	if err != nil {
 		return "", err
@@ -1029,7 +1030,7 @@ func (r *reader) readDateTime() (string, error) {
 	if err := r.expectByte('T'); err != nil {
 		return "", err
 	}
-	t, err := r.readTime()
+	t, err := r.readTimePart()
 	if err != nil {
 		return "", err
 	}

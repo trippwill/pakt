@@ -14,10 +14,10 @@ func TestEventKindMarshalRoundTrip(t *testing.T) {
 	}{
 		{EventAssignStart, `"AssignStart"`},
 		{EventAssignEnd, `"AssignEnd"`},
-		{EventListStreamStart, `"ListStreamStart"`},
-		{EventListStreamEnd, `"ListStreamEnd"`},
-		{EventMapStreamStart, `"MapStreamStart"`},
-		{EventMapStreamEnd, `"MapStreamEnd"`},
+		{EventListPackStart, `"ListPackStart"`},
+		{EventListPackEnd, `"ListPackEnd"`},
+		{EventMapPackStart, `"MapPackStart"`},
+		{EventMapPackEnd, `"MapPackEnd"`},
 		{EventScalarValue, `"ScalarValue"`},
 		{EventStructStart, `"StructStart"`},
 		{EventStructEnd, `"StructEnd"`},
@@ -129,6 +129,37 @@ func TestEventMarshalOmitsEmptyFields(t *testing.T) {
 	for _, field := range []string{`"name"`, `"scalarType"`, `"value"`} {
 		if strings.Contains(s, field) {
 			t.Fatalf("expected %s to be omitted, got: %s", field, s)
+		}
+	}
+}
+
+func TestIsPackStartEnd(t *testing.T) {
+	packStarts := []EventKind{EventListPackStart, EventMapPackStart}
+	packEnds := []EventKind{EventListPackEnd, EventMapPackEnd}
+	nonPack := []EventKind{EventAssignStart, EventAssignEnd, EventScalarValue, EventStructStart, EventListStart, EventMapStart}
+
+	for _, k := range packStarts {
+		if !k.IsPackStart() {
+			t.Errorf("%s.IsPackStart() = false, want true", k)
+		}
+		if k.IsPackEnd() {
+			t.Errorf("%s.IsPackEnd() = true, want false", k)
+		}
+	}
+	for _, k := range packEnds {
+		if !k.IsPackEnd() {
+			t.Errorf("%s.IsPackEnd() = false, want true", k)
+		}
+		if k.IsPackStart() {
+			t.Errorf("%s.IsPackStart() = true, want false", k)
+		}
+	}
+	for _, k := range nonPack {
+		if k.IsPackStart() {
+			t.Errorf("%s.IsPackStart() = true, want false", k)
+		}
+		if k.IsPackEnd() {
+			t.Errorf("%s.IsPackEnd() = true, want false", k)
 		}
 	}
 }

@@ -59,8 +59,8 @@ rate:float
 active:bool
 id:uuid
 created:date
-started:time
-updated:datetime
+started:ts
+updated:ts
 level:|dev, staging, prod|
 config:{host:str, port:int}
 version:(int, int, int)
@@ -328,8 +328,8 @@ func TestProjectionSkipUUID(t *testing.T) {
 	}
 }
 
-func TestProjectionSkipDateTimeValues(t *testing.T) {
-	doc := "started:datetime = 2026-06-01T14:30:00Z\ncount:int = 1"
+func TestProjectionSkipTsValues(t *testing.T) {
+	doc := "started:ts = 2026-06-01T14:30:00Z\ncount:int = 1"
 	spec := "count:int"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -558,8 +558,8 @@ func TestSkipValueDate(t *testing.T) {
 	}
 }
 
-func TestSkipValueTime(t *testing.T) {
-	doc := "t:time = 14:30:00Z\nname:str = 'ok'"
+func TestSkipValueTs(t *testing.T) {
+	doc := "t:ts = 2026-01-15T14:30:00Z\nname:str = 'ok'"
 	spec := "name:str"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 3 {
@@ -938,8 +938,8 @@ nothing:str? = nil
 neg:int = -42
 id:uuid = 550e8400-e29b-41d4-a716-446655440000
 d:date = 2026-01-15
-t:time = 14:30:00Z
-dt:datetime = 2026-06-01T14:30:00Z
+t:ts = 2026-01-15T14:30:00Z
+dt:ts = 2026-06-01T14:30:00Z
 level:|dev, staging, prod| = |staging
 wanted:int = 100`
 	spec := "wanted:int"

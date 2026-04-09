@@ -182,17 +182,10 @@ func (e *Encoder) writeScalar(kind TypeKind, v any) {
 			return
 		}
 		e.write(s)
-	case TypeTime:
+	case TypeTs:
 		s, ok := v.(string)
 		if !ok {
-			e.err = fmt.Errorf("time value must be string, got %T", v)
-			return
-		}
-		e.write(s)
-	case TypeDateTime:
-		s, ok := v.(string)
-		if !ok {
-			e.err = fmt.Errorf("datetime value must be string, got %T", v)
+			e.err = fmt.Errorf("ts value must be string, got %T", v)
 			return
 		}
 		e.write(s)

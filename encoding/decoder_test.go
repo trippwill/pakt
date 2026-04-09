@@ -155,23 +155,18 @@ func TestDecodeMapAssignment(t *testing.T) {
 // Duplicate root name → error
 // ---------------------------------------------------------------------------
 
-func TestDecodeDuplicateRootName(t *testing.T) {
+func TestDecodeDuplicateRootNamePreserved(t *testing.T) {
 	input := "name:str = 'a'\nname:str = 'b'"
-	d := NewDecoder(strings.NewReader(input))
-	// Read first assignment (3 events).
-	for i := 0; i < 3; i++ {
-		_, err := d.Decode()
-		if err != nil {
-			t.Fatalf("unexpected error reading first assignment: %v", err)
-		}
+	events := decodeAll(t, input)
+	// Both statements preserved: AssignStart, ScalarValue, AssignEnd × 2
+	if len(events) != 6 {
+		t.Fatalf("expected 6 events for two duplicate statements, got %d: %v", len(events), events)
 	}
-	// Next decode should fail.
-	_, err := d.Decode()
-	if err == nil {
-		t.Fatal("expected error for duplicate root name")
+	if events[0].Name != "name" || events[1].Value != "a" {
+		t.Fatalf("first statement not preserved: %v", events[:3])
 	}
-	if !strings.Contains(err.Error(), "duplicate") {
-		t.Fatalf("error should mention 'duplicate': %v", err)
+	if events[3].Name != "name" || events[4].Value != "b" {
+		t.Fatalf("second statement not preserved: %v", events[3:])
 	}
 }
 

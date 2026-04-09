@@ -237,7 +237,7 @@ func TestMarshalOmitemptyRetained(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 8. time.Time → datetime
+// 8. time.Time → ts
 // ---------------------------------------------------------------------------
 
 func TestMarshalTime(t *testing.T) {
@@ -247,8 +247,8 @@ func TestMarshalTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := string(b)
-	if !strings.Contains(got, "created:datetime") {
-		t.Errorf("expected datetime type: %q", got)
+	if !strings.Contains(got, "created:ts") {
+		t.Errorf("expected ts type: %q", got)
 	}
 	if !strings.Contains(got, "2024-06-15T10:30:00Z") {
 		t.Errorf("expected RFC3339 value: %q", got)

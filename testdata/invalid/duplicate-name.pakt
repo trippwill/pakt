@@ -1,3 +1,0 @@
-# ERROR: duplicate name 'name' at root level
-name:str = 'Alice'
-name:str = 'Bob'

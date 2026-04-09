@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -128,6 +129,9 @@ var (
 	benchFS10KJSON  []byte
 	benchFS10KVal   benchFSDataset
 	benchFS10KEncFs []benchEncField
+
+	benchFS1KNDJSON  []byte
+	benchFS10KNDJSON []byte
 
 	benchFSEntriesType Type
 )
@@ -300,9 +304,21 @@ func benchInitFS() {
 	benchFS1KVal, benchFS1KPAKT, benchFS1KJSON = benchGenerateFS(1000)
 	benchFS10KVal, benchFS10KPAKT, benchFS10KJSON = benchGenerateFS(10000)
 
+	benchFS1KNDJSON = benchGenerateNDJSON(benchFS1KVal.Entries)
+	benchFS10KNDJSON = benchGenerateNDJSON(benchFS10KVal.Entries)
+
 	benchFSEntriesType = benchFSBuildEntriesType()
 	benchFS1KEncFs = benchFSBuildEncFields(benchFS1KVal)
 	benchFS10KEncFs = benchFSBuildEncFields(benchFS10KVal)
+}
+
+func benchGenerateNDJSON(entries []benchFSEntry) []byte {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	for i := range entries {
+		enc.Encode(entries[i]) //nolint:errcheck
+	}
+	return buf.Bytes()
 }
 
 func benchFSBuildEntriesType() Type {
@@ -311,7 +327,7 @@ func benchFSBuildEntriesType() Type {
 		{Name: "path", Type: scalar(TypeStr)},
 		{Name: "size", Type: scalar(TypeInt)},
 		{Name: "mode", Type: scalar(TypeInt)},
-		{Name: "mod_time", Type: scalar(TypeDateTime)},
+		{Name: "mod_time", Type: scalar(TypeTs)},
 		{Name: "is_dir", Type: scalar(TypeBool)},
 		{Name: "owner", Type: scalar(TypeStr)},
 		{Name: "group", Type: scalar(TypeStr)},
@@ -321,7 +337,7 @@ func benchFSBuildEntriesType() Type {
 
 func benchFSBuildEncFields(ds benchFSDataset) []benchEncField {
 	sk := TypeStr
-	dk := TypeDateTime
+	dk := TypeTs
 
 	encEntries := make([]any, len(ds.Entries))
 	for i, e := range ds.Entries {
@@ -406,11 +422,11 @@ func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
 		Entries: entries,
 	}
 
-	// Build PAKT bytes using stream syntax (<<).
+	// Build PAKT bytes using pack syntax (<<).
 	var pb strings.Builder
 	pb.WriteString("root:str = '/data/warehouse'\n")
-	pb.WriteString("scanned:datetime = 2026-06-01T14:30:00Z\n")
-	pb.WriteString("entries:[{path:str, size:int, mode:int, mod_time:datetime, is_dir:bool, owner:str, group:str, hash:str}] <<\n")
+	pb.WriteString("scanned:ts = 2026-06-01T14:30:00Z\n")
+	pb.WriteString("entries:[{path:str, size:int, mode:int, mod_time:ts, is_dir:bool, owner:str, group:str, hash:str}] <<\n")
 	for i, e := range entries {
 		if i > 0 {
 			pb.WriteByte('\n')
@@ -837,5 +853,70 @@ func BenchmarkJSONEncodeFS10K(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
 		json.NewEncoder(&buf).Encode(val) //nolint:errcheck
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Streaming Benchmarks — element-by-element pack via More()+UnmarshalNext
+// vs NDJSON streaming via json.Decoder
+//
+// Uses the FS dataset entries as the pack elements. PAKT reads from a pack
+// statement (<<); JSON reads from newline-delimited JSON (one object per line).
+// Both decode one element per iteration, measuring the true streaming path.
+// ---------------------------------------------------------------------------
+
+func BenchmarkPAKTStreamFS1K(b *testing.B) {
+	benchStreamPAKT(b, benchFS1KPAKT)
+}
+
+func BenchmarkJSONStreamFS1K(b *testing.B) {
+	benchStreamJSON(b, benchFS1KNDJSON)
+}
+
+func BenchmarkPAKTStreamFS10K(b *testing.B) {
+	benchStreamPAKT(b, benchFS10KPAKT)
+}
+
+func BenchmarkJSONStreamFS10K(b *testing.B) {
+	benchStreamJSON(b, benchFS10KNDJSON)
+}
+
+func benchStreamPAKT(b *testing.B, data []byte) {
+	b.Helper()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dec := NewDecoder(bytes.NewReader(data))
+		// Read header assigns into a struct, then stream pack elements.
+		type header struct {
+			Root    string         `pakt:"root"`
+			Scanned string         `pakt:"scanned"`
+			Entries []benchFSEntry `pakt:"entries"`
+		}
+		var h header
+		for dec.More() {
+			if err := dec.UnmarshalNext(&h); err != nil {
+				if err == io.EOF {
+					break
+				}
+				b.Fatal(err)
+			}
+		}
+		dec.Close()
+	}
+}
+
+func benchStreamJSON(b *testing.B, data []byte) {
+	b.Helper()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		for dec.More() {
+			var entry benchFSEntry
+			if err := dec.Decode(&entry); err != nil {
+				b.Fatal(err)
+			}
+		}
 	}
 }

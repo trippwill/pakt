@@ -165,13 +165,13 @@ func (r *reader) readStringInto(target reflect.Value) error {
 	return setString(allocPtr(target), val)
 }
 
-// readDateTimeInto reads a PAKT datetime directly into target.
-func (r *reader) readDateTimeInto(target reflect.Value) error {
-	val, err := r.readDateTime()
+// readTsInto reads a PAKT timestamp directly into target.
+func (r *reader) readTsInto(target reflect.Value) error {
+	val, err := r.readTs()
 	if err != nil {
 		return err
 	}
-	return setDateTimeString(allocPtr(target), val, allocPtr(target).Kind())
+	return setTemporalString(allocPtr(target), val, allocPtr(target).Kind())
 }
 
 // readDateInto reads a PAKT date directly into target.
@@ -180,16 +180,7 @@ func (r *reader) readDateInto(target reflect.Value) error {
 	if err != nil {
 		return err
 	}
-	return setDateTimeString(allocPtr(target), val, allocPtr(target).Kind())
-}
-
-// readTimeInto reads a PAKT time directly into target.
-func (r *reader) readTimeInto(target reflect.Value) error {
-	val, err := r.readTime()
-	if err != nil {
-		return err
-	}
-	return setDateTimeString(allocPtr(target), val, allocPtr(target).Kind())
+	return setTemporalString(allocPtr(target), val, allocPtr(target).Kind())
 }
 
 // readUUIDInto reads a PAKT UUID directly into target.
@@ -227,10 +218,8 @@ func (r *reader) readScalarInto(kind TypeKind, target reflect.Value) error {
 		return r.readUUIDInto(target)
 	case TypeDate:
 		return r.readDateInto(target)
-	case TypeTime:
-		return r.readTimeInto(target)
-	case TypeDateTime:
-		return r.readDateTimeInto(target)
+	case TypeTs:
+		return r.readTsInto(target)
 	case TypeBin:
 		return r.readBinInto(target)
 	default:

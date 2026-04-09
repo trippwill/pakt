@@ -70,8 +70,8 @@ func TestTypeOf_TimeTime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TypeOf(time.Time): %v", err)
 	}
-	if got := typ.String(); got != "datetime" {
-		t.Errorf("TypeOf(time.Time) = %s, want datetime", got)
+	if got := typ.String(); got != "ts" {
+		t.Errorf("TypeOf(time.Time) = %s, want ts", got)
 	}
 }
 
@@ -167,7 +167,7 @@ func TestTypeOf_AllScalarFieldStruct(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TypeOf(AllScalars): %v", err)
 	}
-	want := "{s:str, i:int, i8:int, u:int, f:float, b:bool, t:datetime}"
+	want := "{s:str, i:int, i8:int, u:int, f:float, b:bool, t:ts}"
 	if got := typ.String(); got != want {
 		t.Errorf("TypeOf(AllScalars) = %s, want %s", got, want)
 	}

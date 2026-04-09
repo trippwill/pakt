@@ -117,9 +117,7 @@ func TestReadScalarValues(t *testing.T) {
 		{"bool_false", "false", TypeBool, "false"},
 		{"uuid", "550e8400-e29b-41d4-a716-446655440000", TypeUUID, "550e8400-e29b-41d4-a716-446655440000"},
 		{"date", "2026-06-01", TypeDate, "2026-06-01"},
-		{"time", "14:30:00Z", TypeTime, "14:30:00Z"},
-		{"time_offset", "14:30:00-04:00", TypeTime, "14:30:00-04:00"},
-		{"datetime", "2026-06-01T14:30:00Z", TypeDateTime, "2026-06-01T14:30:00Z"},
+		{"ts", "2026-06-01T14:30:00Z", TypeTs, "2026-06-01T14:30:00Z"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

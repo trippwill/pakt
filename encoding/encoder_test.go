@@ -143,17 +143,9 @@ func TestEncodeDate(t *testing.T) {
 	}
 }
 
-func TestEncodeTime(t *testing.T) {
-	got := encodeCompact(t, "t", scalarType(TypeTime), "14:30:00Z")
-	want := "t:time = 14:30:00Z\n"
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func TestEncodeDateTime(t *testing.T) {
-	got := encodeCompact(t, "dt", scalarType(TypeDateTime), "2026-06-01T14:30:00Z")
-	want := "dt:datetime = 2026-06-01T14:30:00Z\n"
+func TestEncodeTs(t *testing.T) {
+	got := encodeCompact(t, "dt", scalarType(TypeTs), "2026-06-01T14:30:00Z")
+	want := "dt:ts = 2026-06-01T14:30:00Z\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -517,15 +509,8 @@ func TestRoundTripDate(t *testing.T) {
 	}
 }
 
-func TestRoundTripTime(t *testing.T) {
-	events := roundTrip(t, "t", scalarType(TypeTime), "14:30:00Z")
-	if events[1].Value != "14:30:00Z" {
-		t.Errorf("got value %q, want %q", events[1].Value, "14:30:00Z")
-	}
-}
-
-func TestRoundTripDateTime(t *testing.T) {
-	events := roundTrip(t, "dt", scalarType(TypeDateTime), "2026-06-01T14:30:00Z")
+func TestRoundTripTs(t *testing.T) {
+	events := roundTrip(t, "dt", scalarType(TypeTs), "2026-06-01T14:30:00Z")
 	if events[1].Value != "2026-06-01T14:30:00Z" {
 		t.Errorf("got value %q, want %q", events[1].Value, "2026-06-01T14:30:00Z")
 	}

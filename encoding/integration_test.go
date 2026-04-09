@@ -100,8 +100,8 @@ func countCompositeEnds(events []Event) int {
 func TestIntegrationValidScalars(t *testing.T) {
 	events := fileDecodeAll(t, "../testdata/valid/scalars.pakt")
 
-	// scalars.pakt has 17 assignments, each producing 3 events
-	const wantAssignments = 17
+	// scalars.pakt has 16 assignments, each producing 3 events
+	const wantAssignments = 16
 	starts := countKind(events, EventAssignStart)
 	ends := countKind(events, EventAssignEnd)
 	scalars := countKind(events, EventScalarValue)
@@ -135,7 +135,7 @@ func TestIntegrationValidScalars(t *testing.T) {
 	// Spot-check specific assignments
 	expectedNames := []string{
 		"greeting", "count", "hex", "binary", "octal", "big", "negative",
-		"price", "avogadro", "active", "inactive", "id", "started", "opened", "updated",
+		"price", "avogadro", "active", "inactive", "id", "started", "updated",
 		"payload", "payload64",
 	}
 	for i, name := range expectedNames {
@@ -578,10 +578,6 @@ func TestIntegrationInvalidFiles(t *testing.T) {
 		keywords []string // at least one keyword must appear in the error message
 	}{
 		{
-			file:     "duplicate-name.pakt",
-			keywords: []string{"duplicate"},
-		},
-		{
 			file:     "type-mismatch.pakt",
 			keywords: []string{"type", "mismatch", "expected", "invalid"},
 		},
@@ -653,10 +649,27 @@ func TestIntegrationInvalidAllFiles(t *testing.T) {
 // Sentinel error tests — verify errors.Is works on returned errors
 // ---------------------------------------------------------------------------
 
-func TestSentinelErrDuplicateName(t *testing.T) {
-	gotErr := fileDecodeExpectError(t, filepath.Join("..", "testdata", "invalid", "duplicate-name.pakt"))
-	if !errors.Is(gotErr, ErrDuplicateName) {
-		t.Fatalf("expected errors.Is(err, ErrDuplicateName), got: %v", gotErr)
+func TestDuplicateRootNamesPreserved(t *testing.T) {
+	input := "name:str = 'a'\nname:str = 'b'"
+	d := NewDecoder(strings.NewReader(input))
+	defer d.Close()
+	var events []Event
+	for {
+		ev, err := d.Decode()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		events = append(events, ev)
+	}
+	// Both statements preserved: AssignStart, ScalarValue, AssignEnd × 2
+	if len(events) != 6 {
+		t.Fatalf("expected 6 events for two duplicate statements, got %d: %v", len(events), events)
+	}
+	if events[1].Value != "a" || events[4].Value != "b" {
+		t.Fatalf("duplicate names not preserved in order: %v", events)
 	}
 }
 
@@ -701,30 +714,8 @@ func TestSentinelErrDuplicateNameInSpec(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for duplicate name in spec")
 	}
-	if !errors.Is(err, ErrDuplicateName) {
-		t.Fatalf("expected errors.Is(err, ErrDuplicateName), got: %v", err)
-	}
-}
-
-func TestSentinelErrDuplicateNameViaDecoder(t *testing.T) {
-	input := "name:str = 'a'\nname:str = 'b'"
-	d := NewDecoder(strings.NewReader(input))
-	var decErr error
-	for {
-		_, err := d.Decode()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			decErr = err
-			break
-		}
-	}
-	if decErr == nil {
-		t.Fatal("expected error for duplicate root name")
-	}
-	if !errors.Is(decErr, ErrDuplicateName) {
-		t.Fatalf("expected errors.Is(err, ErrDuplicateName), got: %v", decErr)
+	if !errors.Is(err, ErrSyntax) {
+		t.Fatalf("expected errors.Is(err, ErrSyntax), got: %v", err)
 	}
 }
 
@@ -749,5 +740,96 @@ func TestSentinelErrNilNonNullableUnit(t *testing.T) {
 	}
 	if !errors.Is(err, ErrNilNonNullable) {
 		t.Fatalf("expected errors.Is(err, ErrNilNonNullable), got: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// NUL byte framing (spec §10.1)
+// ---------------------------------------------------------------------------
+
+func TestNulByteTerminatesUnitAtTopLevel(t *testing.T) {
+	// NUL after a complete statement should act as end-of-unit.
+	input := "name:str = 'Alice'\x00ignored:str = 'Bob'"
+	d := NewDecoder(strings.NewReader(input))
+	defer d.Close()
+	var events []Event
+	for {
+		ev, err := d.Decode()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		events = append(events, ev)
+	}
+	// Only the first statement should be decoded (3 events).
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events (one statement before NUL), got %d: %v", len(events), events)
+	}
+	if events[1].Value != "Alice" {
+		t.Errorf("expected value 'Alice', got %q", events[1].Value)
+	}
+}
+
+func TestNulByteTerminatesUnitBeforeAnyStatement(t *testing.T) {
+	// NUL as the very first byte should produce immediate EOF.
+	input := "\x00name:str = 'Alice'"
+	d := NewDecoder(strings.NewReader(input))
+	defer d.Close()
+	_, err := d.Decode()
+	if err != io.EOF {
+		t.Fatalf("expected io.EOF for NUL at start, got %v", err)
+	}
+}
+
+func TestNulByteTerminatesPack(t *testing.T) {
+	// NUL in the middle of a pack should terminate the pack.
+	input := "items:[int] <<\n1\n2\x003\n"
+	d := NewDecoder(strings.NewReader(input))
+	defer d.Close()
+	var events []Event
+	for {
+		ev, err := d.Decode()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		events = append(events, ev)
+	}
+	// ListPackStart + ScalarValue(1) + ScalarValue(2) + ListPackEnd = 4 events.
+	if len(events) != 4 {
+		t.Fatalf("expected 4 events (pack terminated by NUL), got %d: %v", len(events), events)
+	}
+	if events[0].Kind != EventListPackStart {
+		t.Errorf("expected ListPackStart, got %s", events[0].Kind)
+	}
+	if events[3].Kind != EventListPackEnd {
+		t.Errorf("expected ListPackEnd, got %s", events[3].Kind)
+	}
+}
+
+func TestNulByteMoreReturnsFalse(t *testing.T) {
+	// More() should return false when NUL terminates the unit.
+	input := "name:str = 'Alice'\x00"
+	d := NewDecoder(strings.NewReader(input))
+	defer d.Close()
+	// Consume the first statement.
+	for {
+		ev, err := d.Decode()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ev.Kind == EventAssignEnd {
+			break
+		}
+	}
+	if d.More() {
+		t.Fatal("More() should return false after NUL terminator")
 	}
 }

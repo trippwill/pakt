@@ -28,7 +28,6 @@ type allScalars struct {
 	Active  bool    `pakt:"active"`
 	ID      string  `pakt:"id"`
 	Born    string  `pakt:"born"`
-	Start   string  `pakt:"start_time"`
 	Created string  `pakt:"created"`
 }
 
@@ -122,8 +121,7 @@ rate:float = 1.5e+2
 active:bool = true
 id:uuid = 550e8400-e29b-41d4-a716-446655440000
 born:date = 2000-01-15
-start_time:time = 14:30:00Z
-created:datetime = 2024-06-01T12:00:00Z`)
+created:ts = 2024-06-01T12:00:00Z`)
 
 	var v allScalars
 	if err := Unmarshal(data, &v); err != nil {
@@ -142,7 +140,6 @@ created:datetime = 2024-06-01T12:00:00Z`)
 		{"Active", v.Active, true},
 		{"ID", v.ID, "550e8400-e29b-41d4-a716-446655440000"},
 		{"Born", v.Born, "2000-01-15"},
-		{"Start", v.Start, "14:30:00Z"},
 		{"Created", v.Created, "2024-06-01T12:00:00Z"},
 	}
 	for _, c := range checks {
@@ -332,7 +329,7 @@ func TestUnmarshalNestedComposites(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUnmarshalTimeTime(t *testing.T) {
-	data := []byte("created:datetime = 2024-06-01T12:00:00Z")
+	data := []byte("created:ts = 2024-06-01T12:00:00Z")
 	var v withTimeFields
 	if err := Unmarshal(data, &v); err != nil {
 		t.Fatal(err)

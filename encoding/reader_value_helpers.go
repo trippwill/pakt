@@ -74,10 +74,8 @@ func (r *reader) readScalarDirect(kind TypeKind) (string, Pos, error) {
 		val, err = r.readUUID()
 	case TypeDate:
 		val, err = r.readDate()
-	case TypeTime:
-		val, err = r.readTime()
-	case TypeDateTime:
-		val, err = r.readDateTime()
+	case TypeTs:
+		val, err = r.readTs()
 	case TypeBin:
 		val, err = r.readBin()
 	default:

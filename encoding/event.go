@@ -9,41 +9,41 @@ import (
 type EventKind int
 
 const (
-	EventAssignStart     EventKind = iota // beginning of a top-level assignment
-	EventAssignEnd                        // end of a top-level assignment
-	EventListStreamStart                  // beginning of a top-level list stream
-	EventListStreamEnd                    // end of a top-level list stream
-	EventMapStreamStart                   // beginning of a top-level map stream
-	EventMapStreamEnd                     // end of a top-level map stream
-	EventScalarValue                      // a scalar (or nil/atom) value
-	EventStructStart                      // opening delimiter of a struct value
-	EventStructEnd                        // closing delimiter of a struct value
-	EventTupleStart                       // opening delimiter of a tuple value
-	EventTupleEnd                         // closing delimiter of a tuple value
-	EventListStart                        // opening delimiter of a list value
-	EventListEnd                          // closing delimiter of a list value
-	EventMapStart                         // opening delimiter of a map value
-	EventMapEnd                           // closing delimiter of a map value
-	EventError                            // parse or validation error
+	EventAssignStart   EventKind = iota // beginning of a top-level assignment
+	EventAssignEnd                      // end of a top-level assignment
+	EventListPackStart                  // beginning of a top-level list pack
+	EventListPackEnd                    // end of a top-level list pack
+	EventMapPackStart                   // beginning of a top-level map pack
+	EventMapPackEnd                     // end of a top-level map pack
+	EventScalarValue                    // a scalar (or nil/atom) value
+	EventStructStart                    // opening delimiter of a struct value
+	EventStructEnd                      // closing delimiter of a struct value
+	EventTupleStart                     // opening delimiter of a tuple value
+	EventTupleEnd                       // closing delimiter of a tuple value
+	EventListStart                      // opening delimiter of a list value
+	EventListEnd                        // closing delimiter of a list value
+	EventMapStart                       // opening delimiter of a map value
+	EventMapEnd                         // closing delimiter of a map value
+	EventError                          // parse or validation error
 )
 
 var eventKindNames = [...]string{
-	EventAssignStart:     "AssignStart",
-	EventAssignEnd:       "AssignEnd",
-	EventListStreamStart: "ListStreamStart",
-	EventListStreamEnd:   "ListStreamEnd",
-	EventMapStreamStart:  "MapStreamStart",
-	EventMapStreamEnd:    "MapStreamEnd",
-	EventScalarValue:     "ScalarValue",
-	EventStructStart:     "StructStart",
-	EventStructEnd:       "StructEnd",
-	EventTupleStart:      "TupleStart",
-	EventTupleEnd:        "TupleEnd",
-	EventListStart:       "ListStart",
-	EventListEnd:         "ListEnd",
-	EventMapStart:        "MapStart",
-	EventMapEnd:          "MapEnd",
-	EventError:           "Error",
+	EventAssignStart:   "AssignStart",
+	EventAssignEnd:     "AssignEnd",
+	EventListPackStart: "ListPackStart",
+	EventListPackEnd:   "ListPackEnd",
+	EventMapPackStart:  "MapPackStart",
+	EventMapPackEnd:    "MapPackEnd",
+	EventScalarValue:   "ScalarValue",
+	EventStructStart:   "StructStart",
+	EventStructEnd:     "StructEnd",
+	EventTupleStart:    "TupleStart",
+	EventTupleEnd:      "TupleEnd",
+	EventListStart:     "ListStart",
+	EventListEnd:       "ListEnd",
+	EventMapStart:      "MapStart",
+	EventMapEnd:        "MapEnd",
+	EventError:         "Error",
 }
 
 // IsCompositeStart reports whether k is a composite opening event.
@@ -56,14 +56,14 @@ func (k EventKind) IsCompositeEnd() bool {
 	return k == EventStructEnd || k == EventTupleEnd || k == EventListEnd || k == EventMapEnd
 }
 
-// IsStreamStart reports whether k is a stream opening event.
-func (k EventKind) IsStreamStart() bool {
-	return k == EventListStreamStart || k == EventMapStreamStart
+// IsPackStart reports whether k is a pack opening event.
+func (k EventKind) IsPackStart() bool {
+	return k == EventListPackStart || k == EventMapPackStart
 }
 
-// IsStreamEnd reports whether k is a stream closing event.
-func (k EventKind) IsStreamEnd() bool {
-	return k == EventListStreamEnd || k == EventMapStreamEnd
+// IsPackEnd reports whether k is a pack closing event.
+func (k EventKind) IsPackEnd() bool {
+	return k == EventListPackEnd || k == EventMapPackEnd
 }
 
 // String returns the human-readable name for the event kind.

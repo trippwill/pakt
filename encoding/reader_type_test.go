@@ -26,8 +26,7 @@ func TestReadScalarTypes(t *testing.T) {
 		{":bool", TypeBool},
 		{":uuid", TypeUUID},
 		{":date", TypeDate},
-		{":time", TypeTime},
-		{":datetime", TypeDateTime},
+		{":ts", TypeTs},
 		{":bin", TypeBin},
 	}
 	for _, tc := range scalars {

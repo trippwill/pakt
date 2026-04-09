@@ -5,12 +5,12 @@ import (
 	"testing"
 )
 
-func TestDecodeListStream(t *testing.T) {
+func TestDecodeListPack(t *testing.T) {
 	events := decodeAll(t, "ports:[int] << 80, 443, 8080")
 	if len(events) != 5 {
 		t.Fatalf("expected 5 events, got %d: %v", len(events), events)
 	}
-	if events[0].Kind != EventListStreamStart || events[0].Name != "ports" {
+	if events[0].Kind != EventListPackStart || events[0].Name != "ports" {
 		t.Fatalf("event[0] = %v", events[0])
 	}
 	if events[1].Name != "[0]" || events[1].Value != "80" {
@@ -22,24 +22,24 @@ func TestDecodeListStream(t *testing.T) {
 	if events[3].Name != "[2]" || events[3].Value != "8080" {
 		t.Fatalf("event[3] = %v", events[3])
 	}
-	if events[4].Kind != EventListStreamEnd || events[4].Name != "ports" {
+	if events[4].Kind != EventListPackEnd || events[4].Name != "ports" {
 		t.Fatalf("event[4] = %v", events[4])
 	}
 }
 
-func TestDecodeListStreamStopsAtNextStatement(t *testing.T) {
+func TestDecodeListPackStopsAtNextStatement(t *testing.T) {
 	input := "states:[|dev, prod|] << |dev\nnext:int = 1"
 	events := decodeAll(t, input)
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d: %v", len(events), events)
 	}
-	if events[0].Kind != EventListStreamStart || events[0].Name != "states" {
+	if events[0].Kind != EventListPackStart || events[0].Name != "states" {
 		t.Fatalf("event[0] = %v", events[0])
 	}
 	if events[1].Kind != EventScalarValue || events[1].Value != "dev" {
 		t.Fatalf("event[1] = %v", events[1])
 	}
-	if events[2].Kind != EventListStreamEnd || events[2].Name != "states" {
+	if events[2].Kind != EventListPackEnd || events[2].Name != "states" {
 		t.Fatalf("event[2] = %v", events[2])
 	}
 	if events[3].Kind != EventAssignStart || events[3].Name != "next" {
@@ -47,13 +47,13 @@ func TestDecodeListStreamStopsAtNextStatement(t *testing.T) {
 	}
 }
 
-func TestDecodeMapStream(t *testing.T) {
+func TestDecodeMapPack(t *testing.T) {
 	input := "headers:<str ; int> << 'a' ; 1, 'b' ; 2"
 	events := decodeAll(t, input)
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d: %v", len(events), events)
 	}
-	if events[0].Kind != EventMapStreamStart || events[0].Name != "headers" {
+	if events[0].Kind != EventMapPackStart || events[0].Name != "headers" {
 		t.Fatalf("event[0] = %v", events[0])
 	}
 	if events[1].Kind != EventScalarValue || events[1].Value != "a" {
@@ -62,12 +62,12 @@ func TestDecodeMapStream(t *testing.T) {
 	if events[2].Kind != EventScalarValue || events[2].Value != "1" {
 		t.Fatalf("event[2] = %v", events[2])
 	}
-	if events[5].Kind != EventMapStreamEnd || events[5].Name != "headers" {
+	if events[5].Kind != EventMapPackEnd || events[5].Name != "headers" {
 		t.Fatalf("event[5] = %v", events[5])
 	}
 }
 
-func TestDecodeMapStreamDuplicateKeysPreserved(t *testing.T) {
+func TestDecodeMapPackDuplicateKeysPreserved(t *testing.T) {
 	input := "headers:<str ; int> << 'a' ; 1, 'a' ; 2"
 	events := decodeAll(t, input)
 	if len(events) != 6 {
@@ -78,17 +78,17 @@ func TestDecodeMapStreamDuplicateKeysPreserved(t *testing.T) {
 	}
 }
 
-func TestProjectionMatchesStream(t *testing.T) {
+func TestProjectionMatchesPack(t *testing.T) {
 	doc := "drop:int = 1\nports:[int] << 80, 443\nname:str = 'svc'"
 	spec := "ports:[int]\nname:str"
 	events := decodeAllWithSpec(t, doc, spec)
 	if len(events) != 7 {
 		t.Fatalf("expected 7 events, got %d: %v", len(events), events)
 	}
-	if events[0].Kind != EventListStreamStart || events[0].Name != "ports" {
+	if events[0].Kind != EventListPackStart || events[0].Name != "ports" {
 		t.Fatalf("event[0] = %v", events[0])
 	}
-	if events[3].Kind != EventListStreamEnd || events[3].Name != "ports" {
+	if events[3].Kind != EventListPackEnd || events[3].Name != "ports" {
 		t.Fatalf("event[3] = %v", events[3])
 	}
 	if events[4].Kind != EventAssignStart || events[4].Name != "name" {
@@ -96,7 +96,7 @@ func TestProjectionMatchesStream(t *testing.T) {
 	}
 }
 
-func TestUnmarshalListStream(t *testing.T) {
+func TestUnmarshalListPack(t *testing.T) {
 	data := []byte("tags:[str] << 'alpha', 'beta', 'gamma'")
 	var v withList
 	if err := Unmarshal(data, &v); err != nil {
@@ -108,7 +108,7 @@ func TestUnmarshalListStream(t *testing.T) {
 	}
 }
 
-func TestUnmarshalStructListStream(t *testing.T) {
+func TestUnmarshalStructListPack(t *testing.T) {
 	data := []byte("servers:[{host:str, port:int}] << { 'a', 80 }, { 'b', 443 }")
 	var v nestedListOfStructs
 	if err := Unmarshal(data, &v); err != nil {
@@ -123,7 +123,7 @@ func TestUnmarshalStructListStream(t *testing.T) {
 	}
 }
 
-func TestUnmarshalMapStreamLastWins(t *testing.T) {
+func TestUnmarshalMapPackLastWins(t *testing.T) {
 	data := []byte("headers:<str ; str> << 'Accept' ; 'json', 'Accept' ; 'text/html'")
 	var v withMap
 	if err := Unmarshal(data, &v); err != nil {

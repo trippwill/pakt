@@ -140,6 +140,31 @@ This is a breaking API change and should be weighed against ergonomics. The `Unm
 
 Integers, dates, timestamps, and UUIDs are also parsed through the builder. These are always escape-free, so the direct-reference path applies to all of them. The builder becomes a fallback for escaped strings only.
 
+For non-string target fields (`int64`, `float64`, `bool`, `time.Time`, `[16]byte`, `[]byte`), the parsed text is only an intermediate — it's passed to `strconv.ParseInt`, `time.Parse`, etc. and then discarded. With a direct buffer reference via `unsafe.String`, these conversions can parse directly from the input buffer without any allocation:
+
+```
+input buffer → unsafe.String(ptr, len) → strconv.ParseInt() → target.SetInt()
+```
+
+`unsafe.String` doesn't allocate — it creates a string header pointing at the existing bytes. `strconv.ParseInt` and friends don't escape the string argument, so the compiler can prove it stays on the stack. The result goes directly into the reflect target. **Truly zero allocation** for numeric, boolean, date, ts, and uuid fields mapped to their native Go types.
+
+The only fields that require a copy are string-typed targets (`target.SetString` must copy because Go strings are immutable and the input buffer is recycled). Summary by target type:
+
+| Scalar type | Go target | Copies with zero-copy path |
+|------------|-----------|---------------------------|
+| `int` | `int64` | **0** — parse from buffer view |
+| `float` | `float64` | **0** — parse from buffer view |
+| `bool` | `bool` | **0** — compare bytes directly |
+| `dec` | `float64` | **0** — parse from buffer view |
+| `dec` | `string` | 1 — `SetString` must copy |
+| `date`/`ts` | `time.Time` | **0** — parse from buffer view |
+| `date`/`ts` | `string` | 1 — `SetString` must copy |
+| `uuid` | `[16]byte` | **0** — parse from buffer view |
+| `uuid` | `string` | 1 — `SetString` must copy |
+| `str` (no escapes) | `string` | 1 — `SetString` must copy |
+| `str` (escapes) | `string` | 3 — builder path (unchanged) |
+| `bin` | `[]byte` | **0** — decode into target directly |
+
 ### Testability
 
 A helper like `borrowString(src []byte, start, end int) string` with clear lifetime documentation is straightforward to test and fuzz. The key invariant: `borrowString` output must be byte-identical to the builder path for the same input. A fuzz test that compares both paths on random inputs (with and without escapes) would provide strong coverage.
@@ -148,8 +173,9 @@ A helper like `borrowString(src []byte, start, end int) string` with clear lifet
 
 | Path | Current copies | With zero-copy | Savings |
 |------|---------------|----------------|---------|
-| Escape-free string | 3 | 1 | 67% |
-| Escaped string | 3 | 3 | 0% |
-| Integer/date/ts/uuid | 3 | 1 | 67% |
+| Non-string field (int, bool, float, date, ts) | 3 | **0** | 100% |
+| Escape-free string → string field | 3 | 1 | 67% |
+| Escaped string → string field | 3 | 3 | 0% |
+| bin → []byte field | 3 | **0** | 100% |
 
-For typical data (>95% escape-free), expected ~60% reduction in string-related allocations, which is ~18% of total allocations (30% × 60%).
+For a typical struct with 8 fields (e.g., the FS benchmark entry: 3 strings, 2 ints, 1 bool, 1 ts, 1 string-hash), 5 of 8 fields would be truly zero-allocation. The remaining 3 string fields need 1 copy each. Total: 3 copies instead of 24. Per 1K entries: 3K copies instead of 24K.

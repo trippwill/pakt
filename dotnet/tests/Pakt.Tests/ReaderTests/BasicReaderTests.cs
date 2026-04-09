@@ -191,7 +191,7 @@ public class BasicReaderTests
 
         Assert.True(reader.Read());
         Assert.Equal("my_config", reader.StatementName);
-        Assert.False(reader.IsStreamStatement);
+        Assert.False(reader.IsPackStatement);
 
         reader.Dispose();
     }

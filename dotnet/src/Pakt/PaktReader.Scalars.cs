@@ -23,8 +23,7 @@ public ref partial struct PaktReader
             PaktScalarType.Bool => ReadBoolValue(),
             PaktScalarType.Uuid => ReadUuidValue(),
             PaktScalarType.Date => ReadDateValue(),
-            PaktScalarType.Time => ReadTimeValue(),
-            PaktScalarType.DateTime => ReadDateTimeValue(),
+            PaktScalarType.Ts => ReadTimestampValue(),
             PaktScalarType.Bin => ReadBinValue(),
             _ => throw new PaktException($"Unknown scalar type kind {kind}", Position, PaktErrorCode.Syntax),
         };
@@ -86,16 +85,8 @@ public ref partial struct PaktReader
         return DateOnly.Parse(Encoding.UTF8.GetString(ValueSpan), CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Gets the current scalar value as a DateTimeOffset (for time values).</summary>
-    public readonly DateTimeOffset GetTime()
-    {
-        AssertTokenIs(PaktTokenType.ScalarValue);
-        var text = Encoding.UTF8.GetString(ValueSpan);
-        return DateTimeOffset.Parse("2000-01-01T" + text, CultureInfo.InvariantCulture, DateTimeStyles.None);
-    }
-
-    /// <summary>Gets the current scalar value as a DateTimeOffset.</summary>
-    public readonly DateTimeOffset GetDateTime()
+    /// <summary>Gets the current scalar value as a DateTimeOffset (for timestamp values).</summary>
+    public readonly DateTimeOffset GetTimestamp()
     {
         AssertTokenIs(PaktTokenType.ScalarValue);
         return DateTimeOffset.Parse(Encoding.UTF8.GetString(ValueSpan), CultureInfo.InvariantCulture, DateTimeStyles.None);
@@ -353,12 +344,6 @@ public ref partial struct PaktReader
                         AppendUnicodeEscape(sb, content.Slice(i, 4));
                         i += 4;
                         break;
-                    case (byte)'U':
-                        i++;
-                        if (i + 8 > content.Length) ThrowError("Incomplete \\U escape", PaktErrorCode.Syntax);
-                        AppendUnicodeEscape(sb, content.Slice(i, 8));
-                        i += 8;
-                        break;
                     default:
                         ThrowError($"Invalid escape sequence: \\{(char)next}", PaktErrorCode.Syntax);
                         break;
@@ -402,16 +387,6 @@ public ref partial struct PaktReader
                 _bytePositionInLine += 4;
                 break;
             }
-            case (byte)'U':
-            {
-                if (_consumed + 8 > _buffer.Length)
-                    ThrowError("Incomplete \\U escape", PaktErrorCode.UnexpectedEof);
-                var hexSpan = _buffer.Slice(_consumed, 8);
-                AppendUnicodeEscape(sb, hexSpan);
-                _consumed += 8;
-                _bytePositionInLine += 8;
-                break;
-            }
             default:
                 ThrowError($"Invalid escape sequence: \\{(char)b}", PaktErrorCode.Syntax);
                 break;
@@ -428,19 +403,7 @@ public ref partial struct PaktReader
             val = val * 16 + d;
         }
         if (val == 0) ThrowError("Null byte (U+0000) not permitted in strings", PaktErrorCode.Syntax);
-        if (val > 0x10FFFF) ThrowError($"Invalid unicode code point: U+{val:X8}", PaktErrorCode.Syntax);
-
-        if (val <= 0xFFFF)
-        {
-            if (char.IsSurrogate((char)val))
-                ThrowError($"Surrogate code point U+{val:X4} not permitted", PaktErrorCode.Syntax);
-            sb.Append((char)val);
-        }
-        else
-        {
-            // Supplementary plane — encode as surrogate pair
-            sb.Append(char.ConvertFromUtf32(val));
-        }
+        sb.Append((char)val);
     }
 
     private void AppendUtf8Char(StringBuilder sb)
@@ -627,20 +590,9 @@ public ref partial struct PaktReader
         return (dateStart, _consumed - dateStart);
     }
 
-    private (int start, int length) ReadTimeValue()
+    private (int start, int length) ReadTimestampValue()
     {
-        int timeStart = _consumed;
-        ReadExactDigits(2); ExpectByte((byte)':');
-        ReadExactDigits(2); ExpectByte((byte)':');
-        ReadExactDigits(2);
-        ReadOptionalFractionalSeconds();
-        ReadTimezone();
-        return (timeStart, _consumed - timeStart);
-    }
-
-    private (int start, int length) ReadDateTimeValue()
-    {
-        int dtStart = _consumed;
+        int tsStart = _consumed;
         ReadExactDigits(4); ExpectByte((byte)'-');
         ReadExactDigits(2); ExpectByte((byte)'-');
         ReadExactDigits(2);
@@ -650,7 +602,7 @@ public ref partial struct PaktReader
         ReadExactDigits(2);
         ReadOptionalFractionalSeconds();
         ReadTimezone();
-        return (dtStart, _consumed - dtStart);
+        return (tsStart, _consumed - tsStart);
     }
 
     private void ReadOptionalFractionalSeconds()

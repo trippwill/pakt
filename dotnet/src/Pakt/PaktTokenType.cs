@@ -14,13 +14,13 @@ public enum PaktTokenType
     /// <summary>End of a top-level assignment.</summary>
     AssignEnd,
 
-    /// <summary>Start of a top-level stream: <c>name:type &lt;&lt;</c></summary>
-    StreamStart,
+    /// <summary>Start of a top-level pack: <c>name:type &lt;&lt;</c></summary>
+    PackStart,
 
-    /// <summary>End of a top-level stream.</summary>
-    StreamEnd,
+    /// <summary>End of a top-level pack.</summary>
+    PackEnd,
 
-    /// <summary>A scalar value (string, int, decimal, float, bool, uuid, date, time, datetime, bin, atom).</summary>
+    /// <summary>A scalar value (string, int, decimal, float, bool, uuid, date, ts, bin, atom).</summary>
     ScalarValue,
 
     /// <summary>A nil value for a nullable type.</summary>

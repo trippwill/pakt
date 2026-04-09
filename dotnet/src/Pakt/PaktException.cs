@@ -11,10 +11,10 @@ public enum PaktErrorCode
     /// <summary>Input ends before a construct is complete.</summary>
     UnexpectedEof = 1,
 
-    /// <summary>Two root-level statements share the same name.</summary>
+    /// <summary>Reserved (formerly duplicate_name; see spec §6.1).</summary>
     DuplicateName = 2,
 
-    /// <summary>A value does not conform to its declared type, or a spec type mismatch.</summary>
+    /// <summary>A value does not conform to its declared type.</summary>
     TypeMismatch = 3,
 
     /// <summary><c>nil</c> assigned to a non-nullable type.</summary>

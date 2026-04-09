@@ -17,7 +17,7 @@ public class PaktStreamReaderTests
 
         Assert.True(await reader.ReadStatementAsync());
         Assert.Equal("server", reader.StatementName);
-        Assert.False(reader.IsStream);
+        Assert.False(reader.IsPack);
 
         Assert.False(await reader.ReadStatementAsync());
     }
@@ -102,17 +102,17 @@ public class PaktStreamReaderTests
     }
 
     [Fact]
-    public async Task ReadStreamElements_ListStream()
+    public async Task ReadPackElements_ListPack()
     {
         var pakt = "servers:[{host:str, port:int}] << {'a', 1}, {'b', 2}, {'c', 3}\n"u8;
         await using var reader = PaktStreamReader.Create(pakt);
 
         Assert.True(await reader.ReadStatementAsync());
         Assert.Equal("servers", reader.StatementName);
-        Assert.True(reader.IsStream);
+        Assert.True(reader.IsPack);
 
         var servers = new List<SimpleServer>();
-        await foreach (var server in reader.ReadStreamElements(TestPaktContext.Default.SimpleServer))
+        await foreach (var server in reader.ReadPackElements(TestPaktContext.Default.SimpleServer))
         {
             servers.Add(server);
         }
@@ -127,7 +127,7 @@ public class PaktStreamReaderTests
     }
 
     [Fact]
-    public async Task MixedAssignmentsAndStreams()
+    public async Task MixedAssignmentsAndPacks()
     {
         var pakt = "config:{host:str, port:int} = {'main', 80}\nentries:[{host:str, port:int}] << {'a', 1}, {'b', 2}\n"u8;
         await using var reader = PaktStreamReader.Create(pakt);
@@ -135,17 +135,17 @@ public class PaktStreamReaderTests
         // Read config assignment
         Assert.True(await reader.ReadStatementAsync());
         Assert.Equal("config", reader.StatementName);
-        Assert.False(reader.IsStream);
+        Assert.False(reader.IsPack);
         var config = reader.Deserialize(TestPaktContext.Default.SimpleServer);
         Assert.Equal("main", config.Host);
         Assert.Equal(80, config.Port);
 
-        // Read stream
+        // Read pack
         Assert.True(await reader.ReadStatementAsync());
         Assert.Equal("entries", reader.StatementName);
-        Assert.True(reader.IsStream);
+        Assert.True(reader.IsPack);
         var entries = new List<SimpleServer>();
-        await foreach (var entry in reader.ReadStreamElements(TestPaktContext.Default.SimpleServer))
+        await foreach (var entry in reader.ReadPackElements(TestPaktContext.Default.SimpleServer))
         {
             entries.Add(entry);
         }
@@ -172,7 +172,7 @@ public class PaktStreamReaderTests
     }
 
     [Fact]
-    public async Task ReadStatementAsync_EmptyDocument()
+    public async Task ReadStatementAsync_EmptyUnit()
     {
         await using var reader = PaktStreamReader.Create(ReadOnlySpan<byte>.Empty);
         Assert.False(await reader.ReadStatementAsync());
@@ -202,7 +202,7 @@ public class PaktStreamReaderTests
     }
 
     [Fact]
-    public async Task Deserialize_ThrowsOnStream()
+    public async Task Deserialize_ThrowsOnPack()
     {
         var pakt = "s:[{host:str, port:int}] << {'a', 1}\n"u8;
         await using var reader = PaktStreamReader.Create(pakt);
@@ -213,7 +213,7 @@ public class PaktStreamReaderTests
     }
 
     [Fact]
-    public async Task ReadStreamElements_ThrowsOnNonStream()
+    public async Task ReadPackElements_ThrowsOnNonPack()
     {
         var pakt = "s:{host:str, port:int} = {'a', 1}\n"u8;
         await using var reader = PaktStreamReader.Create(pakt);
@@ -222,7 +222,7 @@ public class PaktStreamReaderTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             async () =>
             {
-                await foreach (var _ in reader.ReadStreamElements(TestPaktContext.Default.SimpleServer))
+                await foreach (var _ in reader.ReadPackElements(TestPaktContext.Default.SimpleServer))
                 {
                 }
             });

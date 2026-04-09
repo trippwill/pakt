@@ -15,7 +15,7 @@ public sealed class PaktWriter : IDisposable
     private int _stackDepth;
     private bool _disposed;
 
-    private enum CompositeKind : byte { None, Struct, Tuple, List, Map, Stream }
+    private enum CompositeKind : byte { None, Struct, Tuple, List, Map, Pack }
     private enum MapPhase : byte { Key, Value }
 
     private struct WriterFrame
@@ -53,20 +53,20 @@ public sealed class PaktWriter : IDisposable
         WriteRaw("\n"u8);
     }
 
-    /// <summary>Writes the start of a top-level stream: <c>name:type &lt;&lt; </c>.</summary>
-    public void WriteStreamStart(string name, PaktType type)
+    /// <summary>Writes the start of a top-level pack: <c>name:type &lt;&lt; </c>.</summary>
+    public void WritePackStart(string name, PaktType type)
     {
         ThrowIfDisposed();
         WriteStatementHeader(name, type);
         WriteRaw(" << "u8);
-        PushFrame(CompositeKind.Stream);
+        PushFrame(CompositeKind.Pack);
     }
 
-    /// <summary>Writes the end of a top-level stream (newline).</summary>
-    public void WriteStreamEnd()
+    /// <summary>Writes the end of a top-level pack (newline).</summary>
+    public void WritePackEnd()
     {
         ThrowIfDisposed();
-        PopFrame(CompositeKind.Stream);
+        PopFrame(CompositeKind.Pack);
         WriteRaw("\n"u8);
     }
 
@@ -240,31 +240,8 @@ public sealed class PaktWriter : IDisposable
         WriteRaw(buf);
     }
 
-    /// <summary>Writes a time scalar value with timezone offset.</summary>
-    public void WriteTimeValue(DateTimeOffset value)
-    {
-        ThrowIfDisposed();
-        PrependSeparator();
-        Span<char> charBuf = stackalloc char[32];
-        int written;
-
-        if (value.Offset == TimeSpan.Zero)
-        {
-            value.TryFormat(charBuf, out written, "HH:mm:ssZ", CultureInfo.InvariantCulture);
-        }
-        else
-        {
-            // HH:mm:ss±HH:mm — must format manually to avoid framework quirks
-            value.TryFormat(charBuf, out written, "HH:mm:sszzz", CultureInfo.InvariantCulture);
-        }
-
-        Span<byte> buf = stackalloc byte[written];
-        Encoding.UTF8.GetBytes(charBuf[..written], buf);
-        WriteRaw(buf);
-    }
-
-    /// <summary>Writes a datetime scalar value in ISO 8601 format.</summary>
-    public void WriteDateTimeValue(DateTimeOffset value)
+    /// <summary>Writes a timestamp scalar value in ISO 8601 format.</summary>
+    public void WriteTimestampValue(DateTimeOffset value)
     {
         ThrowIfDisposed();
         PrependSeparator();
@@ -420,9 +397,9 @@ public sealed class PaktWriter : IDisposable
                 frame.MapPhase = MapPhase.Key;
             }
         }
-        else if (frame.Kind == CompositeKind.Stream)
+        else if (frame.Kind == CompositeKind.Pack)
         {
-            // Stream elements: no leading space (already in header), comma between elements
+            // Pack elements: no leading space (already in header), comma between elements
             if (frame.ElementCount > 0)
                 WriteRaw(", "u8);
             frame.ElementCount++;

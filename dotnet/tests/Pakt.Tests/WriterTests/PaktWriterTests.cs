@@ -221,20 +221,23 @@ public class PaktWriterTests
     }
 
     [Fact]
-    public void RoundTrip_TimeWithZ()
+    public void RoundTrip_TimestampWithZ()
     {
-        var time = new DateTimeOffset(2000, 1, 1, 14, 30, 0, TimeSpan.Zero);
+        var time = new DateTimeOffset(2026, 6, 1, 14, 30, 0, TimeSpan.Zero);
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new PaktWriter(buffer);
-        writer.WriteAssignmentStart("t", PaktType.Scalar(PaktScalarType.Time));
-        writer.WriteTimeValue(time);
+        writer.WriteAssignmentStart("t", PaktType.Scalar(PaktScalarType.Ts));
+        writer.WriteTimestampValue(time);
         writer.WriteAssignmentEnd();
         writer.Flush();
 
         var reader = new PaktReader(buffer.WrittenSpan);
         reader.Read();
         Assert.True(reader.Read());
-        var result = reader.GetTime();
+        var result = reader.GetTimestamp();
+        Assert.Equal(2026, result.Year);
+        Assert.Equal(6, result.Month);
+        Assert.Equal(1, result.Day);
         Assert.Equal(14, result.Hour);
         Assert.Equal(30, result.Minute);
         Assert.Equal(0, result.Second);
@@ -243,20 +246,23 @@ public class PaktWriterTests
     }
 
     [Fact]
-    public void RoundTrip_TimeWithOffset()
+    public void RoundTrip_TimestampWithOffset()
     {
-        var time = new DateTimeOffset(2000, 1, 1, 14, 30, 0, TimeSpan.FromHours(-4));
+        var time = new DateTimeOffset(2026, 6, 1, 14, 30, 0, TimeSpan.FromHours(-4));
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new PaktWriter(buffer);
-        writer.WriteAssignmentStart("t", PaktType.Scalar(PaktScalarType.Time));
-        writer.WriteTimeValue(time);
+        writer.WriteAssignmentStart("t", PaktType.Scalar(PaktScalarType.Ts));
+        writer.WriteTimestampValue(time);
         writer.WriteAssignmentEnd();
         writer.Flush();
 
         var reader = new PaktReader(buffer.WrittenSpan);
         reader.Read();
         Assert.True(reader.Read());
-        var result = reader.GetTime();
+        var result = reader.GetTimestamp();
+        Assert.Equal(2026, result.Year);
+        Assert.Equal(6, result.Month);
+        Assert.Equal(1, result.Day);
         Assert.Equal(14, result.Hour);
         Assert.Equal(30, result.Minute);
         Assert.Equal(TimeSpan.FromHours(-4), result.Offset);
@@ -264,20 +270,20 @@ public class PaktWriterTests
     }
 
     [Fact]
-    public void RoundTrip_DateTimeAssignment()
+    public void RoundTrip_TimestampAssignment()
     {
         var dt = new DateTimeOffset(2026, 6, 1, 14, 30, 0, TimeSpan.Zero);
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new PaktWriter(buffer);
-        writer.WriteAssignmentStart("dt", PaktType.Scalar(PaktScalarType.DateTime));
-        writer.WriteDateTimeValue(dt);
+        writer.WriteAssignmentStart("dt", PaktType.Scalar(PaktScalarType.Ts));
+        writer.WriteTimestampValue(dt);
         writer.WriteAssignmentEnd();
         writer.Flush();
 
         var reader = new PaktReader(buffer.WrittenSpan);
         reader.Read();
         Assert.True(reader.Read());
-        var result = reader.GetDateTime();
+        var result = reader.GetTimestamp();
         Assert.Equal(2026, result.Year);
         Assert.Equal(6, result.Month);
         Assert.Equal(1, result.Day);
@@ -743,69 +749,69 @@ public class PaktWriterTests
     #region Streams
 
     [Fact]
-    public void RoundTrip_StreamWithElements()
+    public void RoundTrip_PackWithElements()
     {
         var listType = PaktType.List(PaktType.Scalar(PaktScalarType.Str));
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new PaktWriter(buffer);
-        writer.WriteStreamStart("events", listType);
+        writer.WritePackStart("events", listType);
         writer.WriteStringValue("alpha");
         writer.WriteStringValue("beta");
         writer.WriteStringValue("gamma");
-        writer.WriteStreamEnd();
+        writer.WritePackEnd();
         writer.Flush();
 
-        // Verify the stream format includes <<
+        // Verify the pack format includes <<
         var output = Written(buffer);
         Assert.Contains("<<", output);
 
         var reader = new PaktReader(buffer.WrittenSpan);
-        Assert.True(reader.Read()); // StreamStart
-        Assert.Equal(PaktTokenType.StreamStart, reader.TokenType);
-        Assert.True(reader.IsStreamStatement);
+        Assert.True(reader.Read()); // PackStart
+        Assert.Equal(PaktTokenType.PackStart, reader.TokenType);
+        Assert.True(reader.IsPackStatement);
 
         Assert.True(reader.Read()); Assert.Equal("alpha", reader.GetString());
         Assert.True(reader.Read()); Assert.Equal("beta", reader.GetString());
         Assert.True(reader.Read()); Assert.Equal("gamma", reader.GetString());
 
-        Assert.True(reader.Read()); // StreamEnd
-        Assert.Equal(PaktTokenType.StreamEnd, reader.TokenType);
+        Assert.True(reader.Read()); // PackEnd
+        Assert.Equal(PaktTokenType.PackEnd, reader.TokenType);
         Assert.False(reader.Read());
         reader.Dispose();
     }
 
     [Fact]
-    public void RoundTrip_StreamWithStructs()
+    public void RoundTrip_PackWithStructs()
     {
         var structType = PaktType.Struct([
-            new PaktField("ts", PaktType.Scalar(PaktScalarType.DateTime)),
+            new PaktField("ts", PaktType.Scalar(PaktScalarType.Ts)),
             new PaktField("msg", PaktType.Scalar(PaktScalarType.Str)),
         ]);
         var listType = PaktType.List(structType);
 
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new PaktWriter(buffer);
-        writer.WriteStreamStart("events", listType);
+        writer.WritePackStart("events", listType);
 
         writer.WriteStructStart();
-        writer.WriteDateTimeValue(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        writer.WriteTimestampValue(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         writer.WriteStringValue("start");
         writer.WriteStructEnd();
 
         writer.WriteStructStart();
-        writer.WriteDateTimeValue(new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero));
+        writer.WriteTimestampValue(new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero));
         writer.WriteStringValue("stop");
         writer.WriteStructEnd();
 
-        writer.WriteStreamEnd();
+        writer.WritePackEnd();
         writer.Flush();
 
         var reader = new PaktReader(buffer.WrittenSpan);
-        Assert.True(reader.Read()); // StreamStart
+        Assert.True(reader.Read()); // PackStart
 
         Assert.True(reader.Read()); // StructStart
-        Assert.True(reader.Read()); // datetime
-        var dt1 = reader.GetDateTime();
+        Assert.True(reader.Read()); // timestamp
+        var dt1 = reader.GetTimestamp();
         Assert.Equal(2026, dt1.Year);
         Assert.Equal(1, dt1.Month);
         Assert.Equal(1, dt1.Day);
@@ -814,8 +820,8 @@ public class PaktWriterTests
         Assert.True(reader.Read()); // StructEnd
 
         Assert.True(reader.Read()); // StructStart
-        Assert.True(reader.Read()); // datetime
-        var dt2 = reader.GetDateTime();
+        Assert.True(reader.Read()); // timestamp
+        var dt2 = reader.GetTimestamp();
         Assert.Equal(2026, dt2.Year);
         Assert.Equal(1, dt2.Month);
         Assert.Equal(2, dt2.Day);
@@ -823,7 +829,7 @@ public class PaktWriterTests
         Assert.Equal("stop", reader.GetString());
         Assert.True(reader.Read()); // StructEnd
 
-        Assert.True(reader.Read()); // StreamEnd
+        Assert.True(reader.Read()); // PackEnd
         Assert.False(reader.Read());
         reader.Dispose();
     }

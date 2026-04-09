@@ -258,4 +258,101 @@ public class CompositeReaderTests
         Assert.False(reader.Read());
         reader.Dispose();
     }
+
+    [Fact]
+    public void EmptyStruct_ValidType()
+    {
+        var data = ToUtf8("v:{} = {}");
+        var reader = new PaktReader(data);
+
+        Assert.True(reader.Read()); // AssignStart
+        Assert.Equal(PaktTokenType.AssignStart, reader.TokenType);
+        Assert.True(reader.StatementType!.IsStruct);
+        Assert.Empty(reader.StatementType.StructFields);
+
+        Assert.True(reader.Read()); // StructStart
+        Assert.Equal(PaktTokenType.StructStart, reader.TokenType);
+
+        Assert.True(reader.Read()); // StructEnd
+        Assert.Equal(PaktTokenType.StructEnd, reader.TokenType);
+
+        Assert.True(reader.Read()); // AssignEnd
+        Assert.False(reader.Read());
+        reader.Dispose();
+    }
+
+    [Fact]
+    public void EmptyTuple_ValidType()
+    {
+        var data = ToUtf8("v:() = ()");
+        var reader = new PaktReader(data);
+
+        Assert.True(reader.Read()); // AssignStart
+        Assert.Equal(PaktTokenType.AssignStart, reader.TokenType);
+        Assert.True(reader.StatementType!.IsTuple);
+        Assert.Empty(reader.StatementType.TupleElements);
+
+        Assert.True(reader.Read()); // TupleStart
+        Assert.Equal(PaktTokenType.TupleStart, reader.TokenType);
+
+        Assert.True(reader.Read()); // TupleEnd
+        Assert.Equal(PaktTokenType.TupleEnd, reader.TokenType);
+
+        Assert.True(reader.Read()); // AssignEnd
+        Assert.False(reader.Read());
+        reader.Dispose();
+    }
+
+    [Fact]
+    public void NulByte_TerminatesUnit()
+    {
+        // Two statements separated by NUL — only the first should be read
+        var first = Encoding.UTF8.GetBytes("name:str = 'hello'");
+        var second = Encoding.UTF8.GetBytes("other:int = 42");
+        var combined = new byte[first.Length + 1 + second.Length];
+        first.CopyTo(combined, 0);
+        combined[first.Length] = 0x00; // NUL terminator
+        second.CopyTo(combined, first.Length + 1);
+
+        var reader = new PaktReader(combined);
+
+        Assert.True(reader.Read()); // AssignStart
+        Assert.Equal("name", reader.StatementName);
+
+        Assert.True(reader.Read()); // ScalarValue
+        Assert.Equal("hello", reader.GetString());
+
+        Assert.True(reader.Read()); // AssignEnd
+
+        // NUL should terminate — second statement not seen
+        Assert.False(reader.Read());
+        reader.Dispose();
+    }
+
+    [Fact]
+    public void NulByte_TerminatesPack()
+    {
+        var pack = Encoding.UTF8.GetBytes("items:[int] << 1, 2, 3");
+        var next = Encoding.UTF8.GetBytes("other:str = 'x'");
+        var combined = new byte[pack.Length + 1 + next.Length];
+        pack.CopyTo(combined, 0);
+        combined[pack.Length] = 0x00;
+        next.CopyTo(combined, pack.Length + 1);
+
+        var reader = new PaktReader(combined);
+
+        Assert.True(reader.Read()); // PackStart
+        Assert.Equal(PaktTokenType.PackStart, reader.TokenType);
+
+        Assert.True(reader.Read()); Assert.Equal(1L, reader.GetInt64());
+        Assert.True(reader.Read()); Assert.Equal(2L, reader.GetInt64());
+        Assert.True(reader.Read()); Assert.Equal(3L, reader.GetInt64());
+
+        Assert.True(reader.Read()); // PackEnd
+        Assert.Equal(PaktTokenType.PackEnd, reader.TokenType);
+
+        // NUL should terminate — next statement not seen
+        Assert.False(reader.Read());
+        reader.Dispose();
+    }
 }

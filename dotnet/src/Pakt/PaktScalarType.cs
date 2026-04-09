@@ -29,11 +29,8 @@ public enum PaktScalarType
     /// <summary>ISO 8601 date: <c>date</c></summary>
     Date,
 
-    /// <summary>ISO 8601 time with timezone: <c>time</c></summary>
-    Time,
-
-    /// <summary>ISO 8601 datetime with timezone: <c>datetime</c></summary>
-    DateTime,
+    /// <summary>ISO 8601 timestamp with timezone: <c>ts</c></summary>
+    Ts,
 
     /// <summary>Raw bytes (hex or base64 encoded): <c>bin</c></summary>
     Bin,

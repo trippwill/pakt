@@ -6,7 +6,7 @@ using Pakt.Serialization;
 namespace Pakt;
 
 /// <summary>
-/// Asynchronous statement-level reader for PAKT documents.
+/// Asynchronous statement-level reader for PAKT units.
 /// This is the primary consumption API — iterates statements one at a time from a Stream.
 /// </summary>
 /// <remarks>
@@ -24,7 +24,7 @@ public sealed class PaktStreamReader : IAsyncDisposable
     // Current statement metadata
     private string? _statementName;
     private PaktType? _statementType;
-    private bool _isStream;
+    private bool _isPack;
     private int _valueStart; // byte offset where value begins (after '=' or '<<')
     private bool _hasStatement;
 
@@ -83,11 +83,11 @@ public sealed class PaktStreamReader : IAsyncDisposable
     /// <summary>The type of the current statement.</summary>
     public PaktType StatementType => _statementType ?? throw new InvalidOperationException("No current statement. Call ReadStatementAsync first.");
 
-    /// <summary>Whether the current statement uses stream syntax (<c>&lt;&lt;</c>).</summary>
-    public bool IsStream => _isStream;
+    /// <summary>Whether the current statement uses pack syntax (<c>&lt;&lt;</c>).</summary>
+    public bool IsPack => _isPack;
 
     /// <summary>Advance to the next top-level statement.</summary>
-    /// <returns><c>true</c> if a statement was read; <c>false</c> at end of document.</returns>
+    /// <returns><c>true</c> if a statement was read; <c>false</c> at end of unit.</returns>
     public ValueTask<bool> ReadStatementAsync(CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -115,12 +115,12 @@ public sealed class PaktStreamReader : IAsyncDisposable
                 return new ValueTask<bool>(false);
             }
 
-            if (reader.TokenType != PaktTokenType.AssignStart && reader.TokenType != PaktTokenType.StreamStart)
+            if (reader.TokenType != PaktTokenType.AssignStart && reader.TokenType != PaktTokenType.PackStart)
                 throw new PaktException($"Expected statement start, got {reader.TokenType}", reader.Position, PaktErrorCode.Syntax);
 
             _statementName = reader.StatementName;
             _statementType = reader.StatementType;
-            _isStream = reader.IsStreamStatement;
+            _isPack = reader.IsPackStatement;
             _valueStart = _offset + reader.BytesConsumed;
             _hasStatement = true;
 
@@ -133,16 +133,16 @@ public sealed class PaktStreamReader : IAsyncDisposable
     }
 
     /// <summary>
-    /// Deserialize the current assignment's value using generated type info.
-    /// Call after <see cref="ReadStatementAsync"/> returns true and <see cref="IsStream"/> is false.
+    /// Deserialize the current assign statement's value using generated type info.
+    /// Call after <see cref="ReadStatementAsync"/> returns true and <see cref="IsPack"/> is false.
     /// </summary>
     public T Deserialize<T>(PaktTypeInfo<T> typeInfo)
     {
         ThrowIfDisposed();
         if (!_hasStatement)
             throw new InvalidOperationException("No current statement. Call ReadStatementAsync first.");
-        if (_isStream)
-            throw new InvalidOperationException("Current statement is a stream. Use ReadStreamElements instead.");
+        if (_isPack)
+            throw new InvalidOperationException("Current statement is a pack. Use ReadPackElements instead.");
         if (typeInfo.Deserialize is null)
             throw new InvalidOperationException($"PaktTypeInfo<{typeof(T).Name}> does not have a Deserialize delegate. Use source-generated type info.");
 
@@ -152,22 +152,22 @@ public sealed class PaktStreamReader : IAsyncDisposable
     }
 
     /// <summary>
-    /// Iterate elements of a stream statement as <see cref="IAsyncEnumerable{T}"/>.
-    /// Call after <see cref="ReadStatementAsync"/> returns true and <see cref="IsStream"/> is true.
+    /// Iterate elements of a pack statement as <see cref="IAsyncEnumerable{T}"/>.
+    /// Call after <see cref="ReadStatementAsync"/> returns true and <see cref="IsPack"/> is true.
     /// </summary>
-    public async IAsyncEnumerable<T> ReadStreamElements<T>(
+    public async IAsyncEnumerable<T> ReadPackElements<T>(
         PaktTypeInfo<T> typeInfo,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         ThrowIfDisposed();
         if (!_hasStatement)
             throw new InvalidOperationException("No current statement. Call ReadStatementAsync first.");
-        if (!_isStream)
-            throw new InvalidOperationException("Current statement is not a stream. Use Deserialize instead.");
+        if (!_isPack)
+            throw new InvalidOperationException("Current statement is not a pack. Use Deserialize instead.");
         if (typeInfo.Deserialize is null)
             throw new InvalidOperationException($"PaktTypeInfo<{typeof(T).Name}> does not have a Deserialize delegate. Use source-generated type info.");
 
-        var elements = DeserializeStreamElementsCore(typeInfo);
+        var elements = DeserializePackElementsCore(typeInfo);
         _hasStatement = false;
         foreach (var element in elements)
         {
@@ -227,19 +227,19 @@ public sealed class PaktStreamReader : IAsyncDisposable
         }
     }
 
-    private List<T> DeserializeStreamElementsCore<T>(PaktTypeInfo<T> typeInfo)
+    private List<T> DeserializePackElementsCore<T>(PaktTypeInfo<T> typeInfo)
     {
-        var synthetic = BuildSyntheticStream();
+        var synthetic = BuildSyntheticPack();
         var headerLen = synthetic.Length - (_length - _valueStart);
         var reader = new PaktReader(synthetic, _options);
         try
         {
-            reader.Read(); // StreamStart
+            reader.Read(); // PackStart
             var list = new List<T>();
 
             while (reader.Read())
             {
-                if (reader.TokenType == PaktTokenType.StreamEnd)
+                if (reader.TokenType == PaktTokenType.PackEnd)
                     break;
 
                 list.Add(typeInfo.Deserialize!(ref reader));
@@ -259,9 +259,9 @@ public sealed class PaktStreamReader : IAsyncDisposable
         byte[] synthetic;
         int headerLen;
 
-        if (_isStream)
+        if (_isPack)
         {
-            synthetic = BuildSyntheticStream();
+            synthetic = BuildSyntheticPack();
             headerLen = synthetic.Length - (_length - _valueStart);
         }
         else
@@ -275,7 +275,7 @@ public sealed class PaktStreamReader : IAsyncDisposable
         {
             while (reader.Read())
             {
-                if (reader.TokenType == PaktTokenType.AssignEnd || reader.TokenType == PaktTokenType.StreamEnd)
+                if (reader.TokenType == PaktTokenType.AssignEnd || reader.TokenType == PaktTokenType.PackEnd)
                     break;
             }
 
@@ -300,7 +300,7 @@ public sealed class PaktStreamReader : IAsyncDisposable
     }
 
     // Builds: _:<type> << <remaining_value_bytes>
-    private byte[] BuildSyntheticStream()
+    private byte[] BuildSyntheticPack()
     {
         var typeStr = _statementType!.ToString();
         var header = Encoding.UTF8.GetBytes($"_:{typeStr} << ");

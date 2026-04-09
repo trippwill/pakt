@@ -312,7 +312,7 @@ public static class BenchmarkData
     }
 
     // ---------------------------------------------------------------------------
-    // FS: filesystem metadata with stream syntax
+    // FS: filesystem metadata with pack syntax
     // ---------------------------------------------------------------------------
 
     public static (byte[] Pakt, byte[] Json, FSDataset Dataset) GenerateFS(int n)
@@ -381,7 +381,7 @@ public static class BenchmarkData
             Entries = entries,
         };
 
-        // Build PAKT bytes using stream syntax (<<)
+        // Build PAKT bytes using pack syntax (<<)
         var pb = new StringBuilder();
         pb.AppendLine("root:str = '/data/warehouse'");
         pb.AppendLine("scanned:str = '2026-06-01T14:30:00Z'");
@@ -427,7 +427,7 @@ public static class BenchmarkData
 }
 
 // ---------------------------------------------------------------------------
-// Async enumeration helper (PaktStreamReader yields IAsyncEnumerable)
+// Async enumeration helper (PaktStreamReader yields IAsyncEnumerable via ReadPackElements)
 // ---------------------------------------------------------------------------
 
 internal static class AsyncHelper

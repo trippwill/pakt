@@ -161,7 +161,7 @@ public class PaktSerializerConvenienceTests
     }
 
     [Fact]
-    public void Deserialize_EmptyDocument_Throws()
+    public void Deserialize_EmptyUnit_Throws()
     {
         Assert.Throws<PaktException>(() =>
             PaktSerializer.Deserialize(ReadOnlySpan<byte>.Empty, TestPaktContext.Default.SimpleServer));

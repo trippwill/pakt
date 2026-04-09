@@ -216,11 +216,8 @@ namespace Pakt.Generators.Emitters
                 case PaktTypeKind.Date:
                     sb.AppendLine($"{target} = reader.GetDate();");
                     break;
-                case PaktTypeKind.Time:
-                    sb.AppendLine($"{target} = reader.GetTime();");
-                    break;
-                case PaktTypeKind.DateTime:
-                    sb.AppendLine($"{target} = reader.GetDateTime();");
+                case PaktTypeKind.Ts:
+                    sb.AppendLine($"{target} = reader.GetTimestamp();");
                     break;
                 case PaktTypeKind.Bin:
                     sb.AppendLine("var _binData = new byte[reader.ValueSpan.Length / 2];");
@@ -404,8 +401,7 @@ namespace Pakt.Generators.Emitters
                 case PaktTypeKind.Bool:
                 case PaktTypeKind.Uuid:
                 case PaktTypeKind.Date:
-                case PaktTypeKind.Time:
-                case PaktTypeKind.DateTime:
+                case PaktTypeKind.Ts:
                     return true;
                 default:
                     return false;
@@ -441,11 +437,8 @@ namespace Pakt.Generators.Emitters
                 case PaktTypeKind.Date:
                     sb.AppendLine($"writer.WriteDateValue({expr});");
                     break;
-                case PaktTypeKind.Time:
-                    sb.AppendLine($"writer.WriteTimeValue({expr});");
-                    break;
-                case PaktTypeKind.DateTime:
-                    sb.AppendLine($"writer.WriteDateTimeValue({expr});");
+                case PaktTypeKind.Ts:
+                    sb.AppendLine($"writer.WriteTimestampValue({expr});");
                     break;
                 case PaktTypeKind.Bin:
                     sb.AppendLine($"writer.WriteBinValue({expr});");
@@ -604,8 +597,7 @@ namespace Pakt.Generators.Emitters
                 case PaktTypeKind.Bool: return $"global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Bool{nullable})";
                 case PaktTypeKind.Uuid: return $"global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Uuid{nullable})";
                 case PaktTypeKind.Date: return $"global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Date{nullable})";
-                case PaktTypeKind.Time: return $"global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Time{nullable})";
-                case PaktTypeKind.DateTime: return $"global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.DateTime{nullable})";
+                case PaktTypeKind.Ts: return $"global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Ts{nullable})";
                 case PaktTypeKind.Bin: return $"global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Bin{nullable})";
 
                 case PaktTypeKind.Atom:
@@ -662,8 +654,7 @@ namespace Pakt.Generators.Emitters
                 case PaktTypeKind.Bool: return "global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Bool)";
                 case PaktTypeKind.Uuid: return "global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Uuid)";
                 case PaktTypeKind.Date: return "global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Date)";
-                case PaktTypeKind.Time: return "global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Time)";
-                case PaktTypeKind.DateTime: return "global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.DateTime)";
+                case PaktTypeKind.Ts: return "global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Ts)";
                 case PaktTypeKind.Bin: return "global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Bin)";
                 default: return "global::Pakt.PaktType.Scalar(global::Pakt.PaktScalarType.Str)";
             }
@@ -712,8 +703,7 @@ namespace Pakt.Generators.Emitters
                 case PaktTypeKind.Bool: return "reader.GetBoolean()";
                 case PaktTypeKind.Uuid: return "reader.GetGuid()";
                 case PaktTypeKind.Date: return "reader.GetDate()";
-                case PaktTypeKind.Time: return "reader.GetTime()";
-                case PaktTypeKind.DateTime: return "reader.GetDateTime()";
+                case PaktTypeKind.Ts: return "reader.GetTimestamp()";
                 case PaktTypeKind.Atom: return "reader.GetAtom()";
                 default: return "reader.GetString()";
             }
@@ -730,8 +720,7 @@ namespace Pakt.Generators.Emitters
                 case PaktTypeKind.Bool: return $"writer.WriteBoolValue({expr});";
                 case PaktTypeKind.Uuid: return $"writer.WriteUuidValue({expr});";
                 case PaktTypeKind.Date: return $"writer.WriteDateValue({expr});";
-                case PaktTypeKind.Time: return $"writer.WriteTimeValue({expr});";
-                case PaktTypeKind.DateTime: return $"writer.WriteDateTimeValue({expr});";
+                case PaktTypeKind.Ts: return $"writer.WriteTimestampValue({expr});";
                 case PaktTypeKind.Bin: return $"writer.WriteBinValue({expr});";
                 case PaktTypeKind.Atom: return $"writer.WriteAtomValue({expr}.AsSpan());";
                 default: return $"writer.WriteStringValue({expr}.AsSpan());";

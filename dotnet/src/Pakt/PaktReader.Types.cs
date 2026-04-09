@@ -10,25 +10,17 @@ public ref partial struct PaktReader
     // -----------------------------------------------------------------------
 
     /// <summary>
-    /// Reads a ':' followed by a type annotation and optional '?' nullable suffix.
+    /// Reads a ':' followed by a type annotation.
     /// </summary>
     private PaktType ReadTypeAnnotation()
     {
         ExpectByte((byte)':');
-        var typ = ReadType();
-
-        if (_consumed < _buffer.Length && _buffer[_consumed] == '?')
-        {
-            _consumed++;
-            _bytePositionInLine++;
-            return MakeNullable(typ);
-        }
-
-        return typ;
+        return ReadType();
     }
 
     /// <summary>
-    /// Dispatches on the next byte to parse a type (scalar, atom set, or composite).
+    /// Dispatches on the next byte to parse a type (scalar, atom set, or composite),
+    /// followed by an optional '?' nullable suffix.
     /// </summary>
     private PaktType ReadType()
     {
@@ -38,7 +30,7 @@ public ref partial struct PaktReader
             ThrowError("Expected type, got EOF", PaktErrorCode.UnexpectedEof);
 
         byte b = _buffer[_consumed];
-        return b switch
+        var typ = b switch
         {
             (byte)'|' => ReadAtomSetType(),
             (byte)'{' => ReadStructType(),
@@ -49,6 +41,15 @@ public ref partial struct PaktReader
             _ => throw new PaktException(
                 $"Unexpected character in type: '{(char)b}'", Position, PaktErrorCode.Syntax),
         };
+
+        if (_consumed < _buffer.Length && _buffer[_consumed] == '?')
+        {
+            _consumed++;
+            _bytePositionInLine++;
+            return MakeNullable(typ);
+        }
+
+        return typ;
     }
 
     private PaktType ReadScalarTypeName()
@@ -67,8 +68,7 @@ public ref partial struct PaktReader
         "bool" => PaktScalarType.Bool,
         "uuid" => PaktScalarType.Uuid,
         "date" => PaktScalarType.Date,
-        "time" => PaktScalarType.Time,
-        "datetime" => PaktScalarType.DateTime,
+        "ts" => PaktScalarType.Ts,
         "bin" => PaktScalarType.Bin,
         _ => throw new PaktException($"Unknown scalar type '{name}'", PaktPosition.None, PaktErrorCode.Syntax),
     };
@@ -112,8 +112,15 @@ public ref partial struct PaktReader
         SkipWSAndNewlines();
 
         var fields = ImmutableArray.CreateBuilder<PaktField>();
-        var first = ReadFieldDecl();
-        fields.Add(first);
+
+        if (_consumed < _buffer.Length && _buffer[_consumed] == '}')
+        {
+            _consumed++;
+            _bytePositionInLine++;
+            return PaktType.Struct(fields.ToImmutable());
+        }
+
+        fields.Add(ReadFieldDecl());
 
         while (true)
         {
@@ -145,13 +152,6 @@ public ref partial struct PaktReader
         ExpectByte((byte)':');
         var typ = ReadType();
 
-        if (_consumed < _buffer.Length && _buffer[_consumed] == '?')
-        {
-            _consumed++;
-            _bytePositionInLine++;
-            typ = MakeNullable(typ);
-        }
-
         return new PaktField(name, typ);
     }
 
@@ -161,7 +161,15 @@ public ref partial struct PaktReader
         SkipWSAndNewlines();
 
         var elements = ImmutableArray.CreateBuilder<PaktType>();
-        elements.Add(ReadTypeWithNullable());
+
+        if (_consumed < _buffer.Length && _buffer[_consumed] == ')')
+        {
+            _consumed++;
+            _bytePositionInLine++;
+            return PaktType.Tuple(elements.ToImmutable());
+        }
+
+        elements.Add(ReadType());
 
         while (true)
         {
@@ -181,7 +189,7 @@ public ref partial struct PaktReader
             _consumed++;
             _bytePositionInLine++;
             SkipWSAndNewlines();
-            elements.Add(ReadTypeWithNullable());
+            elements.Add(ReadType());
         }
 
         return PaktType.Tuple(elements.ToImmutable());
@@ -191,7 +199,7 @@ public ref partial struct PaktReader
     {
         ExpectByte((byte)'[');
         SkipWSAndNewlines();
-        var elemType = ReadTypeWithNullable();
+        var elemType = ReadType();
         SkipWSAndNewlines();
         ExpectByte((byte)']');
         return PaktType.List(elemType);
@@ -201,29 +209,14 @@ public ref partial struct PaktReader
     {
         ExpectByte((byte)'<');
         SkipWSAndNewlines();
-        var keyType = ReadTypeWithNullable();
+        var keyType = ReadType();
         SkipWSAndNewlines();
         ExpectByte((byte)';');
         SkipWSAndNewlines();
-        var valType = ReadTypeWithNullable();
+        var valType = ReadType();
         SkipWSAndNewlines();
         ExpectByte((byte)'>');
         return PaktType.Map(keyType, valType);
-    }
-
-    /// <summary>
-    /// Reads a type followed by optional '?' nullable suffix.
-    /// </summary>
-    private PaktType ReadTypeWithNullable()
-    {
-        var typ = ReadType();
-        if (_consumed < _buffer.Length && _buffer[_consumed] == '?')
-        {
-            _consumed++;
-            _bytePositionInLine++;
-            return MakeNullable(typ);
-        }
-        return typ;
     }
 
     private static PaktType MakeNullable(PaktType type)

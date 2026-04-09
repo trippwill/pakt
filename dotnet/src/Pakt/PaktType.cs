@@ -41,10 +41,10 @@ public sealed class PaktType : IEquatable<PaktType>
     public bool IsAtomSet => !AtomMembers.IsDefaultOrEmpty;
 
     /// <summary>True if this is a struct type.</summary>
-    public bool IsStruct => !StructFields.IsDefaultOrEmpty;
+    public bool IsStruct => !StructFields.IsDefault;
 
     /// <summary>True if this is a tuple type.</summary>
-    public bool IsTuple => !TupleElements.IsDefaultOrEmpty;
+    public bool IsTuple => !TupleElements.IsDefault;
 
     /// <summary>True if this is a list type.</summary>
     public bool IsList => ListElement is not null;

@@ -161,11 +161,14 @@ public class ScalarReaderTests
     }
 
     [Fact]
-    public void Time_WithZ()
+    public void Timestamp_WithZ()
     {
-        var reader = new PaktReader(ToUtf8("t:time = 14:30:00Z"));
+        var reader = new PaktReader(ToUtf8("t:ts = 2026-06-01T14:30:00Z"));
         reader.Read(); reader.Read();
-        var time = reader.GetTime();
+        var time = reader.GetTimestamp();
+        Assert.Equal(2026, time.Year);
+        Assert.Equal(6, time.Month);
+        Assert.Equal(1, time.Day);
         Assert.Equal(14, time.Hour);
         Assert.Equal(30, time.Minute);
         Assert.Equal(TimeSpan.Zero, time.Offset);
@@ -173,11 +176,14 @@ public class ScalarReaderTests
     }
 
     [Fact]
-    public void Time_WithOffset()
+    public void Timestamp_WithOffset()
     {
-        var reader = new PaktReader(ToUtf8("t:time = 14:30:00-04:00"));
+        var reader = new PaktReader(ToUtf8("t:ts = 2026-06-01T14:30:00-04:00"));
         reader.Read(); reader.Read();
-        var time = reader.GetTime();
+        var time = reader.GetTimestamp();
+        Assert.Equal(2026, time.Year);
+        Assert.Equal(6, time.Month);
+        Assert.Equal(1, time.Day);
         Assert.Equal(14, time.Hour);
         Assert.Equal(30, time.Minute);
         Assert.Equal(TimeSpan.FromHours(-4), time.Offset);
@@ -185,11 +191,11 @@ public class ScalarReaderTests
     }
 
     [Fact]
-    public void DateTime_Value()
+    public void Timestamp_Value()
     {
-        var reader = new PaktReader(ToUtf8("dt:datetime = 2026-06-01T14:30:00Z"));
+        var reader = new PaktReader(ToUtf8("dt:ts = 2026-06-01T14:30:00Z"));
         reader.Read(); reader.Read();
-        var dt = reader.GetDateTime();
+        var dt = reader.GetTimestamp();
         Assert.Equal(2026, dt.Year);
         Assert.Equal(6, dt.Month);
         Assert.Equal(1, dt.Day);

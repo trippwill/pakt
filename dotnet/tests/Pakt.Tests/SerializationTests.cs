@@ -42,8 +42,8 @@ public class AttributeTests
     [Fact]
     public void PaktScalar_StoresScalarType()
     {
-        var attr = new PaktScalarAttribute(PaktScalarType.Time);
-        Assert.Equal(PaktScalarType.Time, attr.ScalarType);
+        var attr = new PaktScalarAttribute(PaktScalarType.Ts);
+        Assert.Equal(PaktScalarType.Ts, attr.ScalarType);
     }
 }
 

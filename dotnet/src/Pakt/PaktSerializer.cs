@@ -4,21 +4,21 @@ using Pakt.Serialization;
 namespace Pakt;
 
 /// <summary>
-/// Convenience API for serializing and deserializing single PAKT assignment values.
-/// For multi-statement documents, use <see cref="PaktStreamReader"/>.
+/// Convenience API for serializing and deserializing single PAKT assign values.
+/// For multi-statement units, use <see cref="PaktStreamReader"/>.
 /// </summary>
 public static class PaktSerializer
 {
     /// <summary>
-    /// Deserialize a PAKT document containing a single assignment statement.
-    /// The assignment's value is deserialized using the generated type info.
+    /// Deserialize a PAKT unit containing a single assign statement.
+    /// The statement's value is deserialized using the generated type info.
     /// </summary>
     /// <typeparam name="T">The type to deserialize into.</typeparam>
-    /// <param name="data">UTF-8 encoded PAKT document bytes.</param>
+    /// <param name="data">UTF-8 encoded PAKT unit bytes.</param>
     /// <param name="typeInfo">Source-generated type info with Deserialize delegate.</param>
     /// <returns>The deserialized value.</returns>
     /// <exception cref="InvalidOperationException">If typeInfo lacks a Deserialize delegate.</exception>
-    /// <exception cref="PaktException">If the document is malformed.</exception>
+    /// <exception cref="PaktException">If the unit is malformed.</exception>
     public static T Deserialize<T>(ReadOnlySpan<byte> data, PaktTypeInfo<T> typeInfo)
         where T : new()
     {
@@ -30,7 +30,7 @@ public static class PaktSerializer
         try
         {
             if (!reader.Read())
-                throw new PaktException("Empty document", PaktPosition.None, PaktErrorCode.UnexpectedEof);
+                throw new PaktException("Empty unit", PaktPosition.None, PaktErrorCode.UnexpectedEof);
 
             if (reader.TokenType == PaktTokenType.AssignStart)
             {
@@ -47,13 +47,13 @@ public static class PaktSerializer
     }
 
     /// <summary>
-    /// Serialize a value to PAKT bytes as a single assignment statement.
+    /// Serialize a value to PAKT bytes as a single assign statement.
     /// </summary>
     /// <typeparam name="T">The type to serialize.</typeparam>
     /// <param name="value">The value to serialize.</param>
     /// <param name="typeInfo">Source-generated type info with Serialize delegate.</param>
     /// <param name="statementName">The name for the top-level statement.</param>
-    /// <returns>UTF-8 encoded PAKT document bytes.</returns>
+    /// <returns>UTF-8 encoded PAKT unit bytes.</returns>
     /// <exception cref="InvalidOperationException">If typeInfo lacks a Serialize delegate.</exception>
     public static byte[] Serialize<T>(T value, PaktTypeInfo<T> typeInfo, string statementName = "value")
     {

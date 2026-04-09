@@ -266,7 +266,7 @@ namespace Pakt.Generators.Parser
                     return new AnalyzedProperty(PaktTypeKind.Date, nullable, typeFullName);
 
                 if (originalFqn == "global::System.DateTimeOffset")
-                    return new AnalyzedProperty(PaktTypeKind.DateTime, nullable, typeFullName);
+                    return new AnalyzedProperty(PaktTypeKind.Ts, nullable, typeFullName);
 
                 // List<T>, IList<T>, IReadOnlyList<T>, ICollection<T>
                 if (IsListLikeType(namedType))
@@ -345,7 +345,7 @@ namespace Pakt.Generators.Parser
                 var fqn = named.OriginalDefinition.ToDisplayString(FullyQualifiedFormat);
                 if (fqn == "global::System.Guid") return PaktTypeKind.Uuid;
                 if (fqn == "global::System.DateOnly") return PaktTypeKind.Date;
-                if (fqn == "global::System.DateTimeOffset") return PaktTypeKind.DateTime;
+                if (fqn == "global::System.DateTimeOffset") return PaktTypeKind.Ts;
                 if (IsListLikeType(named)) return PaktTypeKind.List;
                 if (IsDictionaryType(named)) return PaktTypeKind.Map;
             }
@@ -382,8 +382,7 @@ namespace Pakt.Generators.Parser
                 case 5: return PaktTypeKind.Bool;
                 case 6: return PaktTypeKind.Uuid;
                 case 7: return PaktTypeKind.Date;
-                case 8: return PaktTypeKind.Time;
-                case 9: return PaktTypeKind.DateTime;
+                case 8: return PaktTypeKind.Ts;
                 case 10: return PaktTypeKind.Bin;
                 case 11: return PaktTypeKind.Atom;
                 default: return PaktTypeKind.Str;

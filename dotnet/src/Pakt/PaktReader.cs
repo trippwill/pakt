@@ -29,7 +29,7 @@ public ref partial struct PaktReader
     private string? _currentName;
     private string? _statementName;
     private PaktType? _statementType;
-    private bool _isStreamStatement;
+    private bool _isPackStatement;
     private bool _isNullValue;
 
     private readonly PaktReaderOptions _options;
@@ -60,7 +60,7 @@ public ref partial struct PaktReader
         _currentName = null;
         _statementName = null;
         _statementType = null;
-        _isStreamStatement = false;
+        _isPackStatement = false;
         _isNullValue = false;
         _options = options.MaxDepth > 0 ? options : PaktReaderOptions.Default;
         _disposed = false;
@@ -88,8 +88,8 @@ public ref partial struct PaktReader
     /// <summary>The type of the current top-level statement.</summary>
     public readonly PaktType? StatementType => _statementType;
 
-    /// <summary>Whether the current statement uses stream syntax (<c>&lt;&lt;</c>).</summary>
-    public readonly bool IsStreamStatement => _isStreamStatement;
+    /// <summary>Whether the current statement uses pack syntax (<c>&lt;&lt;</c>).</summary>
+    public readonly bool IsPackStatement => _isPackStatement;
 
     /// <summary>The name of the current field or element (may be a field name, index like "[0]", or statement name).</summary>
     public readonly string? CurrentName => _currentName;
@@ -158,7 +158,7 @@ public ref partial struct PaktReader
     {
         Top,
         AssignStart,
-        StreamStart,
+        PackStart,
         Value,
         StructOpen,
         StructField,
@@ -178,19 +178,19 @@ public ref partial struct PaktReader
         MapAssign,
         MapEntry,
         MapClose,
-        StreamListItem,
-        StreamListSep,
-        StreamMapKey,
-        StreamMapAfterKey,
-        StreamMapSep,
+        PackListItem,
+        PackListSep,
+        PackMapKey,
+        PackMapAfterKey,
+        PackMapSep,
         AssignEnd,
-        StreamEnd,
+        PackEnd,
     }
 
     private enum FrameKind
     {
         Assign,
-        Stream,
+        Pack,
         Struct,
         Tuple,
         List,
@@ -263,8 +263,8 @@ public ref partial struct PaktReader
                 return StepTop();
             case ParserState.AssignStart:
                 return StepAssignStart();
-            case ParserState.StreamStart:
-                return StepStreamStart();
+            case ParserState.PackStart:
+                return StepPackStart();
             case ParserState.Value:
                 return StepValue();
             case ParserState.StructOpen:
@@ -304,20 +304,20 @@ public ref partial struct PaktReader
                 return StepMapEntry();
             case ParserState.MapClose:
                 return StepMapClose();
-            case ParserState.StreamListItem:
-                return StepStreamListItem();
-            case ParserState.StreamListSep:
-                return StepStreamListSep();
-            case ParserState.StreamMapKey:
-                return StepStreamMapKey();
-            case ParserState.StreamMapAfterKey:
-                return StepStreamMapAfterKey();
-            case ParserState.StreamMapSep:
-                return StepStreamMapSep();
+            case ParserState.PackListItem:
+                return StepPackListItem();
+            case ParserState.PackListSep:
+                return StepPackListSep();
+            case ParserState.PackMapKey:
+                return StepPackMapKey();
+            case ParserState.PackMapAfterKey:
+                return StepPackMapAfterKey();
+            case ParserState.PackMapSep:
+                return StepPackMapSep();
             case ParserState.AssignEnd:
                 return StepAssignEnd();
-            case ParserState.StreamEnd:
-                return StepStreamEnd();
+            case ParserState.PackEnd:
+                return StepPackEnd();
             default:
                 ThrowError($"Unknown parser state: {_state}", PaktErrorCode.Syntax);
                 return StepResult.Eof; // unreachable
@@ -330,6 +330,10 @@ public ref partial struct PaktReader
         if (_consumed >= _buffer.Length)
             return StepResult.Eof;
 
+        // NUL byte is end-of-unit (transport framing per §10.1)
+        if (_buffer[_consumed] == 0x00)
+            return StepResult.Eof;
+
         // Read statement header: IDENT:type = value  or  IDENT:type << value, ...
         var identPos = Position;
         var name = ReadIdent();
@@ -339,7 +343,7 @@ public ref partial struct PaktReader
         if (_consumed >= _buffer.Length)
             ThrowError("Expected '=' or '<<' after statement header", PaktErrorCode.UnexpectedEof);
 
-        bool isStream = false;
+        bool isPack = false;
         byte b = _buffer[_consumed];
         if (b == '=')
         {
@@ -350,9 +354,9 @@ public ref partial struct PaktReader
         {
             _consumed += 2;
             _bytePositionInLine += 2;
-            isStream = true;
+            isPack = true;
             if (!type.IsList && !type.IsMap)
-                ThrowError($"Stream type must be list or map, got {type}", PaktErrorCode.Syntax);
+                ThrowError($"Pack type must be list or map, got {type}", PaktErrorCode.Syntax);
         }
         else
         {
@@ -363,13 +367,13 @@ public ref partial struct PaktReader
 
         _statementName = name;
         _statementType = type;
-        _isStreamStatement = isStream;
+        _isPackStatement = isPack;
 
-        if (isStream)
+        if (isPack)
         {
             var fr = new Frame
             {
-                Kind = FrameKind.Stream,
+                Kind = FrameKind.Pack,
                 Resume = ParserState.Top,
                 Name = name,
                 Pos = identPos,
@@ -382,7 +386,7 @@ public ref partial struct PaktReader
                 fr.MapValue = type.MapValue;
             }
             Push(fr);
-            _state = ParserState.StreamStart;
+            _state = ParserState.PackStart;
         }
         else
         {
@@ -416,21 +420,21 @@ public ref partial struct PaktReader
         return StepResult.Emit;
     }
 
-    private StepResult StepStreamStart()
+    private StepResult StepPackStart()
     {
         ref var fr = ref Current();
         PaktTokenType kind;
         if (fr.ListElement is not null)
         {
             fr.ElemIdx = 0;
-            _state = ParserState.StreamListItem;
-            kind = PaktTokenType.StreamStart;
+            _state = ParserState.PackListItem;
+            kind = PaktTokenType.PackStart;
         }
         else
         {
             fr.KeyStr = "";
-            _state = ParserState.StreamMapKey;
-            kind = PaktTokenType.StreamStart;
+            _state = ParserState.PackMapKey;
+            kind = PaktTokenType.PackStart;
         }
         _tokenType = kind;
         _scalarType = PaktScalarType.None;
@@ -896,80 +900,80 @@ public ref partial struct PaktReader
         return StepResult.Emit;
     }
 
-    // -- Stream states --
+    // -- Pack states --
 
-    private StepResult StepStreamListItem()
+    private StepResult StepPackListItem()
     {
         ref var fr = ref Current();
-        if (IsStreamTerminated())
+        if (IsPackTerminated())
         {
-            _state = ParserState.StreamEnd;
+            _state = ParserState.PackEnd;
             return StepResult.Continue;
         }
 
-        fr.ChildResume = ParserState.StreamListSep;
+        fr.ChildResume = ParserState.PackListSep;
         _valType = fr.ListElement;
         _valName = $"[{fr.ElemIdx}]";
         _state = ParserState.Value;
         return StepResult.Continue;
     }
 
-    private StepResult StepStreamListSep()
+    private StepResult StepPackListSep()
     {
         ref var fr = ref Current();
         fr.ElemIdx++;
 
         if (!TryReadSep())
         {
-            if (IsStreamTerminated())
+            if (IsPackTerminated())
             {
-                _state = ParserState.StreamEnd;
+                _state = ParserState.PackEnd;
                 return StepResult.Continue;
             }
-            ThrowError("Expected separator between stream items", PaktErrorCode.Syntax);
+            ThrowError("Expected separator between pack items", PaktErrorCode.Syntax);
         }
 
-        _state = ParserState.StreamListItem;
+        _state = ParserState.PackListItem;
         return StepResult.Continue;
     }
 
-    private StepResult StepStreamMapKey()
+    private StepResult StepPackMapKey()
     {
         ref var fr = ref Current();
-        if (IsStreamTerminated())
+        if (IsPackTerminated())
         {
-            _state = ParserState.StreamEnd;
+            _state = ParserState.PackEnd;
             return StepResult.Continue;
         }
 
-        return EmitMapKey(fr.MapKey!, ParserState.StreamMapAfterKey);
+        return EmitMapKey(fr.MapKey!, ParserState.PackMapAfterKey);
     }
 
-    private StepResult StepStreamMapAfterKey()
+    private StepResult StepPackMapAfterKey()
     {
         ref var fr = ref Current();
         SkipWS();
         ExpectByte((byte)';');
         SkipWS();
-        fr.ChildResume = ParserState.StreamMapSep;
+        fr.ChildResume = ParserState.PackMapSep;
         _valType = fr.MapValue;
         _valName = fr.KeyStr;
         _state = ParserState.Value;
         return StepResult.Continue;
     }
 
-    private StepResult StepStreamMapSep()
+    private StepResult StepPackMapSep()
     {
         if (!TryReadSep())
         {
-            if (IsStreamTerminated())
+            if (IsPackTerminated())
             {
-                _state = ParserState.StreamEnd;
+                _state = ParserState.PackEnd;
                 return StepResult.Continue;
             }
-            ThrowError("Expected separator between stream map entries", PaktErrorCode.Syntax);
+            ThrowError("Expected separator between pack map entries", PaktErrorCode.Syntax);
         }
-        _state = ParserState.StreamMapKey;
+        _state = ParserState.PackMapKey;
         return StepResult.Continue;
     }
 
@@ -987,11 +991,11 @@ public ref partial struct PaktReader
         return StepResult.Emit;
     }
 
-    private StepResult StepStreamEnd()
+    private StepResult StepPackEnd()
     {
         var fr = Pop();
         _state = ParserState.Top;
-        _tokenType = PaktTokenType.StreamEnd;
+        _tokenType = PaktTokenType.PackEnd;
         _scalarType = PaktScalarType.None;
         _currentName = fr.Name;
         _currentType = null;
@@ -1093,20 +1097,23 @@ public ref partial struct PaktReader
     }
 
     // -----------------------------------------------------------------------
-    // Stream termination check
+    // Pack termination check
     // -----------------------------------------------------------------------
 
-    private bool IsStreamTerminated()
+    private bool IsPackTerminated()
     {
         SkipInsignificant(skipNewlines: true);
         if (_consumed >= _buffer.Length)
             return true;
 
         byte b = _buffer[_consumed];
-        return !CanStartValueInStream(b);
+        // NUL byte is end-of-unit (transport framing per §10.1)
+        if (b == 0x00)
+            return true;
+        return !CanStartValueInPack(b);
     }
 
-    private bool CanStartValueInStream(byte b)
+    private bool CanStartValueInPack(byte b)
     {
         if (CanStartValue(b))
             return true;

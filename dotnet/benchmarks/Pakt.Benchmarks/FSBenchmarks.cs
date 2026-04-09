@@ -8,8 +8,8 @@ namespace Pakt.Benchmarks;
 
 /// <summary>
 /// Filesystem metadata benchmarks — the key PAKT scenario.
-/// Compares PAKT (multi-statement with stream) vs JSON (single object)
-/// across decode, deserialize, serialize, and stream-iterate workloads.
+/// Compares PAKT (multi-statement with pack) vs JSON (single object)
+/// across decode, deserialize, serialize, and pack-iterate workloads.
 /// </summary>
 [MemoryDiagnoser]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
@@ -62,7 +62,7 @@ public class FSBenchmarks
     // ---------------------------------------------------------------------------
     // Deserialize (PAKT PaktStreamReader vs JSON JsonSerializer)
     //
-    // Note: PAKT uses PaktStreamReader to read multi-statement format.
+    // Note: PAKT uses PaktStreamReader to read multi-statement pack format.
     // Root and scanned are skipped; entries are deserialized via source-gen.
     // JSON deserializes the entire document in one call.
     // ---------------------------------------------------------------------------
@@ -81,10 +81,10 @@ public class FSBenchmarks
         {
             while (stream.ReadStatementAsync().GetAwaiter().GetResult())
             {
-                if (stream.IsStream && stream.StatementName == "entries")
+                if (stream.IsPack && stream.StatementName == "entries")
                 {
                     dataset.Entries = AsyncHelper.ToListSync(
-                        stream.ReadStreamElements(BenchmarkPaktContext.Default.FSEntry));
+                        stream.ReadPackElements(BenchmarkPaktContext.Default.FSEntry));
                 }
                 else
                 {
@@ -124,11 +124,11 @@ public class FSBenchmarks
         writer.WriteStringValue(_dataset.Scanned);
         writer.WriteAssignmentEnd();
 
-        writer.WriteStreamStart("entries", BenchmarkData.FSEntryListPaktType);
+        writer.WritePackStart("entries", BenchmarkData.FSEntryListPaktType);
         var serialize = BenchmarkPaktContext.Default.FSEntry.Serialize!;
         foreach (var entry in _dataset.Entries)
             serialize(writer, entry);
-        writer.WriteStreamEnd();
+        writer.WritePackEnd();
 
         return _paktBuffer.WrittenCount;
     }
@@ -144,18 +144,18 @@ public class FSBenchmarks
     }
 
     // ---------------------------------------------------------------------------
-    // Stream (PAKT statement-level iteration vs JSON full-document load)
+    // Pack (PAKT statement-level iteration vs JSON full-document load)
     //
-    // Demonstrates the streaming API pattern: PAKT can iterate stream elements
+    // Demonstrates the pack API pattern: PAKT can iterate pack elements
     // statement-by-statement, while JSON must deserialize the entire document
     // to access nested arrays.
     //
-    // Note: The current PaktStreamReader implementation materializes stream
+    // Note: The current PaktStreamReader implementation materializes pack
     // elements internally; the API shape is designed for future true streaming.
     // ---------------------------------------------------------------------------
 
-    [BenchmarkCategory("Stream"), Benchmark(Baseline = true)]
-    public int PAKT_Stream()
+    [BenchmarkCategory("Pack"), Benchmark(Baseline = true)]
+    public int PAKT_Pack()
     {
         var stream = PaktStreamReader.Create(_paktData);
         int count = 0;
@@ -163,10 +163,10 @@ public class FSBenchmarks
         {
             while (stream.ReadStatementAsync().GetAwaiter().GetResult())
             {
-                if (stream.IsStream)
+                if (stream.IsPack)
                 {
                     count = AsyncHelper.CountSync(
-                        stream.ReadStreamElements(BenchmarkPaktContext.Default.FSEntry));
+                        stream.ReadPackElements(BenchmarkPaktContext.Default.FSEntry));
                 }
                 else
                 {
@@ -182,7 +182,7 @@ public class FSBenchmarks
         return count;
     }
 
-    [BenchmarkCategory("Stream"), Benchmark]
+    [BenchmarkCategory("Pack"), Benchmark]
     public int JSON_FullLoad()
     {
         var dataset = JsonSerializer.Deserialize(_jsonData, BenchmarkJsonContext.Default.FSDataset)!;

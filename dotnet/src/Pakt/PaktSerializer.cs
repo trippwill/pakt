@@ -20,7 +20,6 @@ public static class PaktSerializer
     /// <exception cref="InvalidOperationException">If typeInfo lacks a Deserialize delegate.</exception>
     /// <exception cref="PaktException">If the unit is malformed.</exception>
     public static T Deserialize<T>(ReadOnlySpan<byte> data, PaktTypeInfo<T> typeInfo)
-        where T : new()
     {
         ArgumentNullException.ThrowIfNull(typeInfo);
         if (typeInfo.Deserialize is null)
@@ -35,7 +34,16 @@ public static class PaktSerializer
             if (reader.TokenType == PaktTokenType.AssignStart)
             {
                 reader.Read(); // Value start (StructStart, etc.)
-                return typeInfo.Deserialize(ref reader);
+                var result = typeInfo.Deserialize(ref reader);
+
+                // Consume through AssignEnd
+                while (reader.Read())
+                {
+                    if (reader.TokenType == PaktTokenType.AssignEnd)
+                        break;
+                }
+
+                return result;
             }
 
             throw new PaktException($"Expected AssignStart, got {reader.TokenType}", reader.Position, PaktErrorCode.Syntax);

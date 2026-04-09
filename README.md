@@ -21,6 +21,7 @@ The current Go library and CLI implement the PAKT v0 surface: `;` map syntax, `b
 ```
 pakt/
 ├── encoding/       # Canonical Go library (github.com/trippwill/pakt/encoding)
+├── dotnet/         # .NET library, source generator, benchmarks
 ├── main.go         # CLI entry point (go install github.com/trippwill/pakt@latest)
 ├── spec/           # Formal specification (PAKT v0 draft)
 ├── docs/           # User guide and documentation
@@ -92,6 +93,32 @@ for dec.More() {
         break
     }
     process(entry)
+}
+```
+
+## .NET Library
+
+The `dotnet/` directory contains a high-performance .NET implementation with source-generated serialization. See [dotnet/README.md](dotnet/README.md) for full details.
+
+```csharp
+using Pakt;
+using Pakt.Serialization;
+
+[PaktSerializable(typeof(Server))]
+public partial class AppPaktContext : PaktSerializerContext { }
+
+// Deserialize
+var server = PaktSerializer.Deserialize(paktBytes, AppPaktContext.Default.Server);
+
+// Iterate pack statements
+await using var reader = PaktStreamReader.Create(paktBytes);
+while (await reader.ReadStatementAsync())
+{
+    if (reader.IsPack)
+        await foreach (var item in reader.ReadPackElements(AppPaktContext.Default.Server))
+            Process(item);
+    else
+        var value = reader.Deserialize(AppPaktContext.Default.Server);
 }
 ```
 

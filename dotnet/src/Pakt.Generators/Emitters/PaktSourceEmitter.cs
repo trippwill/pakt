@@ -605,12 +605,19 @@ namespace Pakt.Generators.Emitters
                     return $"global::Pakt.PaktType.AtomSet(global::System.Collections.Immutable.ImmutableArray.Create({members}){nullable})";
 
                 case PaktTypeKind.List:
-                    var elemExpr = EmitScalarPaktTypeExpr(prop.ElementPaktKind ?? PaktTypeKind.Str);
+                    var elemKind = prop.ElementPaktKind ?? PaktTypeKind.Str;
+                    var elemExpr = elemKind == PaktTypeKind.Struct
+                        ? EmitNestedStructTypeExpr(prop, allTypes, string.Empty)
+                        : EmitScalarPaktTypeExpr(elemKind);
                     return $"global::Pakt.PaktType.List({elemExpr}{nullable})";
 
                 case PaktTypeKind.Map:
-                    var keyExpr = EmitScalarPaktTypeExpr(prop.KeyPaktKind ?? PaktTypeKind.Str);
-                    var valExpr = EmitScalarPaktTypeExpr(prop.ValuePaktKind ?? PaktTypeKind.Str);
+                    var keyKind = prop.KeyPaktKind ?? PaktTypeKind.Str;
+                    var valKind = prop.ValuePaktKind ?? PaktTypeKind.Str;
+                    var keyExpr = EmitScalarPaktTypeExpr(keyKind);
+                    var valExpr = valKind == PaktTypeKind.Struct
+                        ? EmitNestedStructTypeExpr(prop, allTypes, string.Empty)
+                        : EmitScalarPaktTypeExpr(valKind);
                     return $"global::Pakt.PaktType.Map({keyExpr}, {valExpr}{nullable})";
 
                 case PaktTypeKind.Struct:

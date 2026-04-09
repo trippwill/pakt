@@ -229,7 +229,7 @@ Empty maps are valid: `cache:<str ; int> = <>`
 
 All composite types may be empty except atom sets, which require at least one member.
 
-Duplicate keys in a map are an error.
+Duplicate keys in a map are preserved in encounter order.
 
 ---
 

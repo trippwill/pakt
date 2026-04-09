@@ -48,6 +48,15 @@ namespace Pakt.Generators.Parser
                 bool hasSetter = prop.SetMethod is not null &&
                     prop.SetMethod.DeclaredAccessibility >= Accessibility.Internal;
 
+                if (!hasSetter && !isIgnored)
+                {
+                    diagnostics.Add(Diagnostic.Create(
+                        DiagnosticDescriptors.NoSettableSetter,
+                        prop.Locations.FirstOrDefault(),
+                        prop.Name, typeSymbol.Name));
+                    isIgnored = true;
+                }
+
                 string paktName = GetPaktName(prop);
 
                 int? explicitOrder = GetExplicitOrder(prop);
@@ -206,8 +215,11 @@ namespace Pakt.Generators.Parser
             {
                 var arg = atomAttr.ConstructorArguments[0];
                 var members = arg.Values.Select(v => (string)v.Value!).ToArray();
-                return new AnalyzedProperty(PaktTypeKind.Atom, nullable, typeFullName,
-                    atomMembers: members);
+                if (members.Length > 0)
+                {
+                    return new AnalyzedProperty(PaktTypeKind.Atom, nullable, typeFullName,
+                        atomMembers: members);
+                }
             }
 
             // byte[] → Bin

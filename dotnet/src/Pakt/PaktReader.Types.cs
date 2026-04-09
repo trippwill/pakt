@@ -59,19 +59,22 @@ public ref partial struct PaktReader
         return PaktType.Scalar(kind);
     }
 
-    private static PaktScalarType LookupScalarType(string name) => name switch
+    private PaktScalarType LookupScalarType(string name)
     {
-        "str" => PaktScalarType.Str,
-        "int" => PaktScalarType.Int,
-        "dec" => PaktScalarType.Dec,
-        "float" => PaktScalarType.Float,
-        "bool" => PaktScalarType.Bool,
-        "uuid" => PaktScalarType.Uuid,
-        "date" => PaktScalarType.Date,
-        "ts" => PaktScalarType.Ts,
-        "bin" => PaktScalarType.Bin,
-        _ => throw new PaktException($"Unknown scalar type '{name}'", PaktPosition.None, PaktErrorCode.Syntax),
-    };
+        return name switch
+        {
+            "str" => PaktScalarType.Str,
+            "int" => PaktScalarType.Int,
+            "dec" => PaktScalarType.Dec,
+            "float" => PaktScalarType.Float,
+            "bool" => PaktScalarType.Bool,
+            "uuid" => PaktScalarType.Uuid,
+            "date" => PaktScalarType.Date,
+            "ts" => PaktScalarType.Ts,
+            "bin" => PaktScalarType.Bin,
+            _ => throw new PaktException($"Unknown scalar type '{name}'", Position, PaktErrorCode.Syntax),
+        };
+    }
 
     private PaktType ReadAtomSetType()
     {

@@ -176,7 +176,7 @@ public sealed class PaktWriter : IDisposable
         WriteRaw(buf);
     }
 
-    /// <summary>Writes a floating-point scalar value in scientific notation.</summary>
+    /// <summary>Writes a floating-point scalar value.</summary>
     public void WriteFloatValue(double value)
     {
         ThrowIfDisposed();
@@ -185,7 +185,7 @@ public sealed class PaktWriter : IDisposable
 
         PrependSeparator();
         Span<char> charBuf = stackalloc char[64];
-        value.TryFormat(charBuf, out int charWritten, "E", CultureInfo.InvariantCulture);
+        value.TryFormat(charBuf, out int charWritten, "G17", CultureInfo.InvariantCulture);
         var formatted = charBuf[..charWritten];
 
         // Normalize 'E' to 'e' for PAKT convention

@@ -5,15 +5,15 @@
 // # Decoder
 //
 // [Decoder] reads PAKT input from an [io.Reader] and emits [Event] values one
-// at a time. Each grammatical construct — assignment, stream, struct, tuple,
+// at a time. Each grammatical construct — assignment, pack, struct, tuple,
 // list, map, scalar — maps to a distinct [EventKind]. An optional [Spec]
-// projection filters the stream to matched fields, skipping everything else
+// projection filters the source to matched fields, skipping everything else
 // without allocation.
 //
 // # Events
 //
 // The event model is minimal and machine-oriented:
-//   - Root statements emit AssignStart/End or ListStreamStart/End / MapStreamStart/End
+//   - Root statements emit AssignStart/End or ListPackStart/End / MapPackStart/End
 //   - Composite values emit StructStart/End, TupleStart/End, ListStart/End, MapStart/End
 //   - Scalar values emit ScalarValue with a [TypeKind] (integer, not string)
 //
@@ -23,12 +23,12 @@
 // struct tags (`pakt:"name"`) for field mapping. [Encoder] provides low-level
 // control over output formatting.
 //
-// # Streaming Unmarshal
+// # Incremental Unmarshal
 //
 // For large datasets, [Decoder.UnmarshalNext] reads one top-level statement at a
 // time and populates a Go value directly — no intermediate Event objects are
 // created. Combined with [Decoder.More], this enables constant-memory processing
-// of arbitrarily large stream (<<) statements:
+// of arbitrarily large pack (<<) statements:
 //
 //	dec := encoding.NewDecoder(r)
 //	defer dec.Close()

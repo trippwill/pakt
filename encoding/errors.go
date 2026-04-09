@@ -10,7 +10,7 @@ type ErrorCode int
 
 const (
 	ErrUnexpectedEOF  ErrorCode = 1 // unexpected end of input
-	ErrDuplicateName  ErrorCode = 2 // duplicate name
+	_                 ErrorCode = 2 // reserved (formerly duplicate_name; removed per spec §6.1)
 	ErrTypeMismatch   ErrorCode = 3 // type mismatch
 	ErrNilNonNullable ErrorCode = 4 // nil on non-nullable type
 	ErrSyntax         ErrorCode = 5 // syntax error (catch-all)
@@ -18,7 +18,7 @@ const (
 
 var errorCodeNames = [...]string{
 	ErrUnexpectedEOF:  "unexpected_eof",
-	ErrDuplicateName:  "duplicate_name",
+	2:                 "",
 	ErrTypeMismatch:   "type_mismatch",
 	ErrNilNonNullable: "nil_non_nullable",
 	ErrSyntax:         "syntax",

@@ -18,7 +18,7 @@ type parserState int
 const (
 	stateTop parserState = iota
 	stateAssignStart
-	stateStreamStart
+	statePackStart
 	stateValue
 	stateStructOpen
 	stateStructField
@@ -38,20 +38,20 @@ const (
 	stateMapAssign
 	stateMapEntry
 	stateMapClose
-	stateStreamListItem
-	stateStreamListSep
-	stateStreamMapKey
-	stateStreamMapAfterKey
-	stateStreamMapSep
+	statePackListItem
+	statePackListSep
+	statePackMapKey
+	statePackMapAfterKey
+	statePackMapSep
 	stateAssignEnd
-	stateStreamEnd
+	statePackEnd
 )
 
 type frameKind int
 
 const (
 	frameAssign frameKind = iota
-	frameStream
+	framePack
 	frameStruct
 	frameTuple
 	frameList
@@ -78,10 +78,10 @@ type frame struct {
 }
 
 type statementHeader struct {
-	pos    Pos
-	name   string
-	typ    Type
-	stream bool
+	pos  Pos
+	name string
+	typ  Type
+	pack bool
 }
 
 type stateMachine struct {
@@ -137,8 +137,15 @@ func (sm *stateMachine) currentChildResume() parserState {
 func (sm *stateMachine) readStatementHeader() (statementHeader, error) {
 	sm.r.skipInsignificant(true)
 
-	if _, err := sm.r.peekByte(); err != nil {
+	b, err := sm.r.peekByte()
+	if err != nil {
 		return statementHeader{}, err
+	}
+	// NUL byte at top level is end-of-unit (spec §10.1).
+	if b == 0 {
+		sm.r.readByte() //nolint:errcheck
+		sm.r.hitNUL = true
+		return statementHeader{}, io.EOF
 	}
 
 	identPos := sm.r.pos
@@ -146,11 +153,6 @@ func (sm *stateMachine) readStatementHeader() (statementHeader, error) {
 	if err != nil {
 		return statementHeader{}, err
 	}
-
-	if _, dup := sm.r.seen[name]; dup {
-		return statementHeader{}, Wrapf(identPos, ErrDuplicateName, "duplicate root name %q", name)
-	}
-	sm.r.seen[name] = struct{}{}
 
 	typ, err := sm.r.readTypeAnnot()
 	if err != nil {
@@ -171,14 +173,14 @@ func (sm *stateMachine) readStatementHeader() (statementHeader, error) {
 		sm.r.readByte() //nolint:errcheck
 		sm.r.readByte() //nolint:errcheck
 		if typ.List == nil && typ.Map == nil {
-			return statementHeader{}, sm.r.errorf("stream type must be list or map, got %s", typ.String())
+			return statementHeader{}, sm.r.errorf("pack type must be list or map, got %s", typ.String())
 		}
 		sm.r.skipWS()
 		return statementHeader{
-			pos:    identPos,
-			name:   name,
-			typ:    typ,
-			stream: true,
+			pos:  identPos,
+			name: name,
+			typ:  typ,
+			pack: true,
 		}, nil
 	default:
 		return statementHeader{}, sm.r.errorf("expected '=' or '<<' after statement header")
@@ -205,9 +207,9 @@ func (sm *stateMachine) beginAssignment(h statementHeader) {
 	sm.state = stateAssignStart
 }
 
-func (sm *stateMachine) beginStream(h statementHeader) {
+func (sm *stateMachine) beginPack(h statementHeader) {
 	fr := frame{
-		kind:   frameStream,
+		kind:   framePack,
 		resume: stateTop,
 		name:   h.name,
 		pos:    h.pos,
@@ -218,12 +220,12 @@ func (sm *stateMachine) beginStream(h statementHeader) {
 		fr.mt = h.typ.Map
 	}
 	sm.push(fr)
-	sm.state = stateStreamStart
+	sm.state = statePackStart
 }
 
 func (sm *stateMachine) beginStatement(h statementHeader) {
-	if h.stream {
-		sm.beginStream(h)
+	if h.pack {
+		sm.beginPack(h)
 		return
 	}
 	sm.beginAssignment(h)
@@ -253,10 +255,10 @@ func (sm *stateMachine) primeNextMatchedStatement(spec *Spec) (string, error) {
 	}
 }
 
-// streamTerminated checks whether the stream has ended (EOF or next
+// packTerminated checks whether the pack has ended (EOF, NUL, or next
 // top-level statement). With the '|' prefix on atom values and reserved
 // keywords for booleans/nil, a bare identifier always starts a new statement.
-func (sm *stateMachine) streamTerminated() (bool, error) {
+func (sm *stateMachine) packTerminated() (bool, error) {
 	sm.r.skipInsignificant(true)
 	b, err := sm.r.peekByte()
 	if err != nil {
@@ -265,7 +267,13 @@ func (sm *stateMachine) streamTerminated() (bool, error) {
 		}
 		return false, err
 	}
-	return !sm.r.canStartValueInStream(b), nil
+	// NUL byte terminates the pack (end-of-unit per spec §10.1).
+	if b == 0 {
+		sm.r.readByte() //nolint:errcheck
+		sm.r.hitNUL = true
+		return true, nil
+	}
+	return !sm.r.canStartValueInPack(b), nil
 }
 
 // canStartValue reports whether b can be the first byte of any PAKT value.
@@ -296,11 +304,11 @@ func canStartValue(b byte) bool {
 	}
 }
 
-// canStartValueInStream reports whether the byte at the reader's current
+// canStartValueInPack reports whether the byte at the reader's current
 // position begins a value (as opposed to a new statement header).
 // For ambiguous single-byte cases (r, b, x, t, f, n), it performs
 // additional lookahead checks.
-func (r *reader) canStartValueInStream(b byte) bool {
+func (r *reader) canStartValueInPack(b byte) bool {
 	if canStartValue(b) {
 		return true
 	}
@@ -432,17 +440,17 @@ func (sm *stateMachine) step() (Event, error) {
 				Name: fr.name,
 			}, nil
 
-		case stateStreamStart:
+		case statePackStart:
 			fr := sm.current()
 			var kind EventKind
 			if fr.lt != nil {
 				fr.elemIdx = 0
-				sm.state = stateStreamListItem
-				kind = EventListStreamStart
+				sm.state = statePackListItem
+				kind = EventListPackStart
 			} else {
 				fr.keyStr = ""
-				sm.state = stateStreamMapKey
-				kind = EventMapStreamStart
+				sm.state = statePackMapKey
+				kind = EventMapPackStart
 			}
 			return Event{
 				Kind: kind,
@@ -858,23 +866,23 @@ func (sm *stateMachine) step() (Event, error) {
 
 			sm.state = stateMapKey
 
-		case stateStreamListItem:
+		case statePackListItem:
 			fr := sm.current()
-			done, err := sm.streamTerminated()
+			done, err := sm.packTerminated()
 			if err != nil {
 				return Event{}, err
 			}
 			if done {
-				sm.state = stateStreamEnd
+				sm.state = statePackEnd
 				continue
 			}
 
-			fr.childResume = stateStreamListSep
+			fr.childResume = statePackListSep
 			sm.valType = fr.lt.Element
 			sm.valName = indexName(fr.elemIdx)
 			sm.state = stateValue
 
-		case stateStreamListSep:
+		case statePackListSep:
 			fr := sm.current()
 			fr.elemIdx++
 
@@ -883,31 +891,31 @@ func (sm *stateMachine) step() (Event, error) {
 				return Event{}, err
 			}
 			if !sep {
-				done, err := sm.streamTerminated()
+				done, err := sm.packTerminated()
 				if err != nil {
 					return Event{}, err
 				}
 				if done {
-					sm.state = stateStreamEnd
+					sm.state = statePackEnd
 					continue
 				}
-				return Event{}, sm.r.errorf("expected separator between stream items")
+				return Event{}, sm.r.errorf("expected separator between pack items")
 			}
 
-			sm.state = stateStreamListItem
+			sm.state = statePackListItem
 
-		case stateStreamMapKey:
+		case statePackMapKey:
 			fr := sm.current()
-			done, err := sm.streamTerminated()
+			done, err := sm.packTerminated()
 			if err != nil {
 				return Event{}, err
 			}
 			if done {
-				sm.state = stateStreamEnd
+				sm.state = statePackEnd
 				continue
 			}
 
-			ev, emitted, err := sm.beginMapKeyValue(fr.mt.Key, stateStreamMapAfterKey)
+			ev, emitted, err := sm.beginMapKeyValue(fr.mt.Key, statePackMapAfterKey)
 			if err != nil {
 				return Event{}, err
 			}
@@ -915,36 +923,36 @@ func (sm *stateMachine) step() (Event, error) {
 				return ev, nil
 			}
 
-		case stateStreamMapAfterKey:
+		case statePackMapAfterKey:
 			fr := sm.current()
 			sm.r.skipWS()
 			if err := sm.r.expectByte(';'); err != nil {
 				return Event{}, err
 			}
 			sm.r.skipWS()
-			fr.childResume = stateStreamMapSep
+			fr.childResume = statePackMapSep
 			sm.valType = fr.mt.Value
 			sm.valName = fr.keyStr
 			sm.state = stateValue
 
-		case stateStreamMapSep:
+		case statePackMapSep:
 			sep, err := sm.r.readSep()
 			if err != nil {
 				return Event{}, err
 			}
 			if !sep {
-				done, err := sm.streamTerminated()
+				done, err := sm.packTerminated()
 				if err != nil {
 					return Event{}, err
 				}
 				if done {
-					sm.state = stateStreamEnd
+					sm.state = statePackEnd
 					continue
 				}
-				return Event{}, sm.r.errorf("expected separator between stream map entries")
+				return Event{}, sm.r.errorf("expected separator between pack map entries")
 			}
 
-			sm.state = stateStreamMapKey
+			sm.state = statePackMapKey
 
 		case stateMapClose:
 			pos := sm.r.pos
@@ -958,15 +966,15 @@ func (sm *stateMachine) step() (Event, error) {
 				Pos:  pos,
 			}, nil
 
-		case stateStreamEnd:
+		case statePackEnd:
 			pos := sm.r.pos
 			fr := sm.pop()
 			sm.state = stateTop
 			var kind EventKind
 			if fr.lt != nil {
-				kind = EventListStreamEnd
+				kind = EventListPackEnd
 			} else {
-				kind = EventMapStreamEnd
+				kind = EventMapPackEnd
 			}
 			return Event{
 				Kind: kind,

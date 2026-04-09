@@ -59,7 +59,7 @@ func typeOfReflect(t reflect.Type, seen map[reflect.Type]bool) (Type, error) {
 
 	// Check for time.Time before other struct handling.
 	if t == timeType {
-		k := TypeDateTime
+		k := TypeTs
 		return Type{Scalar: &k}, nil
 	}
 

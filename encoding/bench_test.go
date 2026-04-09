@@ -311,7 +311,7 @@ func benchFSBuildEntriesType() Type {
 		{Name: "path", Type: scalar(TypeStr)},
 		{Name: "size", Type: scalar(TypeInt)},
 		{Name: "mode", Type: scalar(TypeInt)},
-		{Name: "mod_time", Type: scalar(TypeDateTime)},
+		{Name: "mod_time", Type: scalar(TypeTs)},
 		{Name: "is_dir", Type: scalar(TypeBool)},
 		{Name: "owner", Type: scalar(TypeStr)},
 		{Name: "group", Type: scalar(TypeStr)},
@@ -321,7 +321,7 @@ func benchFSBuildEntriesType() Type {
 
 func benchFSBuildEncFields(ds benchFSDataset) []benchEncField {
 	sk := TypeStr
-	dk := TypeDateTime
+	dk := TypeTs
 
 	encEntries := make([]any, len(ds.Entries))
 	for i, e := range ds.Entries {
@@ -409,8 +409,8 @@ func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
 	// Build PAKT bytes using stream syntax (<<).
 	var pb strings.Builder
 	pb.WriteString("root:str = '/data/warehouse'\n")
-	pb.WriteString("scanned:datetime = 2026-06-01T14:30:00Z\n")
-	pb.WriteString("entries:[{path:str, size:int, mode:int, mod_time:datetime, is_dir:bool, owner:str, group:str, hash:str}] <<\n")
+	pb.WriteString("scanned:ts = 2026-06-01T14:30:00Z\n")
+	pb.WriteString("entries:[{path:str, size:int, mode:int, mod_time:ts, is_dir:bool, owner:str, group:str, hash:str}] <<\n")
 	for i, e := range entries {
 		if i > 0 {
 			pb.WriteByte('\n')

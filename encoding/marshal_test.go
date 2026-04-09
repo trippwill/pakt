@@ -247,7 +247,7 @@ func TestMarshalTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := string(b)
-	if !strings.Contains(got, "created:datetime") {
+	if !strings.Contains(got, "created:ts") {
 		t.Errorf("expected datetime type: %q", got)
 	}
 	if !strings.Contains(got, "2024-06-15T10:30:00Z") {

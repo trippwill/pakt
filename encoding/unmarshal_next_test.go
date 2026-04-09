@@ -32,7 +32,7 @@ func TestUnmarshalNextBasicAssignment(t *testing.T) {
 	}
 }
 
-func TestUnmarshalNextStreamList(t *testing.T) {
+func TestUnmarshalNextPackList(t *testing.T) {
 	doc := "items:[int] <<\n1\n2\n3\n"
 	dec := NewDecoder(strings.NewReader(doc))
 	defer dec.Close()
@@ -56,7 +56,7 @@ func TestUnmarshalNextStreamList(t *testing.T) {
 	}
 }
 
-func TestUnmarshalNextStreamStruct(t *testing.T) {
+func TestUnmarshalNextPackStruct(t *testing.T) {
 	doc := `root:str = '/data'
 entries:[{name:str, size:int}] <<
     {'file1.txt', 100}
@@ -323,7 +323,7 @@ func TestUnmarshalNextTuple(t *testing.T) {
 }
 
 func TestUnmarshalNextDatetime(t *testing.T) {
-	doc := "ts:datetime = 2026-01-15T10:30:00Z\n"
+	doc := "ts:ts = 2026-01-15T10:30:00Z\n"
 	dec := NewDecoder(strings.NewReader(doc))
 	defer dec.Close()
 

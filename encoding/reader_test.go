@@ -571,9 +571,9 @@ func TestReadDate(t *testing.T) {
 	}
 }
 
-func TestReadTimeZ(t *testing.T) {
+func TestReadTimePartZ(t *testing.T) {
 	r := mkReader("14:30:00Z")
-	got, err := r.readTime()
+	got, err := r.readTimePart()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -582,9 +582,9 @@ func TestReadTimeZ(t *testing.T) {
 	}
 }
 
-func TestReadTimeOffset(t *testing.T) {
+func TestReadTimePartOffset(t *testing.T) {
 	r := mkReader("14:30:00-04:00")
-	got, err := r.readTime()
+	got, err := r.readTimePart()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -593,9 +593,9 @@ func TestReadTimeOffset(t *testing.T) {
 	}
 }
 
-func TestReadTimeFractional(t *testing.T) {
+func TestReadTimePartFractional(t *testing.T) {
 	r := mkReader("14:30:00.123Z")
-	got, err := r.readTime()
+	got, err := r.readTimePart()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -604,9 +604,9 @@ func TestReadTimeFractional(t *testing.T) {
 	}
 }
 
-func TestReadDateTime(t *testing.T) {
+func TestReadTs(t *testing.T) {
 	r := mkReader("2026-06-01T14:30:00Z")
-	got, err := r.readDateTime()
+	got, err := r.readTs()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -615,9 +615,9 @@ func TestReadDateTime(t *testing.T) {
 	}
 }
 
-func TestReadDateTimeOffset(t *testing.T) {
+func TestReadTsOffset(t *testing.T) {
 	r := mkReader("2026-06-01T14:30:00.500+05:30")
-	got, err := r.readDateTime()
+	got, err := r.readTs()
 	if err != nil {
 		t.Fatal(err)
 	}

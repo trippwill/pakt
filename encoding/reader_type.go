@@ -5,29 +5,27 @@ package encoding
 // ---------------------------------------------------------------------------
 
 var (
-	typeKindStr      = TypeStr
-	typeKindInt      = TypeInt
-	typeKindDec      = TypeDec
-	typeKindFloat    = TypeFloat
-	typeKindBool     = TypeBool
-	typeKindUUID     = TypeUUID
-	typeKindDate     = TypeDate
-	typeKindTime     = TypeTime
-	typeKindDateTime = TypeDateTime
-	typeKindBin      = TypeBin
+	typeKindStr   = TypeStr
+	typeKindInt   = TypeInt
+	typeKindDec   = TypeDec
+	typeKindFloat = TypeFloat
+	typeKindBool  = TypeBool
+	typeKindUUID  = TypeUUID
+	typeKindDate  = TypeDate
+	typeKindTs    = TypeTs
+	typeKindBin   = TypeBin
 )
 
 var scalarTypeKindPtrs = [...](*TypeKind){
-	TypeStr:      &typeKindStr,
-	TypeInt:      &typeKindInt,
-	TypeDec:      &typeKindDec,
-	TypeFloat:    &typeKindFloat,
-	TypeBool:     &typeKindBool,
-	TypeUUID:     &typeKindUUID,
-	TypeDate:     &typeKindDate,
-	TypeTime:     &typeKindTime,
-	TypeDateTime: &typeKindDateTime,
-	TypeBin:      &typeKindBin,
+	TypeStr:   &typeKindStr,
+	TypeInt:   &typeKindInt,
+	TypeDec:   &typeKindDec,
+	TypeFloat: &typeKindFloat,
+	TypeBool:  &typeKindBool,
+	TypeUUID:  &typeKindUUID,
+	TypeDate:  &typeKindDate,
+	TypeTs:    &typeKindTs,
+	TypeBin:   &typeKindBin,
 }
 
 // scalarTypeKindPtr returns a pointer to a pre-allocated TypeKind, avoiding heap allocation.
@@ -59,10 +57,8 @@ func lookupScalarType(name string) (TypeKind, bool) {
 		return TypeUUID, true
 	case "date":
 		return TypeDate, true
-	case "time":
-		return TypeTime, true
-	case "datetime":
-		return TypeDateTime, true
+	case "ts":
+		return TypeTs, true
 	case "bin":
 		return TypeBin, true
 	default:

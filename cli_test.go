@@ -96,7 +96,7 @@ func TestValidateSuccess(t *testing.T) {
 }
 
 func TestValidateFailure(t *testing.T) {
-	cmd := exec.Command(binaryPath, "validate", "testdata/invalid/duplicate-name.pakt")
+	cmd := exec.Command(binaryPath, "validate", "testdata/invalid/nil-non-nullable.pakt")
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatal("expected non-zero exit code, got 0")

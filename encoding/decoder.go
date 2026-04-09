@@ -5,20 +5,20 @@ import (
 	"reflect"
 )
 
-// Decoder reads a PAKT document from an input stream and emits [Event] values
+// Decoder reads a PAKT document from an input source and emits [Event] values
 // one at a time, similar to [encoding/json.Decoder]. An optional spec
 // projection may be applied via [Decoder.SetSpec] to filter and validate the
-// stream against a .spec.pakt definition.
+// source against a .spec.pakt definition.
 type Decoder struct {
 	r    *reader
 	sm   *stateMachine
 	spec *Spec
 	done bool // true after document fully parsed
 
-	// streaming unmarshal state
-	inStream   bool // true while inside a stream statement
-	streamList *ListType
-	streamMap  *MapType
+	// pack unmarshal state
+	inPack   bool // true while inside a pack statement
+	packList *ListType
+	packMap  *MapType
 }
 
 // NewDecoder returns a Decoder that reads PAKT input from r.
@@ -61,7 +61,7 @@ func (d *Decoder) Close() {
 	}
 }
 
-// Decode reads the next event from the PAKT stream.
+// Decode reads the next event from the PAKT source.
 //
 // On each call it returns the next [Event] in document order. When the
 // document is fully consumed, it returns a zero Event and [io.EOF].
@@ -70,10 +70,10 @@ func (d *Decoder) Decode() (Event, error) {
 	if d.spec != nil {
 		return d.decodeWithSpec()
 	}
-	return d.decodeStreaming()
+	return d.decodeDirect()
 }
 
-func (d *Decoder) decodeStreaming() (Event, error) {
+func (d *Decoder) decodeDirect() (Event, error) {
 	if d.done {
 		return Event{}, io.EOF
 	}
@@ -96,14 +96,14 @@ func (d *Decoder) decodeStreaming() (Event, error) {
 	return ev, nil
 }
 
-// UnmarshalNext reads the next top-level statement from the PAKT stream and
+// UnmarshalNext reads the next top-level statement from the PAKT source and
 // stores the result in the value pointed to by v. It uses a visitor-driven
 // path that bypasses Event creation, writing parsed values directly into
 // struct fields.
 //
 // For assignment statements (name:type = value), v must be a pointer to a
-// struct with a matching field. For stream statements (name:type <<), the
-// first call reads the stream header; subsequent calls read one element at
+// struct with a matching field. For pack statements (name:type <<), the
+// first call reads the pack header; subsequent calls read one element at
 // a time when used with [Decoder.More].
 //
 // Returns [io.EOF] when no more statements remain.
@@ -121,9 +121,9 @@ func (d *Decoder) UnmarshalNext(v any) error {
 	}
 	rv = rv.Elem()
 
-	// If we're mid-stream, read the next stream element.
-	if d.inStream {
-		return d.unmarshalNextStreamElement(rv)
+	// If we're mid-pack, read the next pack element.
+	if d.inPack {
+		return d.unmarshalNextPackElement(rv)
 	}
 
 	// Read the next statement header.
@@ -145,20 +145,20 @@ func (d *Decoder) UnmarshalNext(v any) error {
 		return err
 	}
 
-	if h.stream {
-		// Enter stream mode.
-		d.inStream = true
+	if h.pack {
+		// Enter pack mode.
+		d.inPack = true
 		if h.typ.List != nil {
-			d.streamList = h.typ.List
+			d.packList = h.typ.List
 		} else {
-			d.streamMap = h.typ.Map
+			d.packMap = h.typ.Map
 		}
-		// For a struct target, try to set the stream into a matching field.
+		// For a struct target, try to set the pack into a matching field.
 		if rv.Kind() == reflect.Struct {
-			return d.unmarshalStreamIntoField(h, rv)
+			return d.unmarshalPackIntoField(h, rv)
 		}
-		// For a slice/map target, unmarshal the entire stream.
-		return d.unmarshalWholeStream(h, rv)
+		// For a slice/map target, unmarshal the entire pack.
+		return d.unmarshalWholePack(h, rv)
 	}
 
 	// Assignment statement — unmarshal into matching struct field or directly.
@@ -181,33 +181,38 @@ func (d *Decoder) UnmarshalNext(v any) error {
 	return d.sm.unmarshalValue(h.typ, rv)
 }
 
-// More reports whether there are more elements to read. When inside a stream
-// statement, it reports whether additional stream elements remain. When at
+// More reports whether there are more elements to read. When inside a pack
+// statement, it reports whether additional pack elements remain. When at
 // the top level, it reports whether more statements exist.
 func (d *Decoder) More() bool {
 	if d.done {
 		return false
 	}
-	if d.inStream {
+	if d.inPack {
 		d.r.skipInsignificant(true)
 		b, err := d.r.peekByte()
 		if err != nil {
-			d.inStream = false
-			d.streamList = nil
-			d.streamMap = nil
+			d.inPack = false
+			d.packList = nil
+			d.packMap = nil
 			return false
 		}
-		if !d.r.canStartValueInStream(b) {
-			d.inStream = false
-			d.streamList = nil
-			d.streamMap = nil
+		// NUL byte terminates the pack (end-of-unit per spec §10.1).
+		if b == 0 || !d.r.canStartValueInPack(b) {
+			d.inPack = false
+			d.packList = nil
+			d.packMap = nil
 			return false
 		}
 		return true
 	}
 	d.r.skipInsignificant(true)
-	_, err := d.r.peekByte()
-	return err == nil
+	b, err := d.r.peekByte()
+	if err != nil {
+		return false
+	}
+	// NUL byte at top level is end-of-unit (spec §10.1).
+	return b != 0
 }
 
 func (d *Decoder) nextMatchedHeader() (statementHeader, error) {
@@ -232,51 +237,51 @@ func (d *Decoder) nextMatchedHeader() (statementHeader, error) {
 	}
 }
 
-func (d *Decoder) unmarshalStreamIntoField(h statementHeader, rv reflect.Value) error {
+func (d *Decoder) unmarshalPackIntoField(h statementHeader, rv reflect.Value) error {
 	info, err := cachedStructFields(rv.Type())
 	if err != nil {
 		return err
 	}
 	fi, ok := info.fieldMap[h.name]
 	if !ok {
-		// Skip entire stream.
-		d.inStream = false
-		d.streamList = nil
-		d.streamMap = nil
-		return d.r.skipStreamBody(h.typ)
+		// Skip entire pack.
+		d.inPack = false
+		d.packList = nil
+		d.packMap = nil
+		return d.r.skipPackBody(h.typ)
 	}
 	target := rv.Field(fi.Index)
-	if d.streamList != nil {
-		err = d.sm.unmarshalStreamList(d.streamList, target)
+	if d.packList != nil {
+		err = d.sm.unmarshalPackList(d.packList, target)
 	} else {
-		err = d.sm.unmarshalStreamMap(d.streamMap, target)
+		err = d.sm.unmarshalPackMap(d.packMap, target)
 	}
-	d.inStream = false
-	d.streamList = nil
-	d.streamMap = nil
+	d.inPack = false
+	d.packList = nil
+	d.packMap = nil
 	return err
 }
 
-func (d *Decoder) unmarshalWholeStream(h statementHeader, rv reflect.Value) error {
+func (d *Decoder) unmarshalWholePack(h statementHeader, rv reflect.Value) error {
 	var err error
-	if d.streamList != nil {
-		err = d.sm.unmarshalStreamList(d.streamList, rv)
+	if d.packList != nil {
+		err = d.sm.unmarshalPackList(d.packList, rv)
 	} else {
-		err = d.sm.unmarshalStreamMap(d.streamMap, rv)
+		err = d.sm.unmarshalPackMap(d.packMap, rv)
 	}
-	d.inStream = false
-	d.streamList = nil
-	d.streamMap = nil
+	d.inPack = false
+	d.packList = nil
+	d.packMap = nil
 	return err
 }
 
-func (d *Decoder) unmarshalNextStreamElement(rv reflect.Value) error {
-	if d.streamList != nil {
-		return d.sm.unmarshalValue(d.streamList.Element, rv)
+func (d *Decoder) unmarshalNextPackElement(rv reflect.Value) error {
+	if d.packList != nil {
+		return d.sm.unmarshalValue(d.packList.Element, rv)
 	}
-	if d.streamMap != nil {
-		// For map streams, caller gets key-value pairs.
-		return d.sm.unmarshalValue(d.streamMap.Value, rv)
+	if d.packMap != nil {
+		// For map packs, caller gets key-value pairs.
+		return d.sm.unmarshalValue(d.packMap.Value, rv)
 	}
-	return &ParseError{Message: "pakt: not in a stream"}
+	return &ParseError{Message: "pakt: not in a pack"}
 }

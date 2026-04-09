@@ -1,7 +1,7 @@
 # Warehouse filesystem snapshot — 1K entries
 
 root:str = '/data/warehouse'
-scanned:datetime = 2026-06-01T14:30:00Z
+scanned:ts = 2026-06-01T14:30:00Z
 host:str = 'storage-node-07'
 version:(int, int, int) = (3, 12, 1)
 active:bool = true
@@ -22,7 +22,7 @@ roles:<str ; str> = <
 retention:{days:int, compress-after:int, archive-after:int} = { 90, 30, 60 }
 
 # --- Streamed filesystem entries (1000 rows) ---
-entries:[{path:str, size:int, mode:int, mod_time:datetime, is_dir:bool, owner:str, group:str, hash:bin?}] <<
+entries:[{path:str, size:int, mode:int, mod_time:ts, is_dir:bool, owner:str, group:str, hash:bin?}] <<
     { '/data/warehouse/file_0000.idx', 36914834, 420, 2026-02-08T23:06:43Z, false, 'deploy', 'data', x'972a8469' }
     { '/data/warehouse/file_0001.csv', 29346116, 420, 2026-05-17T00:35:12Z, false, 'deploy', 'ops', x'386ecbe0' }
     { '/data/warehouse/incoming/archive/file_0002.idx', 56723368, 384, 2026-02-09T06:48:21Z, false, 'etl', 'data', x'6142ea7d' }
@@ -1025,7 +1025,7 @@ entries:[{path:str, size:int, mode:int, mod_time:datetime, is_dir:bool, owner:st
     { '/data/warehouse/incoming/incoming/file_0999.log', 30948076, 420, 2026-05-20T10:01:14Z, false, 'app', 'apps', x'63f2fc26' }
 
 # --- Recent events stream ---
-events:[{ts:datetime, level:|info, warn, error|, msg:str}] <<
+events:[{ts:ts, level:|info, warn, error|, msg:str}] <<
     { 2026-06-01T14:48:00Z, |warn, 'row processed' }
     { 2026-06-01T14:59:33Z, |info, 'compression complete' }
     { 2026-06-01T14:05:06Z, |error, 'batch committed' }

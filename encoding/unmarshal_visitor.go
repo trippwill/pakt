@@ -335,11 +335,11 @@ func (sm *stateMachine) unmarshalMap(mt *MapType, target reflect.Value) error {
 	}
 }
 
-// unmarshalStreamList reads stream list elements (<<) into target.
-func (sm *stateMachine) unmarshalStreamList(lt *ListType, target reflect.Value) error {
+// unmarshalPackList reads pack list elements (<<) into target.
+func (sm *stateMachine) unmarshalPackList(lt *ListType, target reflect.Value) error {
 	target = allocPtr(target)
 	if target.Kind() != reflect.Slice {
-		return fmt.Errorf("cannot unmarshal list stream into %s", target.Type())
+		return fmt.Errorf("cannot unmarshal list pack into %s", target.Type())
 	}
 
 	elemType := target.Type().Elem()
@@ -354,7 +354,7 @@ func (sm *stateMachine) unmarshalStreamList(lt *ListType, target reflect.Value) 
 			}
 			return err
 		}
-		if !sm.r.canStartValueInStream(b) {
+		if !sm.r.canStartValueInPack(b) {
 			return nil
 		}
 
@@ -382,19 +382,19 @@ func (sm *stateMachine) unmarshalStreamList(lt *ListType, target reflect.Value) 
 				}
 				return err
 			}
-			if !sm.r.canStartValueInStream(b) {
+			if !sm.r.canStartValueInPack(b) {
 				return nil
 			}
-			return sm.r.errorf("expected separator between stream items")
+			return sm.r.errorf("expected separator between pack items")
 		}
 	}
 }
 
-// unmarshalStreamMap reads stream map entries (<<) into target.
-func (sm *stateMachine) unmarshalStreamMap(mt *MapType, target reflect.Value) error {
+// unmarshalPackMap reads pack map entries (<<) into target.
+func (sm *stateMachine) unmarshalPackMap(mt *MapType, target reflect.Value) error {
 	target = allocPtr(target)
 	if target.Kind() != reflect.Map {
-		return fmt.Errorf("cannot unmarshal map stream into %s", target.Type())
+		return fmt.Errorf("cannot unmarshal map pack into %s", target.Type())
 	}
 
 	if target.IsNil() {
@@ -413,13 +413,13 @@ func (sm *stateMachine) unmarshalStreamMap(mt *MapType, target reflect.Value) er
 			}
 			return err
 		}
-		if !sm.r.canStartValueInStream(b) {
+		if !sm.r.canStartValueInPack(b) {
 			return nil
 		}
 
 		key := reflect.New(keyType).Elem()
 		if err := sm.unmarshalValue(mt.Key, key); err != nil {
-			return fmt.Errorf("stream map key: %w", err)
+			return fmt.Errorf("pack map key: %w", err)
 		}
 
 		sm.r.skipWS()
@@ -430,7 +430,7 @@ func (sm *stateMachine) unmarshalStreamMap(mt *MapType, target reflect.Value) er
 
 		val := reflect.New(valType).Elem()
 		if err := sm.unmarshalValue(mt.Value, val); err != nil {
-			return fmt.Errorf("stream map value: %w", err)
+			return fmt.Errorf("pack map value: %w", err)
 		}
 
 		target.SetMapIndex(key, val)
@@ -448,10 +448,10 @@ func (sm *stateMachine) unmarshalStreamMap(mt *MapType, target reflect.Value) er
 				}
 				return err
 			}
-			if !sm.r.canStartValueInStream(b) {
+			if !sm.r.canStartValueInPack(b) {
 				return nil
 			}
-			return sm.r.errorf("expected separator between stream map entries")
+			return sm.r.errorf("expected separator between pack map entries")
 		}
 	}
 }

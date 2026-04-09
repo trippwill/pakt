@@ -8,8 +8,6 @@ weight: 2
 
 This site page is a synchronized overview of the current **PAKT v0** surface. The normative source remains [`spec/pakt-v0.md`](https://github.com/trippwill/pakt/blob/main/spec/pakt-v0.md).
 
-> **Implementation note:** The current Go library and CLI implement top-level `<<` pack statements as first-class root events (`PackStart` / `PackEnd`). Event names in the Go code currently use `ListStreamStart/End` and `MapStreamStart/End` — a renaming alignment is planned.
-
 ## Version
 
 PAKT uses single-integer versioning. Each version is a complete specification.

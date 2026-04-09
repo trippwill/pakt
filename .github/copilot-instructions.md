@@ -21,7 +21,7 @@ The encoding package uses a **streaming state-machine decoder**:
 3. **`reader_state.go`** — State machine: `parserState` enum, `frame` stack type, `stateMachine.step()` loop. Each `step()` call either yields an event or transitions internally.
 4. **`decoder.go`** — Public `Decoder` type wrapping the state machine. `Decode()` calls `step()` and returns one `Event` per call.
 5. **`spec.go`** — Spec projection (legacy experimental; being moved to future consideration).
-6. **`event.go`** — `Event` struct and `EventKind` enum. Events: `AssignStart/End`, `ListStreamStart/End`, `MapStreamStart/End`, `ScalarValue`, `StructStart/End`, `TupleStart/End`, `ListStart/End`, `MapStart/End`, `Error`.
+6. **`event.go`** — `Event` struct and `EventKind` enum. Events: `AssignStart/End`, `ListPackStart/End`, `MapPackStart/End`, `ScalarValue`, `StructStart/End`, `TupleStart/End`, `ListStart/End`, `MapStart/End`, `Error`.
 7. **`types.go`** — PAKT type system: `TypeKind` (scalars), `Type` interface, composite types (`StructType`, `TupleType`, `ListType`, `MapType`), `AtomSetType`.
 8. **`errors.go`** — `ParseError` with `Pos{Line, Col}` and `ErrorCode` matching spec §11.
 9. **`encoder.go`** — Output writer with optional indentation.
@@ -91,8 +91,6 @@ For composites:
 For maps, children alternate: key (`ScalarValue`) → value → key → value → ...
 
 For packs: `ListPackStart/MapPackStart` → items → `ListPackEnd/MapPackEnd`
-
-> **Note**: The Go implementation currently uses `ListStreamStart/End` and `MapStreamStart/End` event names. These will be renamed to `ListPackStart/End` and `MapPackStart/End` in a future alignment pass.
 
 ## Design Priorities
 

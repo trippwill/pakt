@@ -10,33 +10,31 @@ import (
 type TypeKind int
 
 const (
-	TypeNone     TypeKind = iota // zero value — not a scalar
-	TypeStr                      // str  — quoted string
-	TypeInt                      // int  — signed 64-bit integer
-	TypeDec                      // dec  — arbitrary-precision decimal
-	TypeFloat                    // float — IEEE 754 binary64
-	TypeBool                     // bool — true / false
-	TypeUUID                     // uuid
-	TypeDate                     // date — ISO date
-	TypeTime                     // time — ISO time with timezone
-	TypeDateTime                 // datetime — ISO datetime with timezone
-	TypeBin                      // bin — raw bytes
-	TypeAtom                     // atom set value (treated as string)
+	TypeNone  TypeKind = iota // zero value — not a scalar
+	TypeStr                   // str  — quoted string
+	TypeInt                   // int  — signed 64-bit integer
+	TypeDec                   // dec  — arbitrary-precision decimal
+	TypeFloat                 // float — IEEE 754 binary64
+	TypeBool                  // bool — true / false
+	TypeUUID                  // uuid
+	TypeDate                  // date — ISO date
+	TypeTs                    // ts — ISO timestamp with timezone
+	TypeBin                   // bin — raw bytes
+	TypeAtom                  // atom set value (treated as string)
 )
 
 var typeKindNames = [...]string{
-	TypeNone:     "",
-	TypeStr:      "str",
-	TypeInt:      "int",
-	TypeDec:      "dec",
-	TypeFloat:    "float",
-	TypeBool:     "bool",
-	TypeUUID:     "uuid",
-	TypeDate:     "date",
-	TypeTime:     "time",
-	TypeDateTime: "datetime",
-	TypeBin:      "bin",
-	TypeAtom:     "atom",
+	TypeNone:  "",
+	TypeStr:   "str",
+	TypeInt:   "int",
+	TypeDec:   "dec",
+	TypeFloat: "float",
+	TypeBool:  "bool",
+	TypeUUID:  "uuid",
+	TypeDate:  "date",
+	TypeTs:    "ts",
+	TypeBin:   "bin",
+	TypeAtom:  "atom",
 }
 
 // String returns the PAKT keyword for the scalar type.

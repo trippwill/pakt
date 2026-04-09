@@ -17,7 +17,7 @@ import (
 //
 // Unmarshal uses an optimized path that reads directly from the input byte slice
 // without buffering, and populates struct fields via a visitor-driven parser that
-// bypasses Event creation. For streaming use cases, prefer [Decoder.UnmarshalNext].
+// bypasses Event creation. For incremental use cases, prefer [Decoder.UnmarshalNext].
 func Unmarshal(data []byte, v any) error {
 	if v == nil {
 		return fmt.Errorf("pakt: Unmarshal requires a non-nil pointer")
@@ -72,12 +72,12 @@ func Unmarshal(data []byte, v any) error {
 		}
 
 		target := rv.Field(fi.Index)
-		if h.stream {
+		if h.pack {
 			var serr error
 			if h.typ.List != nil {
-				serr = sm.unmarshalStreamList(h.typ.List, target)
+				serr = sm.unmarshalPackList(h.typ.List, target)
 			} else {
-				serr = sm.unmarshalStreamMap(h.typ.Map, target)
+				serr = sm.unmarshalPackMap(h.typ.Map, target)
 			}
 			if serr != nil {
 				return fmt.Errorf("pakt: field %q: %w", h.name, serr)

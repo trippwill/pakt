@@ -55,4 +55,4 @@ health:{endpoint:str, interval-sec:int, timeout-sec:int, healthy-threshold:int} 
 
 active:bool       = true              # currently deployed
 instance-count:int = 4
-started:datetime  = 2026-06-01T14:30:00Z
+started:ts  = 2026-06-01T14:30:00Z

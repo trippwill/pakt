@@ -1,0 +1,3 @@
+# Duplicate root statement name — both preserved in encounter order (spec §6.1)
+name:str = 'Alice'
+name:str = 'Bob'

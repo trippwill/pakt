@@ -19,4 +19,4 @@ config:{host:str, port:int}? = nil
 # Nullable with various scalar types
 maybe-flag:bool?     = nil
 maybe-price:dec?     = 9.99
-maybe-stamp:datetime? = nil
+maybe-stamp:ts? = nil

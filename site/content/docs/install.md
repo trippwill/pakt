@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "How to install the PAKT CLI and Go library."
+description: "How to install the PAKT CLI, Go library, and .NET library."
 weight: 3
 ---
 
@@ -51,6 +51,57 @@ func main() {
 }
 ```
 
-## Requirements
+### Requirements
 
 - Go 1.25 or later
+
+## .NET Library
+
+The .NET library uses source-generated serialization modeled after `System.Text.Json`.
+
+```sh
+dotnet add package Pakt
+```
+
+### Define types and create a context
+
+```csharp
+using Pakt.Serialization;
+
+public class Server
+{
+    public string Host { get; set; } = "";
+    public int Port { get; set; }
+}
+
+[PaktSerializable(typeof(Server))]
+public partial class AppPaktContext : PaktSerializerContext { }
+```
+
+### Read a unit
+
+```csharp
+using Pakt;
+
+await using var reader = PaktStreamReader.Create(paktBytes, AppPaktContext.Default);
+
+while (await reader.ReadStatementAsync())
+{
+    if (reader.IsPack)
+        await foreach (var s in reader.ReadPackElements<Server>())
+            Console.WriteLine($"{s.Host}:{s.Port}");
+    else
+        var s = reader.Deserialize<Server>();
+}
+```
+
+### Single-statement convenience
+
+```csharp
+var server = PaktSerializer.Deserialize<Server>(paktBytes, AppPaktContext.Default);
+byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default, "server");
+```
+
+### Requirements
+
+- .NET 8.0 or later (net8.0, net10.0)

@@ -130,11 +130,48 @@
   </div>
 </section>
 
-<section class="install-section">
-  <div class="install-inner">
-    <h2>Get started</h2>
-    <pre><code>go install github.com/trippwill/pakt@latest</code></pre>
-    <p><a href="/docs/install/">Installation options →</a></p>
+<section class="libraries-section">
+  <div class="libraries-inner">
+    <div class="section-header">
+      <span class="section-label copper">Libraries</span>
+      <h2 class="section-title">Pick your ecosystem</h2>
+      <p class="section-subtitle">First-class implementations for Go and .NET. Same spec, idiomatic for each platform.</p>
+    </div>
+    <div class="library-grid">
+      <div class="library-card">
+        <div class="library-header">
+          <svg class="library-logo" viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+            <path d="M1.811 10.231c-.047 0-.058-.023-.035-.059l.246-.315c.023-.035.081-.058.128-.058h4.172c.046 0 .058.035.035.07l-.199.303c-.023.036-.082.07-.117.07zM.047 11.306c-.047 0-.059-.023-.035-.058l.245-.316c.023-.035.082-.058.129-.058h5.328c.047 0 .07.035.058.07l-.093.28c-.012.047-.058.07-.105.07zm2.828 1.075c-.047 0-.059.035-.035.07l.163.292c.023.035.07.07.117.07h2.337c.047 0 .07-.035.07-.082l.023-.28c0-.047-.035-.082-.082-.082zm14.394-2.362c-.668.175-1.125.304-1.78.48-.152.038-.164.046-.293-.105-.152-.187-.269-.304-.491-.421-.668-.351-1.318-.246-1.916.14-.714.468-1.078 1.16-1.066 1.975.012.796.563 1.452 1.348 1.556.667.093 1.23-.14 1.687-.632.093-.105.175-.222.269-.351H13.42c-.211 0-.269-.128-.199-.293.129-.316.363-.754.503-1.003.035-.058.117-.152.222-.152h3.903c-.012.175-.012.351-.035.527-.082.644-.258 1.265-.574 1.84-.503.913-1.218 1.59-2.154 2.003-.77.34-1.59.468-2.444.374-.832-.094-1.558-.398-2.166-.949-.527-.479-.878-1.077-1.043-1.77-.21-.879-.14-1.722.21-2.53.445-1.042 1.16-1.841 2.143-2.368.804-.433 1.676-.608 2.596-.503.762.082 1.441.34 2.025.818.315.257.562.573.76.934.058.082.035.117-.07.152z" fill="currentColor"/>
+          </svg>
+          <h3>Go</h3>
+        </div>
+        <p class="library-desc">Streaming state-machine decoder, encoder, reflection-based marshal/unmarshal. Zero-allocation hot path.</p>
+        <pre><code>go install github.com/trippwill/pakt@latest</code></pre>
+        <div class="library-features">
+          <span>Streaming decoder</span>
+          <span>Marshal/Unmarshal</span>
+          <span>CLI tool</span>
+        </div>
+        <a href="/docs/install/" class="library-link">Get started →</a>
+      </div>
+      <div class="library-card library-card-dotnet">
+        <div class="library-header">
+          <svg class="library-logo" viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+            <path d="M24 8.77h-2.468v7.565h-1.425V8.77h-2.462V7.53H24zm-6.852 7.565h-4.821V7.53h4.63v1.24h-3.205v2.494h2.953v1.234h-2.953v2.604h3.396zm-6.708 0H8.882L4.78 9.863a2.896 2.896 0 0 1-.258-.51h-.036c.032.189.048.592.048 1.21v5.772H3.157V7.53h1.659l3.965 6.32c.167.261.275.442.323.54h.024a7.32 7.32 0 0 1-.048-1.282V7.53H10.44zm-7.77 0H1.008V8.77H0v-1.24h2.67v1.24z" fill="currentColor"/>
+          </svg>
+          <h3>.NET</h3>
+          <span class="library-badge">New</span>
+        </div>
+        <p class="library-desc">Source-generated serialization modeled after <code>System.Text.Json</code>. Ref-struct tokenizer, zero-copy, forward-only.</p>
+        <pre><code>dotnet add package Pakt</code></pre>
+        <div class="library-features">
+          <span>Source generator</span>
+          <span>PaktReader / PaktWriter</span>
+          <span>Async packs</span>
+        </div>
+        <a href="/docs/install/#net-library" class="library-link">Get started →</a>
+      </div>
+    </div>
   </div>
 </section>
 

@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"fmt"
 	"io"
 	"reflect"
 )
@@ -102,9 +103,13 @@ func (d *Decoder) decodeDirect() (Event, error) {
 // struct fields.
 //
 // For assignment statements (name:type = value), v must be a pointer to a
-// struct with a matching field. For pack statements (name:type <<), the
-// first call reads the pack header; subsequent calls read one element at
-// a time when used with [Decoder.More].
+// struct with a matching field. For pack statements (name:type <<), behavior
+// depends on the target type:
+//   - Struct target: the pack is unmarshalled in full into a matching slice or
+//     map field. Use this when consuming an entire pack at once.
+//   - Direct target (e.g., pointer to a scalar or value type): the first call
+//     reads the pack header and the first element; subsequent calls each read
+//     one element. Use [Decoder.More] to drive the loop.
 //
 // Returns [io.EOF] when no more statements remain.
 func (d *Decoder) UnmarshalNext(v any) error {
@@ -157,8 +162,8 @@ func (d *Decoder) UnmarshalNext(v any) error {
 		if rv.Kind() == reflect.Struct {
 			return d.unmarshalPackIntoField(h, rv)
 		}
-		// For a slice/map target, unmarshal the entire pack.
-		return d.unmarshalWholePack(h, rv)
+		// For a direct target, read one element at a time.
+		return d.unmarshalNextPackElement(rv)
 	}
 
 	// Assignment statement — unmarshal into matching struct field or directly.
@@ -262,26 +267,24 @@ func (d *Decoder) unmarshalPackIntoField(h statementHeader, rv reflect.Value) er
 	return err
 }
 
-func (d *Decoder) unmarshalWholePack(h statementHeader, rv reflect.Value) error {
-	var err error
-	if d.packList != nil {
-		err = d.sm.unmarshalPackList(d.packList, rv)
-	} else {
-		err = d.sm.unmarshalPackMap(d.packMap, rv)
-	}
-	d.inPack = false
-	d.packList = nil
-	d.packMap = nil
-	return err
-}
-
 func (d *Decoder) unmarshalNextPackElement(rv reflect.Value) error {
+	d.r.skipInsignificant(true)
 	if d.packList != nil {
-		return d.sm.unmarshalValue(d.packList.Element, rv)
+		err := d.sm.unmarshalValue(d.packList.Element, rv)
+		if err != nil {
+			return err
+		}
+		d.r.readSep() //nolint:errcheck
+		return nil
 	}
 	if d.packMap != nil {
 		// For map packs, caller gets key-value pairs.
-		return d.sm.unmarshalValue(d.packMap.Value, rv)
+		err := d.sm.unmarshalValue(d.packMap.Value, rv)
+		if err != nil {
+			return err
+		}
+		d.r.readSep() //nolint:errcheck
+		return nil
 	}
-	return &ParseError{Message: "pakt: not in a pack"}
+	return fmt.Errorf("pakt: not in a pack")
 }

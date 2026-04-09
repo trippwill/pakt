@@ -406,7 +406,7 @@ func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
 		Entries: entries,
 	}
 
-	// Build PAKT bytes using stream syntax (<<).
+	// Build PAKT bytes using pack syntax (<<).
 	var pb strings.Builder
 	pb.WriteString("root:str = '/data/warehouse'\n")
 	pb.WriteString("scanned:ts = 2026-06-01T14:30:00Z\n")

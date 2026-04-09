@@ -133,6 +133,37 @@ func TestEventMarshalOmitsEmptyFields(t *testing.T) {
 	}
 }
 
+func TestIsPackStartEnd(t *testing.T) {
+	packStarts := []EventKind{EventListPackStart, EventMapPackStart}
+	packEnds := []EventKind{EventListPackEnd, EventMapPackEnd}
+	nonPack := []EventKind{EventAssignStart, EventAssignEnd, EventScalarValue, EventStructStart, EventListStart, EventMapStart}
+
+	for _, k := range packStarts {
+		if !k.IsPackStart() {
+			t.Errorf("%s.IsPackStart() = false, want true", k)
+		}
+		if k.IsPackEnd() {
+			t.Errorf("%s.IsPackEnd() = true, want false", k)
+		}
+	}
+	for _, k := range packEnds {
+		if !k.IsPackEnd() {
+			t.Errorf("%s.IsPackEnd() = false, want true", k)
+		}
+		if k.IsPackStart() {
+			t.Errorf("%s.IsPackStart() = true, want false", k)
+		}
+	}
+	for _, k := range nonPack {
+		if k.IsPackStart() {
+			t.Errorf("%s.IsPackStart() = true, want false", k)
+		}
+		if k.IsPackEnd() {
+			t.Errorf("%s.IsPackEnd() = true, want false", k)
+		}
+	}
+}
+
 func TestEventRoundTrip(t *testing.T) {
 	orig := Event{
 		Kind:       EventScalarValue,

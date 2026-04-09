@@ -243,7 +243,7 @@ func setDec(target reflect.Value, raw string) error {
 	}
 }
 
-func setDateTimeString(target reflect.Value, raw string, kind reflect.Kind) error {
+func setTemporalString(target reflect.Value, raw string, kind reflect.Kind) error {
 	// If target is time.Time, parse.
 	if target.Type() == timeType {
 		t, err := parseTime(raw)
@@ -259,12 +259,12 @@ func setDateTimeString(target reflect.Value, raw string, kind reflect.Kind) erro
 		return nil
 	}
 
-	return fmt.Errorf("cannot set date/time into %s", target.Type())
+	return fmt.Errorf("cannot set date/ts into %s", target.Type())
 }
 
-// parseTime parses ISO 8601 date, time, or datetime strings.
+// parseTime parses ISO 8601 date or timestamp strings.
 func parseTime(s string) (time.Time, error) {
-	// Try datetime formats first (has 'T' separator).
+	// Try timestamp formats first (has 'T' separator).
 	formats := []string{
 		time.RFC3339Nano,
 		time.RFC3339,
@@ -282,17 +282,5 @@ func parseTime(s string) (time.Time, error) {
 		return t, nil
 	}
 
-	// Time only (with timezone): try "15:04:05Z07:00" and fractional variants.
-	timeFormats := []string{
-		"15:04:05Z07:00",
-		"15:04:05.999999999Z07:00",
-		"15:04:05Z",
-	}
-	for _, f := range timeFormats {
-		if t, err := time.Parse(f, s); err == nil {
-			return t, nil
-		}
-	}
-
-	return time.Time{}, fmt.Errorf("cannot parse time %q", s)
+	return time.Time{}, fmt.Errorf("cannot parse date/ts %q", s)
 }

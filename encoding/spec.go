@@ -329,7 +329,7 @@ func (r *reader) skipAtom() error {
 	return r.skipKeywordOrAtom()
 }
 
-// skipNumberLike skips a number, date, time, datetime, or UUID literal.
+// skipNumberLike skips a number, date, ts, or UUID literal.
 // Reads until whitespace, newline, comma, closing delimiter, comment, or EOF.
 func (r *reader) skipNumberLike() error {
 	count := 0

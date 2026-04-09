@@ -57,7 +57,7 @@ func prepareValue(typ Type, v reflect.Value) (any, error) {
 		v = v.Elem()
 	}
 
-	// Handle time.Time → RFC3339 string for datetime.
+	// Handle time.Time → RFC3339 string for ts.
 	if v.Type() == timeType {
 		t := v.Interface().(time.Time)
 		return t.Format(time.RFC3339), nil

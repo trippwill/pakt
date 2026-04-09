@@ -298,7 +298,7 @@ func canStartValue(b byte) bool {
 	case b == '-':
 		return true // negative number
 	case isDigit(b):
-		return true // number/date/time/uuid
+		return true // number/date/ts/uuid
 	default:
 		return false
 	}

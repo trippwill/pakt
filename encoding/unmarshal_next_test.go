@@ -92,6 +92,69 @@ entries:[{name:str, size:int}] <<
 	}
 }
 
+func TestUnmarshalNextPackElementByElement(t *testing.T) {
+	doc := "items:[int] <<\n10\n20\n30\n"
+	dec := NewDecoder(strings.NewReader(doc))
+	defer dec.Close()
+
+	var items []int
+	for dec.More() {
+		var item int
+		if err := dec.UnmarshalNext(&item); err != nil {
+			t.Fatal(err)
+		}
+		items = append(items, int(item))
+	}
+
+	if len(items) != 3 {
+		t.Fatalf("items length = %d, want 3", len(items))
+	}
+	if items[0] != 10 || items[1] != 20 || items[2] != 30 {
+		t.Errorf("items = %v, want [10, 20, 30]", items)
+	}
+}
+
+func TestUnmarshalNextPackElementThenAssign(t *testing.T) {
+	doc := "nums:[int] <<\n1\n2\nname:str = 'after'\n"
+	dec := NewDecoder(strings.NewReader(doc))
+	defer dec.Close()
+
+	var nums []int
+	for dec.More() {
+		var n int
+		if err := dec.UnmarshalNext(&n); err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Fatal(err)
+		}
+		nums = append(nums, int(n))
+		// After reading pack elements, check if more pack elements
+		// or if the next statement has started.
+		if !dec.More() {
+			break
+		}
+	}
+
+	if len(nums) != 2 {
+		t.Fatalf("nums = %v, want [1, 2]", nums)
+	}
+
+	// Now read the assignment after the pack.
+	type Doc struct {
+		Name string `pakt:"name"`
+	}
+	var d Doc
+	for dec.More() {
+		if err := dec.UnmarshalNext(&d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if d.Name != "after" {
+		t.Errorf("Name = %q, want %q", d.Name, "after")
+	}
+}
+
 func TestUnmarshalNextSkipsUnknownFields(t *testing.T) {
 	doc := "extra:str = 'skip me'\nname:str = 'keep'\n"
 	dec := NewDecoder(strings.NewReader(doc))
@@ -322,7 +385,7 @@ func TestUnmarshalNextTuple(t *testing.T) {
 	}
 }
 
-func TestUnmarshalNextDatetime(t *testing.T) {
+func TestUnmarshalNextTs(t *testing.T) {
 	doc := "ts:ts = 2026-01-15T10:30:00Z\n"
 	dec := NewDecoder(strings.NewReader(doc))
 	defer dec.Close()

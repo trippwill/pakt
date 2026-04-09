@@ -171,7 +171,7 @@ func (r *reader) readTsInto(target reflect.Value) error {
 	if err != nil {
 		return err
 	}
-	return setDateTimeString(allocPtr(target), val, allocPtr(target).Kind())
+	return setTemporalString(allocPtr(target), val, allocPtr(target).Kind())
 }
 
 // readDateInto reads a PAKT date directly into target.
@@ -180,7 +180,7 @@ func (r *reader) readDateInto(target reflect.Value) error {
 	if err != nil {
 		return err
 	}
-	return setDateTimeString(allocPtr(target), val, allocPtr(target).Kind())
+	return setTemporalString(allocPtr(target), val, allocPtr(target).Kind())
 }
 
 // readUUIDInto reads a PAKT UUID directly into target.

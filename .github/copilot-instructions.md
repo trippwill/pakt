@@ -94,10 +94,20 @@ For packs: `ListPackStart/MapPackStart` → items → `ListPackEnd/MapPackEnd`
 
 > **Note**: The Go implementation currently uses `ListStreamStart/End` and `MapStreamStart/End` event names. These will be renamed to `ListPackStart/End` and `MapPackStart/End` in a future alignment pass.
 
+## Design Priorities
+
+PAKT is pre-release. Backward compatibility is not a concern. The priorities are:
+
+1. **Correctness** — the implementation matches the spec
+2. **Performance** — minimal allocation, streaming-first
+3. **Ergonomics** — clean, discoverable APIs
+4. **Consistency** — uniform design within each library; each library should be idiomatic for its ecosystem (Go idioms in Go, .NET idioms in .NET) except where that conflicts with a higher priority
+
+When these conflict, higher-numbered priorities yield to lower-numbered ones.
+
 ## PR Expectations
 
 - All tests pass with `-race`
 - `golangci-lint run` clean
 - Changes to the spec (`spec/pakt-v0.md`) should be reflected in `docs/guide.md` and site content
-- Changes to the event model must preserve backward compatibility or be clearly documented as breaking
 - New features need tests; bug fixes need regression tests

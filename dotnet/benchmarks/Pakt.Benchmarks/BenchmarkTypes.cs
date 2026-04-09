@@ -171,8 +171,8 @@ public static class BenchmarkData
 
     private static void InitSmall()
     {
-        SmallPakt = PaktSerializer.Serialize(
-            SmallDocValue, BenchmarkPaktContext.Default.SmallDoc, "doc");
+        SmallPakt = PaktSerializer.Serialize<SmallDoc>(
+            SmallDocValue, BenchmarkPaktContext.Default, "doc");
         SmallJson = JsonSerializer.SerializeToUtf8Bytes(
             SmallDocValue, BenchmarkJsonContext.Default.SmallDoc);
     }

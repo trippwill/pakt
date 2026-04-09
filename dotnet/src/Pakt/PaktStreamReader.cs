@@ -18,6 +18,7 @@ public sealed class PaktStreamReader : IAsyncDisposable
     private readonly byte[] _buffer;
     private readonly int _length;
     private readonly PaktReaderOptions _options;
+    private readonly PaktSerializerContext _context;
     private int _offset;
     private bool _disposed;
 
@@ -28,11 +29,12 @@ public sealed class PaktStreamReader : IAsyncDisposable
     private int _valueStart; // byte offset where value begins (after '=' or '<<')
     private bool _hasStatement;
 
-    private PaktStreamReader(byte[] buffer, int length, PaktReaderOptions options)
+    private PaktStreamReader(byte[] buffer, int length, PaktReaderOptions options, PaktSerializerContext context)
     {
         _buffer = buffer;
         _length = length;
         _options = options;
+        _context = context;
     }
 
     /// <summary>
@@ -41,10 +43,12 @@ public sealed class PaktStreamReader : IAsyncDisposable
     /// </summary>
     public static async ValueTask<PaktStreamReader> CreateAsync(
         Stream stream,
+        PaktSerializerContext context,
         PaktReaderOptions options = default,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(context);
 
         byte[] buffer;
         int length;
@@ -64,17 +68,18 @@ public sealed class PaktStreamReader : IAsyncDisposable
             temp.GetBuffer().AsSpan(0, length).CopyTo(buffer);
         }
 
-        return new PaktStreamReader(buffer, length, options);
+        return new PaktStreamReader(buffer, length, options, context);
     }
 
     /// <summary>
     /// Creates a new <see cref="PaktStreamReader"/> from a byte array.
     /// </summary>
-    public static PaktStreamReader Create(ReadOnlySpan<byte> data, PaktReaderOptions options = default)
+    public static PaktStreamReader Create(ReadOnlySpan<byte> data, PaktSerializerContext context, PaktReaderOptions options = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
         var buffer = ArrayPool<byte>.Shared.Rent(data.Length);
         data.CopyTo(buffer);
-        return new PaktStreamReader(buffer, data.Length, options);
+        return new PaktStreamReader(buffer, data.Length, options, context);
     }
 
     /// <summary>The name of the current statement.</summary>
@@ -133,19 +138,18 @@ public sealed class PaktStreamReader : IAsyncDisposable
     }
 
     /// <summary>
-    /// Deserialize the current assign statement's value using generated type info.
+    /// Deserialize the current assign statement's value.
     /// Call after <see cref="ReadStatementAsync"/> returns true and <see cref="IsPack"/> is false.
     /// </summary>
-    public T Deserialize<T>(PaktTypeInfo<T> typeInfo)
+    public T Deserialize<T>()
     {
         ThrowIfDisposed();
         if (!_hasStatement)
             throw new InvalidOperationException("No current statement. Call ReadStatementAsync first.");
         if (_isPack)
             throw new InvalidOperationException("Current statement is a pack. Use ReadPackElements instead.");
-        if (typeInfo.Deserialize is null)
-            throw new InvalidOperationException($"PaktTypeInfo<{typeof(T).Name}> does not have a Deserialize delegate. Use source-generated type info.");
 
+        var typeInfo = ResolveTypeInfo<T>();
         var result = DeserializeCurrentValue(typeInfo);
         _hasStatement = false;
         return result;
@@ -156,7 +160,6 @@ public sealed class PaktStreamReader : IAsyncDisposable
     /// Call after <see cref="ReadStatementAsync"/> returns true and <see cref="IsPack"/> is true.
     /// </summary>
     public async IAsyncEnumerable<T> ReadPackElements<T>(
-        PaktTypeInfo<T> typeInfo,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -164,9 +167,8 @@ public sealed class PaktStreamReader : IAsyncDisposable
             throw new InvalidOperationException("No current statement. Call ReadStatementAsync first.");
         if (!_isPack)
             throw new InvalidOperationException("Current statement is not a pack. Use Deserialize instead.");
-        if (typeInfo.Deserialize is null)
-            throw new InvalidOperationException($"PaktTypeInfo<{typeof(T).Name}> does not have a Deserialize delegate. Use source-generated type info.");
 
+        var typeInfo = ResolveTypeInfo<T>();
         var elements = DeserializePackElementsCore(typeInfo);
         _hasStatement = false;
         foreach (var element in elements)
@@ -315,5 +317,11 @@ public sealed class PaktStreamReader : IAsyncDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(PaktStreamReader));
+    }
+
+    private PaktTypeInfo<T> ResolveTypeInfo<T>()
+    {
+        return _context.GetTypeInfo<T>()
+            ?? throw new InvalidOperationException($"Type '{typeof(T).Name}' is not registered in the serializer context.");
     }
 }

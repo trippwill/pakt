@@ -76,7 +76,7 @@ public class FSBenchmarks
             Scanned = "2026-06-01T14:30:00Z",
         };
 
-        var stream = PaktStreamReader.Create(_paktData);
+        var stream = PaktStreamReader.Create(_paktData, BenchmarkPaktContext.Default);
         try
         {
             while (stream.ReadStatementAsync().GetAwaiter().GetResult())
@@ -84,7 +84,7 @@ public class FSBenchmarks
                 if (stream.IsPack && stream.StatementName == "entries")
                 {
                     dataset.Entries = AsyncHelper.ToListSync(
-                        stream.ReadPackElements(BenchmarkPaktContext.Default.FSEntry));
+                        stream.ReadPackElements<FSEntry>());
                 }
                 else
                 {
@@ -157,7 +157,7 @@ public class FSBenchmarks
     [BenchmarkCategory("Pack"), Benchmark(Baseline = true)]
     public int PAKT_Pack()
     {
-        var stream = PaktStreamReader.Create(_paktData);
+        var stream = PaktStreamReader.Create(_paktData, BenchmarkPaktContext.Default);
         int count = 0;
         try
         {
@@ -166,7 +166,7 @@ public class FSBenchmarks
                 if (stream.IsPack)
                 {
                     count = AsyncHelper.CountSync(
-                        stream.ReadPackElements(BenchmarkPaktContext.Default.FSEntry));
+                        stream.ReadPackElements<FSEntry>());
                 }
                 else
                 {

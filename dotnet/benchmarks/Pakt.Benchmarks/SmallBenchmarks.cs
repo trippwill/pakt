@@ -52,7 +52,7 @@ public class SmallBenchmarks
     [BenchmarkCategory("Deserialize"), Benchmark(Baseline = true)]
     public SmallDoc PAKT_Deserialize()
     {
-        return PaktSerializer.Deserialize(_paktData, BenchmarkPaktContext.Default.SmallDoc);
+        return PaktSerializer.Deserialize<SmallDoc>(_paktData, BenchmarkPaktContext.Default);
     }
 
     [BenchmarkCategory("Deserialize"), Benchmark]
@@ -66,7 +66,7 @@ public class SmallBenchmarks
     [BenchmarkCategory("Serialize"), Benchmark(Baseline = true)]
     public byte[] PAKT_Serialize()
     {
-        return PaktSerializer.Serialize(_doc, BenchmarkPaktContext.Default.SmallDoc, "doc");
+        return PaktSerializer.Serialize<SmallDoc>(_doc, BenchmarkPaktContext.Default, "doc");
     }
 
     [BenchmarkCategory("Serialize"), Benchmark]

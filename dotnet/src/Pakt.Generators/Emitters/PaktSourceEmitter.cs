@@ -67,7 +67,23 @@ namespace Pakt.Generators.Emitters
             // Skip helper
             EmitSkipHelper(sb);
 
+            // GetTypeInfo<T> override
+            EmitGetTypeInfo(sb, types);
+
             sb.CloseBrace();
+        }
+
+        private static void EmitGetTypeInfo(SourceBuilder sb, IReadOnlyList<SerializableTypeModel> types)
+        {
+            sb.AppendLine("public override global::Pakt.Serialization.PaktTypeInfo<T>? GetTypeInfo<T>()");
+            sb.OpenBrace();
+            foreach (var type in types)
+            {
+                sb.AppendLine($"if (typeof(T) == typeof({type.FullyQualifiedName})) return (global::Pakt.Serialization.PaktTypeInfo<T>)(object){type.Name};");
+            }
+            sb.AppendLine("return null;");
+            sb.CloseBrace();
+            sb.AppendLine();
         }
 
         private static void EmitTypeInfoProperty(SourceBuilder sb, SerializableTypeModel type, IReadOnlyList<SerializableTypeModel> allTypes)

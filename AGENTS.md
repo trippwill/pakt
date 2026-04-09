@@ -79,6 +79,17 @@ The specification (`spec/pakt-v0.md`) is the authoritative source for PAKT seman
 - Type annotations are producer assertions checked at parse time
 - Nil is only valid for nullable types (`?` suffix)
 
+## Design Priorities
+
+PAKT is pre-release. Backward compatibility is not a concern. The priorities are:
+
+1. **Correctness** — the implementation matches the spec
+2. **Performance** — minimal allocation, streaming-first
+3. **Ergonomics** — clean, discoverable APIs
+4. **Consistency** — uniform design within each library; each library should be idiomatic for its ecosystem (Go idioms in Go, .NET idioms in .NET) except where that conflicts with a higher priority
+
+When these conflict, higher-numbered priorities yield to lower-numbered ones.
+
 ## Testing Requirements
 
 - **All tests must pass with `-race`** before submitting changes

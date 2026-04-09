@@ -108,17 +108,17 @@ using Pakt.Serialization;
 public partial class AppPaktContext : PaktSerializerContext { }
 
 // Deserialize
-var server = PaktSerializer.Deserialize(paktBytes, AppPaktContext.Default.Server);
+var server = PaktSerializer.Deserialize<Server>(paktBytes, AppPaktContext.Default);
 
 // Iterate pack statements
-await using var reader = PaktStreamReader.Create(paktBytes);
+await using var reader = PaktStreamReader.Create(paktBytes, AppPaktContext.Default);
 while (await reader.ReadStatementAsync())
 {
     if (reader.IsPack)
-        await foreach (var item in reader.ReadPackElements(AppPaktContext.Default.Server))
+        await foreach (var item in reader.ReadPackElements<Server>())
             Process(item);
     else
-        var value = reader.Deserialize(AppPaktContext.Default.Server);
+        var value = reader.Deserialize<Server>();
 }
 ```
 

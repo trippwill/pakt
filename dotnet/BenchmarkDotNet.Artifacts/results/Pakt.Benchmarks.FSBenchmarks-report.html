@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Pakt.Benchmarks.FSBenchmarks-20260408-112544</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.8, Linux Fedora Linux 43 (COSMIC)
+Intel Core Ultra 5 228V 0.40GHz, 1 CPU, 8 logical and 8 physical cores
+.NET SDK 10.0.201
+  [Host]     : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+  DefaultJob : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method    </th><th>Categories</th><th>EntryCount</th><th>Mean  </th><th>Error</th><th>StdDev</th><th>Median</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>PAKT_Decode</td><td>Decode</td><td>1000</td><td>509.31 &mu;s</td><td>10.140 &mu;s</td><td>22.469 &mu;s</td><td>501.81 &mu;s</td><td>1.00</td><td>0.06</td><td>320.3125</td><td>-</td><td>-</td><td>1339904 B</td><td>1.00</td>
+</tr><tr><td>JSON_Decode</td><td>Decode</td><td>1000</td><td>135.05 &mu;s</td><td>1.278 &mu;s</td><td>0.998 &mu;s</td><td>135.03 &mu;s</td><td>0.27</td><td>0.01</td><td>-</td><td>-</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>PAKT_Decode</td><td>Decode</td><td>10000</td><td>4,984.80 &mu;s</td><td>47.275 &mu;s</td><td>70.759 &mu;s</td><td>4,977.70 &mu;s</td><td>1.00</td><td>0.02</td><td>3210.9375</td><td>-</td><td>-</td><td>13452240 B</td><td>1.00</td>
+</tr><tr><td>JSON_Decode</td><td>Decode</td><td>10000</td><td>1,391.04 &mu;s</td><td>27.600 &mu;s</td><td>57.612 &mu;s</td><td>1,358.68 &mu;s</td><td>0.28</td><td>0.01</td><td>-</td><td>-</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>PAKT_Deserialize</td><td>Deserialize</td><td>1000</td><td>1,013.04 &mu;s</td><td>20.026 &mu;s</td><td>49.871 &mu;s</td><td>1,004.21 &mu;s</td><td>1.00</td><td>0.07</td><td>398.4375</td><td>238.2813</td><td>119.1406</td><td>2178466 B</td><td>1.00</td>
+</tr><tr><td>JSON_Deserialize</td><td>Deserialize</td><td>1000</td><td>310.59 &mu;s</td><td>6.204 &mu;s</td><td>17.601 &mu;s</td><td>303.40 &mu;s</td><td>0.31</td><td>0.02</td><td>73.7305</td><td>34.1797</td><td>-</td><td>370744 B</td><td>0.17</td>
+</tr><tr><td>PAKT_Deserialize</td><td>Deserialize</td><td>10000</td><td>16,948.17 &mu;s</td><td>301.583 &mu;s</td><td>251.835 &mu;s</td><td>16,842.62 &mu;s</td><td>1.00</td><td>0.02</td><td>3687.5000</td><td>1687.5000</td><td>812.5000</td><td>21993579 B</td><td>1.00</td>
+</tr><tr><td>JSON_Deserialize</td><td>Deserialize</td><td>10000</td><td>5,502.41 &mu;s</td><td>78.007 &mu;s</td><td>65.140 &mu;s</td><td>5,514.54 &mu;s</td><td>0.32</td><td>0.01</td><td>750.0000</td><td>500.0000</td><td>164.0625</td><td>3801225 B</td><td>0.17</td>
+</tr><tr><td>PAKT_Pack</td><td>Pack</td><td>1000</td><td>1,058.48 &mu;s</td><td>21.062 &mu;s</td><td>46.233 &mu;s</td><td>1,041.53 &mu;s</td><td>1.00</td><td>0.06</td><td>398.4375</td><td>158.2031</td><td>119.1406</td><td>2161794 B</td><td>1.00</td>
+</tr><tr><td>JSON_FullLoad</td><td>Pack</td><td>1000</td><td>322.17 &mu;s</td><td>6.613 &mu;s</td><td>19.499 &mu;s</td><td>311.16 &mu;s</td><td>0.30</td><td>0.02</td><td>73.7305</td><td>34.1797</td><td>-</td><td>370744 B</td><td>0.17</td>
+</tr><tr><td>PAKT_Pack</td><td>Pack</td><td>10000</td><td>17,039.69 &mu;s</td><td>132.910 &mu;s</td><td>110.986 &mu;s</td><td>17,059.76 &mu;s</td><td>1.00</td><td>0.01</td><td>3531.2500</td><td>1562.5000</td><td>687.5000</td><td>21730890 B</td><td>1.00</td>
+</tr><tr><td>JSON_FullLoad</td><td>Pack</td><td>10000</td><td>5,515.22 &mu;s</td><td>82.104 &mu;s</td><td>76.800 &mu;s</td><td>5,511.09 &mu;s</td><td>0.32</td><td>0.00</td><td>750.0000</td><td>500.0000</td><td>164.0625</td><td>3801191 B</td><td>0.17</td>
+</tr><tr><td>PAKT_Serialize</td><td>Serialize</td><td>1000</td><td>546.94 &mu;s</td><td>15.787 &mu;s</td><td>46.549 &mu;s</td><td>519.11 &mu;s</td><td>1.01</td><td>0.12</td><td>-</td><td>-</td><td>-</td><td>2385 B</td><td>1.00</td>
+</tr><tr><td>JSON_Serialize</td><td>Serialize</td><td>1000</td><td>91.42 &mu;s</td><td>0.239 &mu;s</td><td>0.266 &mu;s</td><td>91.41 &mu;s</td><td>0.17</td><td>0.01</td><td>-</td><td>-</td><td>-</td><td>136 B</td><td>0.06</td>
+</tr><tr><td>PAKT_Serialize</td><td>Serialize</td><td>10000</td><td>5,107.96 &mu;s</td><td>14.842 &mu;s</td><td>16.497 &mu;s</td><td>5,103.05 &mu;s</td><td>1.00</td><td>0.00</td><td>-</td><td>-</td><td>-</td><td>2390 B</td><td>1.00</td>
+</tr><tr><td>JSON_Serialize</td><td>Serialize</td><td>10000</td><td>994.28 &mu;s</td><td>7.608 &mu;s</td><td>7.472 &mu;s</td><td>990.59 &mu;s</td><td>0.19</td><td>0.00</td><td>-</td><td>-</td><td>-</td><td>136 B</td><td>0.06</td>
+</tr></tbody></table>
+</body>
+</html>

@@ -32,7 +32,7 @@ public partial class AppPaktContext : PaktSerializerContext { }
 ```csharp
 using Pakt;
 
-await using var reader = PaktStreamReader.Create(paktBytes);
+await using var reader = PaktStreamReader.Create(paktBytes, AppPaktContext.Default);
 
 while (await reader.ReadStatementAsync())
 {
@@ -40,7 +40,7 @@ while (await reader.ReadStatementAsync())
 
     if (reader.StatementName == "server")
     {
-        var server = reader.Deserialize(AppPaktContext.Default.Server);
+        var server = reader.Deserialize<Server>();
         Console.WriteLine($"  {server.Host}:{server.Port}");
     }
     else
@@ -56,10 +56,10 @@ For units with a single assign statement, use the `PaktSerializer` static API:
 
 ```csharp
 // Deserialize
-var server = PaktSerializer.Deserialize(paktBytes, AppPaktContext.Default.Server);
+var server = PaktSerializer.Deserialize<Server>(paktBytes, AppPaktContext.Default);
 
 // Serialize
-byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default.Server, "server");
+byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default, "server");
 ```
 
 ## API Overview
@@ -84,8 +84,7 @@ byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default.Server, "
 | `PaktWriter` | Forward-only PAKT output writer to `IBufferWriter<byte>`. |
 | `PaktStreamReader` | Async statement-level reader. Iterates top-level assigns and packs. Supports `Deserialize<T>()` and `ReadPackElements<T>()`. |
 | `PaktSerializer` | Static convenience API for single-statement units. |
-| `PaktSerializerContext` | Base class for source-generated serialization contexts. |
-| `PaktTypeInfo<T>` | Generated metadata + delegate pair for a serializable type. |
+| `PaktSerializerContext` | Base class for source-generated serialization contexts. Provides `GetTypeInfo<T>()` for type resolution. |
 | `PaktType` | Immutable PAKT type descriptor (scalars, structs, tuples, lists, maps, atom sets). |
 | `PaktException` | Parse/validation error with `PaktPosition` and `PaktErrorCode`. |
 

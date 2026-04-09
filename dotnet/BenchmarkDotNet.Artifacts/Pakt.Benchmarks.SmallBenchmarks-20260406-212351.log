@@ -1,0 +1,574 @@
+// Validating benchmarks:
+// ***** BenchmarkRunner: Start   *****
+// ***** Found 6 benchmark(s) in total *****
+// ***** Building 1 exe(s) in Parallel: Start   *****
+// start dotnet  restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/" /p:OutDir="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0/" /p:OutputPath="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0/" /p:PublishDir="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/publish/" in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1
+// command took 1.22 sec and exited with 0
+// start dotnet  build -c Release --no-restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/" /p:OutDir="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0/" /p:OutputPath="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0/" /p:PublishDir="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/publish/" --output "/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0/" in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1
+// command took 7.61 sec and exited with 0
+// ***** Done, took 00:00:08 (8.88 sec)   *****
+// Found 6 benchmarks:
+//   SmallBenchmarks.PAKT_Decode: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+//   SmallBenchmarks.JSON_Decode: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+//   SmallBenchmarks.PAKT_Deserialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+//   SmallBenchmarks.JSON_Deserialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+//   SmallBenchmarks.PAKT_Serialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+//   SmallBenchmarks.JSON_Serialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+
+// **************************
+// Benchmark: SmallBenchmarks.PAKT_Decode: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-ARYRAM-1.dll --anonymousPipes 132 133 --benchmarkName Pakt.Benchmarks.SmallBenchmarks.PAKT_Decode --job "InvocationCount=512, IterationCount=3, WarmupCount=1" --benchmarkId 0 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 16 op, 229957.00 ns, 14.3723 us/op
+WorkloadJitting  1: 16 op, 4538932.00 ns, 283.6833 us/op
+
+OverheadWarmup   1: 512 op, 844.00 ns, 1.6484 ns/op
+OverheadWarmup   2: 512 op, 661.00 ns, 1.2910 ns/op
+OverheadWarmup   3: 512 op, 585.00 ns, 1.1426 ns/op
+OverheadWarmup   4: 512 op, 567.00 ns, 1.1074 ns/op
+OverheadWarmup   5: 512 op, 683.00 ns, 1.3340 ns/op
+OverheadWarmup   6: 512 op, 715.00 ns, 1.3965 ns/op
+OverheadWarmup   7: 512 op, 986.00 ns, 1.9258 ns/op
+OverheadWarmup   8: 512 op, 700.00 ns, 1.3672 ns/op
+OverheadWarmup   9: 512 op, 732.00 ns, 1.4297 ns/op
+OverheadWarmup  10: 512 op, 722.00 ns, 1.4102 ns/op
+
+OverheadActual   1: 512 op, 1006.00 ns, 1.9648 ns/op
+OverheadActual   2: 512 op, 900.00 ns, 1.7578 ns/op
+OverheadActual   3: 512 op, 962.00 ns, 1.8789 ns/op
+OverheadActual   4: 512 op, 674.00 ns, 1.3164 ns/op
+OverheadActual   5: 512 op, 838.00 ns, 1.6367 ns/op
+OverheadActual   6: 512 op, 705.00 ns, 1.3770 ns/op
+OverheadActual   7: 512 op, 676.00 ns, 1.3203 ns/op
+OverheadActual   8: 512 op, 543.00 ns, 1.0605 ns/op
+OverheadActual   9: 512 op, 858.00 ns, 1.6758 ns/op
+OverheadActual  10: 512 op, 923.00 ns, 1.8027 ns/op
+OverheadActual  11: 512 op, 1052.00 ns, 2.0547 ns/op
+OverheadActual  12: 512 op, 540.00 ns, 1.0547 ns/op
+OverheadActual  13: 512 op, 846.00 ns, 1.6523 ns/op
+OverheadActual  14: 512 op, 690.00 ns, 1.3477 ns/op
+OverheadActual  15: 512 op, 682.00 ns, 1.3320 ns/op
+OverheadActual  16: 512 op, 817.00 ns, 1.5957 ns/op
+OverheadActual  17: 512 op, 1022.00 ns, 1.9961 ns/op
+OverheadActual  18: 512 op, 684.00 ns, 1.3359 ns/op
+OverheadActual  19: 512 op, 707.00 ns, 1.3809 ns/op
+OverheadActual  20: 512 op, 677.00 ns, 1.3223 ns/op
+
+WorkloadWarmup   1: 512 op, 3838470.00 ns, 7.4970 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 512 op, 3788197.00 ns, 7.3988 us/op
+WorkloadActual   2: 512 op, 2932220.00 ns, 5.7270 us/op
+WorkloadActual   3: 512 op, 2682971.00 ns, 5.2402 us/op
+
+// AfterActualRun
+WorkloadResult   1: 512 op, 3787435.00 ns, 7.3973 us/op
+WorkloadResult   2: 512 op, 2931458.00 ns, 5.7255 us/op
+WorkloadResult   3: 512 op, 2682209.00 ns, 5.2387 us/op
+// GC:  0 0 0 1503232 512
+// Threading:  0 0 512
+
+// AfterAll
+// Benchmark Process 1441447 has exited with code 0.
+
+Mean = 6.121 μs, StdErr = 0.654 μs (10.68%), N = 3, StdDev = 1.132 μs
+Min = 5.239 μs, Q1 = 5.482 μs, Median = 5.726 μs, Q3 = 6.561 μs, Max = 7.397 μs
+IQR = 1.079 μs, LowerFence = 3.863 μs, UpperFence = 8.180 μs
+ConfidenceInterval = [-14.536 μs; 26.777 μs] (CI 99.9%), Margin = 20.656 μs (337.49% of Mean)
+Skewness = 0.31, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 5 (83.3%) benchmark(s) to run. Estimated finish 2026-04-06 21:24 (0h 0m from now) **
+// **************************
+// Benchmark: SmallBenchmarks.JSON_Decode: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-ARYRAM-1.dll --anonymousPipes 109 110 --benchmarkName Pakt.Benchmarks.SmallBenchmarks.JSON_Decode --job "InvocationCount=512, IterationCount=3, WarmupCount=1" --benchmarkId 1 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 16 op, 273572.00 ns, 17.0983 us/op
+WorkloadJitting  1: 16 op, 1113332.00 ns, 69.5833 us/op
+
+OverheadWarmup   1: 512 op, 1089.00 ns, 2.1270 ns/op
+OverheadWarmup   2: 512 op, 519.00 ns, 1.0137 ns/op
+OverheadWarmup   3: 512 op, 695.00 ns, 1.3574 ns/op
+OverheadWarmup   4: 512 op, 560.00 ns, 1.0938 ns/op
+OverheadWarmup   5: 512 op, 890.00 ns, 1.7383 ns/op
+OverheadWarmup   6: 512 op, 782.00 ns, 1.5273 ns/op
+
+OverheadActual   1: 512 op, 1001.00 ns, 1.9551 ns/op
+OverheadActual   2: 512 op, 1089.00 ns, 2.1270 ns/op
+OverheadActual   3: 512 op, 1092.00 ns, 2.1328 ns/op
+OverheadActual   4: 512 op, 741.00 ns, 1.4473 ns/op
+OverheadActual   5: 512 op, 780.00 ns, 1.5234 ns/op
+OverheadActual   6: 512 op, 864.00 ns, 1.6875 ns/op
+OverheadActual   7: 512 op, 570.00 ns, 1.1133 ns/op
+OverheadActual   8: 512 op, 567.00 ns, 1.1074 ns/op
+OverheadActual   9: 512 op, 870.00 ns, 1.6992 ns/op
+OverheadActual  10: 512 op, 707.00 ns, 1.3809 ns/op
+OverheadActual  11: 512 op, 576.00 ns, 1.1250 ns/op
+OverheadActual  12: 512 op, 572.00 ns, 1.1172 ns/op
+OverheadActual  13: 512 op, 579.00 ns, 1.1309 ns/op
+OverheadActual  14: 512 op, 879.00 ns, 1.7168 ns/op
+OverheadActual  15: 512 op, 584.00 ns, 1.1406 ns/op
+OverheadActual  16: 512 op, 545.00 ns, 1.0645 ns/op
+OverheadActual  17: 512 op, 851.00 ns, 1.6621 ns/op
+OverheadActual  18: 512 op, 740.00 ns, 1.4453 ns/op
+OverheadActual  19: 512 op, 567.00 ns, 1.1074 ns/op
+OverheadActual  20: 512 op, 579.00 ns, 1.1309 ns/op
+
+WorkloadWarmup   1: 512 op, 1831731.00 ns, 3.5776 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 512 op, 1819995.00 ns, 3.5547 us/op
+WorkloadActual   2: 512 op, 1881438.00 ns, 3.6747 us/op
+WorkloadActual   3: 512 op, 1873550.00 ns, 3.6593 us/op
+
+// AfterActualRun
+WorkloadResult   1: 512 op, 1819271.50 ns, 3.5533 us/op
+WorkloadResult   2: 512 op, 1880714.50 ns, 3.6733 us/op
+WorkloadResult   3: 512 op, 1872826.50 ns, 3.6579 us/op
+// GC:  0 0 0 0 512
+// Threading:  0 0 512
+
+// AfterAll
+// Benchmark Process 1441457 has exited with code 0.
+
+Mean = 3.628 μs, StdErr = 0.038 μs (1.04%), N = 3, StdDev = 0.065 μs
+Min = 3.553 μs, Q1 = 3.606 μs, Median = 3.658 μs, Q3 = 3.666 μs, Max = 3.673 μs
+IQR = 0.060 μs, LowerFence = 3.516 μs, UpperFence = 3.756 μs
+ConfidenceInterval = [2.437 μs; 4.819 μs] (CI 99.9%), Margin = 1.191 μs (32.83% of Mean)
+Skewness = -0.36, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 4 (66.7%) benchmark(s) to run. Estimated finish 2026-04-06 21:24 (0h 0m from now) **
+// **************************
+// Benchmark: SmallBenchmarks.PAKT_Deserialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-ARYRAM-1.dll --anonymousPipes 109 110 --benchmarkName Pakt.Benchmarks.SmallBenchmarks.PAKT_Deserialize --job "InvocationCount=512, IterationCount=3, WarmupCount=1" --benchmarkId 2 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 16 op, 327256.00 ns, 20.4535 us/op
+WorkloadJitting  1: 16 op, 5964281.00 ns, 372.7676 us/op
+
+OverheadWarmup   1: 512 op, 1736.00 ns, 3.3906 ns/op
+OverheadWarmup   2: 512 op, 1283.00 ns, 2.5059 ns/op
+OverheadWarmup   3: 512 op, 1129.00 ns, 2.2051 ns/op
+OverheadWarmup   4: 512 op, 1276.00 ns, 2.4922 ns/op
+OverheadWarmup   5: 512 op, 1194.00 ns, 2.3320 ns/op
+OverheadWarmup   6: 512 op, 1054.00 ns, 2.0586 ns/op
+OverheadWarmup   7: 512 op, 1309.00 ns, 2.5566 ns/op
+OverheadWarmup   8: 512 op, 1100.00 ns, 2.1484 ns/op
+
+OverheadActual   1: 512 op, 1400.00 ns, 2.7344 ns/op
+OverheadActual   2: 512 op, 1536.00 ns, 3.0000 ns/op
+OverheadActual   3: 512 op, 1342.00 ns, 2.6211 ns/op
+OverheadActual   4: 512 op, 1248.00 ns, 2.4375 ns/op
+OverheadActual   5: 512 op, 1383.00 ns, 2.7012 ns/op
+OverheadActual   6: 512 op, 1191.00 ns, 2.3262 ns/op
+OverheadActual   7: 512 op, 1092.00 ns, 2.1328 ns/op
+OverheadActual   8: 512 op, 1067.00 ns, 2.0840 ns/op
+OverheadActual   9: 512 op, 1120.00 ns, 2.1875 ns/op
+OverheadActual  10: 512 op, 1099.00 ns, 2.1465 ns/op
+OverheadActual  11: 512 op, 1129.00 ns, 2.2051 ns/op
+OverheadActual  12: 512 op, 1314.00 ns, 2.5664 ns/op
+OverheadActual  13: 512 op, 1306.00 ns, 2.5508 ns/op
+OverheadActual  14: 512 op, 1098.00 ns, 2.1445 ns/op
+OverheadActual  15: 512 op, 1059.00 ns, 2.0684 ns/op
+OverheadActual  16: 512 op, 1059.00 ns, 2.0684 ns/op
+OverheadActual  17: 512 op, 1300.00 ns, 2.5391 ns/op
+OverheadActual  18: 512 op, 1379.00 ns, 2.6934 ns/op
+OverheadActual  19: 512 op, 1146.00 ns, 2.2383 ns/op
+OverheadActual  20: 512 op, 1101.00 ns, 2.1504 ns/op
+
+WorkloadWarmup   1: 512 op, 4308015.00 ns, 8.4141 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 512 op, 4475352.00 ns, 8.7409 us/op
+WorkloadActual   2: 512 op, 3444591.00 ns, 6.7277 us/op
+WorkloadActual   3: 512 op, 3285849.00 ns, 6.4177 us/op
+
+// AfterActualRun
+WorkloadResult   1: 512 op, 4474183.50 ns, 8.7386 us/op
+WorkloadResult   2: 512 op, 3443422.50 ns, 6.7254 us/op
+WorkloadResult   3: 512 op, 3284680.50 ns, 6.4154 us/op
+// GC:  0 0 0 1691648 512
+// Threading:  0 0 512
+
+// AfterAll
+// Benchmark Process 1441464 has exited with code 0.
+
+Mean = 7.293 μs, StdErr = 0.728 μs (9.99%), N = 3, StdDev = 1.261 μs
+Min = 6.415 μs, Q1 = 6.570 μs, Median = 6.725 μs, Q3 = 7.732 μs, Max = 8.739 μs
+IQR = 1.162 μs, LowerFence = 4.828 μs, UpperFence = 9.474 μs
+ConfidenceInterval = [-15.719 μs; 30.306 μs] (CI 99.9%), Margin = 23.012 μs (315.53% of Mean)
+Skewness = 0.36, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 3 (50.0%) benchmark(s) to run. Estimated finish 2026-04-06 21:24 (0h 0m from now) **
+// **************************
+// Benchmark: SmallBenchmarks.JSON_Deserialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-ARYRAM-1.dll --anonymousPipes 109 110 --benchmarkName Pakt.Benchmarks.SmallBenchmarks.JSON_Deserialize --job "InvocationCount=512, IterationCount=3, WarmupCount=1" --benchmarkId 3 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 16 op, 337568.00 ns, 21.0980 us/op
+WorkloadJitting  1: 16 op, 2798383.00 ns, 174.8989 us/op
+
+OverheadWarmup   1: 512 op, 1356.00 ns, 2.6484 ns/op
+OverheadWarmup   2: 512 op, 1526.00 ns, 2.9805 ns/op
+OverheadWarmup   3: 512 op, 1334.00 ns, 2.6055 ns/op
+OverheadWarmup   4: 512 op, 1400.00 ns, 2.7344 ns/op
+OverheadWarmup   5: 512 op, 1450.00 ns, 2.8320 ns/op
+OverheadWarmup   6: 512 op, 1357.00 ns, 2.6504 ns/op
+
+OverheadActual   1: 512 op, 1705.00 ns, 3.3301 ns/op
+OverheadActual   2: 512 op, 1402.00 ns, 2.7383 ns/op
+OverheadActual   3: 512 op, 1338.00 ns, 2.6133 ns/op
+OverheadActual   4: 512 op, 1159.00 ns, 2.2637 ns/op
+OverheadActual   5: 512 op, 1329.00 ns, 2.5957 ns/op
+OverheadActual   6: 512 op, 1112.00 ns, 2.1719 ns/op
+OverheadActual   7: 512 op, 1351.00 ns, 2.6387 ns/op
+OverheadActual   8: 512 op, 1288.00 ns, 2.5156 ns/op
+OverheadActual   9: 512 op, 1050.00 ns, 2.0508 ns/op
+OverheadActual  10: 512 op, 1125.00 ns, 2.1973 ns/op
+OverheadActual  11: 512 op, 1358.00 ns, 2.6523 ns/op
+OverheadActual  12: 512 op, 1124.00 ns, 2.1953 ns/op
+OverheadActual  13: 512 op, 1083.00 ns, 2.1152 ns/op
+OverheadActual  14: 512 op, 1118.00 ns, 2.1836 ns/op
+OverheadActual  15: 512 op, 1046.00 ns, 2.0430 ns/op
+OverheadActual  16: 512 op, 1042.00 ns, 2.0352 ns/op
+OverheadActual  17: 512 op, 1050.00 ns, 2.0508 ns/op
+OverheadActual  18: 512 op, 1337.00 ns, 2.6113 ns/op
+OverheadActual  19: 512 op, 1155.00 ns, 2.2559 ns/op
+OverheadActual  20: 512 op, 1064.00 ns, 2.0781 ns/op
+
+WorkloadWarmup   1: 512 op, 1985925.00 ns, 3.8788 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 512 op, 1953707.00 ns, 3.8158 us/op
+WorkloadActual   2: 512 op, 1899437.00 ns, 3.7098 us/op
+WorkloadActual   3: 512 op, 1874904.00 ns, 3.6619 us/op
+
+// AfterActualRun
+WorkloadResult   1: 512 op, 1952567.00 ns, 3.8136 us/op
+WorkloadResult   2: 512 op, 1898297.00 ns, 3.7076 us/op
+WorkloadResult   3: 512 op, 1873764.00 ns, 3.6597 us/op
+// GC:  0 0 0 102400 512
+// Threading:  0 0 512
+
+// AfterAll
+// Benchmark Process 1441471 has exited with code 0.
+
+Mean = 3.727 μs, StdErr = 0.045 μs (1.22%), N = 3, StdDev = 0.079 μs
+Min = 3.660 μs, Q1 = 3.684 μs, Median = 3.708 μs, Q3 = 3.761 μs, Max = 3.814 μs
+IQR = 0.077 μs, LowerFence = 3.568 μs, UpperFence = 3.876 μs
+ConfidenceInterval = [2.290 μs; 5.164 μs] (CI 99.9%), Margin = 1.437 μs (38.55% of Mean)
+Skewness = 0.23, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 2 (33.3%) benchmark(s) to run. Estimated finish 2026-04-06 21:24 (0h 0m from now) **
+// **************************
+// Benchmark: SmallBenchmarks.PAKT_Serialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-ARYRAM-1.dll --anonymousPipes 111 112 --benchmarkName Pakt.Benchmarks.SmallBenchmarks.PAKT_Serialize --job "InvocationCount=512, IterationCount=3, WarmupCount=1" --benchmarkId 4 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 16 op, 310682.00 ns, 19.4176 us/op
+WorkloadJitting  1: 16 op, 527411.00 ns, 32.9632 us/op
+
+OverheadWarmup   1: 512 op, 1522.00 ns, 2.9727 ns/op
+OverheadWarmup   2: 512 op, 1133.00 ns, 2.2129 ns/op
+OverheadWarmup   3: 512 op, 1332.00 ns, 2.6016 ns/op
+OverheadWarmup   4: 512 op, 1097.00 ns, 2.1426 ns/op
+OverheadWarmup   5: 512 op, 1236.00 ns, 2.4141 ns/op
+OverheadWarmup   6: 512 op, 1350.00 ns, 2.6367 ns/op
+OverheadWarmup   7: 512 op, 1098.00 ns, 2.1445 ns/op
+
+OverheadActual   1: 512 op, 1646.00 ns, 3.2148 ns/op
+OverheadActual   2: 512 op, 1799.00 ns, 3.5137 ns/op
+OverheadActual   3: 512 op, 1595.00 ns, 3.1152 ns/op
+OverheadActual   4: 512 op, 1289.00 ns, 2.5176 ns/op
+OverheadActual   5: 512 op, 1363.00 ns, 2.6621 ns/op
+OverheadActual   6: 512 op, 1134.00 ns, 2.2148 ns/op
+OverheadActual   7: 512 op, 1110.00 ns, 2.1680 ns/op
+OverheadActual   8: 512 op, 1108.00 ns, 2.1641 ns/op
+OverheadActual   9: 512 op, 1105.00 ns, 2.1582 ns/op
+OverheadActual  10: 512 op, 1098.00 ns, 2.1445 ns/op
+OverheadActual  11: 512 op, 1110.00 ns, 2.1680 ns/op
+OverheadActual  12: 512 op, 1101.00 ns, 2.1504 ns/op
+OverheadActual  13: 512 op, 1095.00 ns, 2.1387 ns/op
+OverheadActual  14: 512 op, 1111.00 ns, 2.1699 ns/op
+OverheadActual  15: 512 op, 1106.00 ns, 2.1602 ns/op
+OverheadActual  16: 512 op, 1104.00 ns, 2.1563 ns/op
+OverheadActual  17: 512 op, 1094.00 ns, 2.1367 ns/op
+OverheadActual  18: 512 op, 1343.00 ns, 2.6230 ns/op
+OverheadActual  19: 512 op, 1153.00 ns, 2.2520 ns/op
+OverheadActual  20: 512 op, 1116.00 ns, 2.1797 ns/op
+
+WorkloadWarmup   1: 512 op, 2763245.00 ns, 5.3970 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 512 op, 2590978.00 ns, 5.0605 us/op
+WorkloadActual   2: 512 op, 1739304.00 ns, 3.3971 us/op
+WorkloadActual   3: 512 op, 1736294.00 ns, 3.3912 us/op
+
+// AfterActualRun
+WorkloadResult   1: 512 op, 2589867.50 ns, 5.0583 us/op
+WorkloadResult   2: 512 op, 1738193.50 ns, 3.3949 us/op
+WorkloadResult   3: 512 op, 1735183.50 ns, 3.3890 us/op
+// GC:  0 0 0 1852184 512
+// Threading:  0 0 512
+
+// AfterAll
+// Benchmark Process 1441478 has exited with code 0.
+
+Mean = 3.947 μs, StdErr = 0.555 μs (14.07%), N = 3, StdDev = 0.962 μs
+Min = 3.389 μs, Q1 = 3.392 μs, Median = 3.395 μs, Q3 = 4.227 μs, Max = 5.058 μs
+IQR = 0.835 μs, LowerFence = 2.140 μs, UpperFence = 5.479 μs
+ConfidenceInterval = [-13.605 μs; 21.499 μs] (CI 99.9%), Margin = 17.552 μs (444.64% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 1 (16.7%) benchmark(s) to run. Estimated finish 2026-04-06 21:24 (0h 0m from now) **
+// **************************
+// Benchmark: SmallBenchmarks.JSON_Serialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-ARYRAM-1.dll --anonymousPipes 111 112 --benchmarkName Pakt.Benchmarks.SmallBenchmarks.JSON_Serialize --job "InvocationCount=512, IterationCount=3, WarmupCount=1" --benchmarkId 5 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-ARYRAM-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 16 op, 307019.00 ns, 19.1887 us/op
+WorkloadJitting  1: 16 op, 465528.00 ns, 29.0955 us/op
+
+OverheadWarmup   1: 512 op, 1461.00 ns, 2.8535 ns/op
+OverheadWarmup   2: 512 op, 1147.00 ns, 2.2402 ns/op
+OverheadWarmup   3: 512 op, 1294.00 ns, 2.5273 ns/op
+OverheadWarmup   4: 512 op, 1017.00 ns, 1.9863 ns/op
+OverheadWarmup   5: 512 op, 1145.00 ns, 2.2363 ns/op
+OverheadWarmup   6: 512 op, 1299.00 ns, 2.5371 ns/op
+OverheadWarmup   7: 512 op, 1179.00 ns, 2.3027 ns/op
+
+OverheadActual   1: 512 op, 1472.00 ns, 2.8750 ns/op
+OverheadActual   2: 512 op, 1552.00 ns, 3.0313 ns/op
+OverheadActual   3: 512 op, 1340.00 ns, 2.6172 ns/op
+OverheadActual   4: 512 op, 1241.00 ns, 2.4238 ns/op
+OverheadActual   5: 512 op, 1310.00 ns, 2.5586 ns/op
+OverheadActual   6: 512 op, 1048.00 ns, 2.0469 ns/op
+OverheadActual   7: 512 op, 1058.00 ns, 2.0664 ns/op
+OverheadActual   8: 512 op, 1321.00 ns, 2.5801 ns/op
+OverheadActual   9: 512 op, 1046.00 ns, 2.0430 ns/op
+OverheadActual  10: 512 op, 1062.00 ns, 2.0742 ns/op
+OverheadActual  11: 512 op, 1030.00 ns, 2.0117 ns/op
+OverheadActual  12: 512 op, 1092.00 ns, 2.1328 ns/op
+OverheadActual  13: 512 op, 1095.00 ns, 2.1387 ns/op
+OverheadActual  14: 512 op, 1069.00 ns, 2.0879 ns/op
+OverheadActual  15: 512 op, 1219.00 ns, 2.3809 ns/op
+OverheadActual  16: 512 op, 1131.00 ns, 2.2090 ns/op
+OverheadActual  17: 512 op, 1083.00 ns, 2.1152 ns/op
+OverheadActual  18: 512 op, 1243.00 ns, 2.4277 ns/op
+OverheadActual  19: 512 op, 1129.00 ns, 2.2051 ns/op
+OverheadActual  20: 512 op, 1054.00 ns, 2.0586 ns/op
+
+WorkloadWarmup   1: 512 op, 317127.00 ns, 619.3887 ns/op
+
+// BeforeActualRun
+WorkloadActual   1: 512 op, 364168.00 ns, 711.2656 ns/op
+WorkloadActual   2: 512 op, 228727.00 ns, 446.7324 ns/op
+WorkloadActual   3: 512 op, 258505.00 ns, 504.8926 ns/op
+
+// AfterActualRun
+WorkloadResult   1: 512 op, 363056.00 ns, 709.0938 ns/op
+WorkloadResult   2: 512 op, 227615.00 ns, 444.5605 ns/op
+WorkloadResult   3: 512 op, 257393.00 ns, 502.7207 ns/op
+// GC:  0 0 0 90112 512
+// Threading:  0 0 512
+
+// AfterAll
+// Benchmark Process 1441485 has exited with code 0.
+
+Mean = 552.125 ns, StdErr = 80.260 ns (14.54%), N = 3, StdDev = 139.015 ns
+Min = 444.561 ns, Q1 = 473.641 ns, Median = 502.721 ns, Q3 = 605.907 ns, Max = 709.094 ns
+IQR = 132.267 ns, LowerFence = 275.241 ns, UpperFence = 804.307 ns
+ConfidenceInterval = [-1,984.018 ns; 3,088.268 ns] (CI 99.9%), Margin = 2,536.143 ns (459.34% of Mean)
+Skewness = 0.31, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 0 (0.0%) benchmark(s) to run. Estimated finish 2026-04-06 21:24 (0h 0m from now) **
+// ***** BenchmarkRunner: Finish  *****
+
+// * Export *
+  BenchmarkDotNet.Artifacts/results/Pakt.Benchmarks.SmallBenchmarks-report.csv
+  BenchmarkDotNet.Artifacts/results/Pakt.Benchmarks.SmallBenchmarks-report-github.md
+  BenchmarkDotNet.Artifacts/results/Pakt.Benchmarks.SmallBenchmarks-report.html
+
+// * Detailed results *
+SmallBenchmarks.PAKT_Decode: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 6.121 μs, StdErr = 0.654 μs (10.68%), N = 3, StdDev = 1.132 μs
+Min = 5.239 μs, Q1 = 5.482 μs, Median = 5.726 μs, Q3 = 6.561 μs, Max = 7.397 μs
+IQR = 1.079 μs, LowerFence = 3.863 μs, UpperFence = 8.180 μs
+ConfidenceInterval = [-14.536 μs; 26.777 μs] (CI 99.9%), Margin = 20.656 μs (337.49% of Mean)
+Skewness = 0.31, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[4.452 μs ; 6.512 μs) | @@
+[6.512 μs ; 8.428 μs) | @
+---------------------------------------------------
+
+SmallBenchmarks.JSON_Decode: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 3.628 μs, StdErr = 0.038 μs (1.04%), N = 3, StdDev = 0.065 μs
+Min = 3.553 μs, Q1 = 3.606 μs, Median = 3.658 μs, Q3 = 3.666 μs, Max = 3.673 μs
+IQR = 0.060 μs, LowerFence = 3.516 μs, UpperFence = 3.756 μs
+ConfidenceInterval = [2.437 μs; 4.819 μs] (CI 99.9%), Margin = 1.191 μs (32.83% of Mean)
+Skewness = -0.36, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[3.494 μs ; 3.606 μs) | @
+[3.606 μs ; 3.733 μs) | @@
+---------------------------------------------------
+
+SmallBenchmarks.PAKT_Deserialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 7.293 μs, StdErr = 0.728 μs (9.99%), N = 3, StdDev = 1.261 μs
+Min = 6.415 μs, Q1 = 6.570 μs, Median = 6.725 μs, Q3 = 7.732 μs, Max = 8.739 μs
+IQR = 1.162 μs, LowerFence = 4.828 μs, UpperFence = 9.474 μs
+ConfidenceInterval = [-15.719 μs; 30.306 μs] (CI 99.9%), Margin = 23.012 μs (315.53% of Mean)
+Skewness = 0.36, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[5.267 μs ; 7.718 μs) | @@
+[7.718 μs ; 9.887 μs) | @
+---------------------------------------------------
+
+SmallBenchmarks.JSON_Deserialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 3.727 μs, StdErr = 0.045 μs (1.22%), N = 3, StdDev = 0.079 μs
+Min = 3.660 μs, Q1 = 3.684 μs, Median = 3.708 μs, Q3 = 3.761 μs, Max = 3.814 μs
+IQR = 0.077 μs, LowerFence = 3.568 μs, UpperFence = 3.876 μs
+ConfidenceInterval = [2.290 μs; 5.164 μs] (CI 99.9%), Margin = 1.437 μs (38.55% of Mean)
+Skewness = 0.23, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[3.612 μs ; 3.755 μs) | @@
+[3.755 μs ; 3.885 μs) | @
+---------------------------------------------------
+
+SmallBenchmarks.PAKT_Serialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 3.947 μs, StdErr = 0.555 μs (14.07%), N = 3, StdDev = 0.962 μs
+Min = 3.389 μs, Q1 = 3.392 μs, Median = 3.395 μs, Q3 = 4.227 μs, Max = 5.058 μs
+IQR = 0.835 μs, LowerFence = 2.140 μs, UpperFence = 5.479 μs
+ConfidenceInterval = [-13.605 μs; 21.499 μs] (CI 99.9%), Margin = 17.552 μs (444.64% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[3.348 μs ; 5.099 μs) | @@@
+---------------------------------------------------
+
+SmallBenchmarks.JSON_Serialize: Job-ARYRAM(InvocationCount=512, IterationCount=3, WarmupCount=1)
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 552.125 ns, StdErr = 80.260 ns (14.54%), N = 3, StdDev = 139.015 ns
+Min = 444.561 ns, Q1 = 473.641 ns, Median = 502.721 ns, Q3 = 605.907 ns, Max = 709.094 ns
+IQR = 132.267 ns, LowerFence = 275.241 ns, UpperFence = 804.307 ns
+ConfidenceInterval = [-1,984.018 ns; 3,088.268 ns] (CI 99.9%), Margin = 2,536.143 ns (459.34% of Mean)
+Skewness = 0.31, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[347.132 ns ; 600.149 ns) | @@
+[600.149 ns ; 835.602 ns) | @
+---------------------------------------------------
+
+// * Summary *
+
+BenchmarkDotNet v0.15.8, Linux Fedora Linux 43 (COSMIC)
+Intel Core Ultra 5 228V 0.40GHz, 1 CPU, 8 logical and 8 physical cores
+.NET SDK 10.0.201
+  [Host]     : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+  Job-ARYRAM : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+
+InvocationCount=512  IterationCount=3  WarmupCount=1  
+
+| Method           | Categories  | Mean       | Error       | StdDev      | Ratio | RatioSD | Allocated | Alloc Ratio |
+|----------------- |------------ |-----------:|------------:|------------:|------:|--------:|----------:|------------:|
+| PAKT_Decode      | Decode      | 6,120.5 ns | 20,656.2 ns | 1,132.24 ns |  1.02 |    0.22 |    2936 B |        1.00 |
+| JSON_Decode      | Decode      | 3,628.1 ns |  1,191.2 ns |    65.29 ns |  0.61 |    0.09 |         - |        0.00 |
+|                  |             |            |             |             |       |         |           |             |
+| PAKT_Deserialize | Deserialize | 7,293.2 ns | 23,012.4 ns | 1,261.39 ns |  1.02 |    0.21 |    3304 B |        1.00 |
+| JSON_Deserialize | Deserialize | 3,727.0 ns |  1,436.9 ns |    78.76 ns |  0.52 |    0.07 |     200 B |        0.06 |
+|                  |             |            |             |             |       |         |           |             |
+| PAKT_Serialize   | Serialize   | 3,947.4 ns | 17,551.9 ns |   962.08 ns |  1.04 |    0.29 |    3618 B |        1.00 |
+| JSON_Serialize   | Serialize   |   552.1 ns |  2,536.1 ns |   139.01 ns |  0.14 |    0.04 |     176 B |        0.05 |
+
+// * Warnings *
+MinIterationTime
+  SmallBenchmarks.PAKT_Decode: InvocationCount=512, IterationCount=3, WarmupCount=1      -> The minimum observed iteration time is 2.683ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  SmallBenchmarks.JSON_Decode: InvocationCount=512, IterationCount=3, WarmupCount=1      -> The minimum observed iteration time is 1.82ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  SmallBenchmarks.PAKT_Deserialize: InvocationCount=512, IterationCount=3, WarmupCount=1 -> The minimum observed iteration time is 3.286ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  SmallBenchmarks.JSON_Deserialize: InvocationCount=512, IterationCount=3, WarmupCount=1 -> The minimum observed iteration time is 1.875ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  SmallBenchmarks.PAKT_Serialize: InvocationCount=512, IterationCount=3, WarmupCount=1   -> The minimum observed iteration time is 1.736ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  SmallBenchmarks.JSON_Serialize: InvocationCount=512, IterationCount=3, WarmupCount=1   -> The minimum observed iteration time is 228.727μs which is very small. It's recommended to increase it to at least 100ms using more operations.
+
+// * Legends *
+  Categories  : All categories of the corresponded method, class, and assembly
+  Mean        : Arithmetic mean of all measurements
+  Error       : Half of 99.9% confidence interval
+  StdDev      : Standard deviation of all measurements
+  Ratio       : Mean of the ratio distribution ([Current]/[Baseline])
+  RatioSD     : Standard deviation of the ratio distribution ([Current]/[Baseline])
+  Allocated   : Allocated memory per single operation (managed only, inclusive, 1KB = 1024B)
+  Alloc Ratio : Allocated memory ratio distribution ([Current]/[Baseline])
+  1 ns        : 1 Nanosecond (0.000000001 sec)
+
+// * Diagnostic Output - MemoryDiagnoser *
+
+
+// ***** BenchmarkRunner: End *****
+Run time: 00:00:00 (0.92 sec), executed benchmarks: 6
+
+Global total time: 00:00:09 (9.91 sec), executed benchmarks: 6
+// * Artifacts cleanup *
+Artifacts cleanup is finished

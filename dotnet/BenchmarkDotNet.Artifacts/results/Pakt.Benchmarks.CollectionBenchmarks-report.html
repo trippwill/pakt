@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Pakt.Benchmarks.CollectionBenchmarks-20260408-111728</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.8, Linux Fedora Linux 43 (COSMIC)
+Intel Core Ultra 5 228V 0.40GHz, 1 CPU, 8 logical and 8 physical cores
+.NET SDK 10.0.201
+  [Host]     : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+  DefaultJob : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method    </th><th>Categories</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Median</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>PAKT_Decode_List</td><td>List-Decode</td><td>349.87 &mu;s</td><td>6.935 &mu;s</td><td>14.322 &mu;s</td><td>341.07 &mu;s</td><td>1.00</td><td>0.06</td><td>93.7500</td><td>392216 B</td><td>1.00</td>
+</tr><tr><td>JSON_Decode_List</td><td>List-Decode</td><td>92.99 &mu;s</td><td>0.713 &mu;s</td><td>0.952 &mu;s</td><td>93.09 &mu;s</td><td>0.27</td><td>0.01</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>PAKT_Encode_List</td><td>List-Encode</td><td>84.97 &mu;s</td><td>1.686 &mu;s</td><td>4.040 &mu;s</td><td>81.95 &mu;s</td><td>1.00</td><td>0.07</td><td>0.1221</td><td>992 B</td><td>1.00</td>
+</tr><tr><td>JSON_Encode_List</td><td>List-Encode</td><td>47.37 &mu;s</td><td>0.945 &mu;s</td><td>2.523 &mu;s</td><td>45.82 &mu;s</td><td>0.56</td><td>0.04</td><td>-</td><td>136 B</td><td>0.14</td>
+</tr><tr><td>PAKT_Decode_Map</td><td>Map-Decode</td><td>70.90 &mu;s</td><td>1.418 &mu;s</td><td>3.834 &mu;s</td><td>68.95 &mu;s</td><td>1.00</td><td>0.07</td><td>67.0166</td><td>280312 B</td><td>1.00</td>
+</tr><tr><td>JSON_Decode_Map</td><td>Map-Decode</td><td>12.27 &mu;s</td><td>0.092 &mu;s</td><td>0.077 &mu;s</td><td>12.27 &mu;s</td><td>0.17</td><td>0.01</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>PAKT_Encode_Map</td><td>Map-Encode</td><td>91.32 &mu;s</td><td>1.824 &mu;s</td><td>4.508 &mu;s</td><td>88.03 &mu;s</td><td>1.00</td><td>0.07</td><td>9.7656</td><td>41071 B</td><td>1.00</td>
+</tr><tr><td>JSON_Encode_Map</td><td>Map-Encode</td><td>35.07 &mu;s</td><td>0.428 &mu;s</td><td>0.400 &mu;s</td><td>34.85 &mu;s</td><td>0.38</td><td>0.02</td><td>9.5825</td><td>40136 B</td><td>0.98</td>
+</tr></tbody></table>
+</body>
+</html>

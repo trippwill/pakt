@@ -1,0 +1,1254 @@
+// Validating benchmarks:
+// ***** BenchmarkRunner: Start   *****
+// ***** Found 16 benchmark(s) in total *****
+// ***** Building 1 exe(s) in Parallel: Start   *****
+// start dotnet  restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/" /p:OutDir="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0/" /p:OutputPath="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0/" /p:PublishDir="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/publish/" in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1
+// command took 1.2 sec and exited with 0
+// start dotnet  build -c Release --no-restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/" /p:OutDir="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0/" /p:OutputPath="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0/" /p:PublishDir="/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/publish/" --output "/home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0/" in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1
+// command took 7.76 sec and exited with 0
+// ***** Done, took 00:00:09 (9.02 sec)   *****
+// Found 16 benchmarks:
+//   FSBenchmarks.PAKT_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+//   FSBenchmarks.JSON_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+//   FSBenchmarks.PAKT_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+//   FSBenchmarks.JSON_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+//   FSBenchmarks.PAKT_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+//   FSBenchmarks.JSON_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+//   FSBenchmarks.PAKT_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+//   FSBenchmarks.JSON_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+//   FSBenchmarks.PAKT_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+//   FSBenchmarks.JSON_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+//   FSBenchmarks.PAKT_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+//   FSBenchmarks.JSON_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+//   FSBenchmarks.PAKT_Stream: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+//   FSBenchmarks.JSON_FullLoad: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+//   FSBenchmarks.PAKT_Stream: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+//   FSBenchmarks.JSON_FullLoad: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+
+// **************************
+// Benchmark: FSBenchmarks.PAKT_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.PAKT_Decode(EntryCount: 1000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 0 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 142682.00 ns, 142.6820 us/op
+
+System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> Pakt.PaktException: 3:101: Stream type must be list or map, got {path:str, size:int, mode:int, mod_time:str, is_dir:bool, owner:str, group:str, hash:str}
+   at Pakt.PaktReader.ThrowError(String message, PaktErrorCode code) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 1433
+   at Pakt.PaktReader.StepTop() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 355
+   at Pakt.PaktReader.Step() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 263
+   at Pakt.PaktReader.Read() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 119
+   at Pakt.Benchmarks.FSBenchmarks.PAKT_Decode() in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/FSBenchmarks.cs:line 48
+   at BenchmarkDotNet.Autogenerated.Runnable_0.WorkloadActionNoUnroll(Int64 invokeCount) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 314
+   at BenchmarkDotNet.Engines.Engine.Measure(Action`1 action, Int64 invokeCount)
+   at BenchmarkDotNet.Engines.Engine.RunIteration(IterationData data)
+   at BenchmarkDotNet.Engines.EngineFactory.Jit(Engine engine, Int32 jitIndex, Int32 invokeCount, Int32 unrollFactor)
+   at BenchmarkDotNet.Engines.EngineFactory.CreateReadyToRun(EngineParameters engineParameters)
+   at BenchmarkDotNet.Autogenerated.Runnable_0.Run(IHost host, String benchmarkName) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 177
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   --- End of inner exception stack trace ---
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at BenchmarkDotNet.Autogenerated.UniqueProgramName.AfterAssemblyLoadingAttached(String[] args) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 57
+// AfterAll
+No Workload Results were obtained from the run.
+// Benchmark Process 1444696 has exited with code 255.
+
+// ** Remained 15 (93.8%) benchmark(s) to run. Estimated finish 2026-04-06 21:25 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.JSON_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.JSON_Decode(EntryCount: 1000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 1 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 157166.00 ns, 157.1660 us/op
+WorkloadJitting  1: 1 op, 4793696.00 ns, 4.7937 ms/op
+
+OverheadJitting  2: 16 op, 234750.00 ns, 14.6719 us/op
+WorkloadJitting  2: 16 op, 55248857.00 ns, 3.4531 ms/op
+
+WorkloadPilot    1: 16 op, 57772738.00 ns, 3.6108 ms/op
+WorkloadPilot    2: 32 op, 115070752.00 ns, 3.5960 ms/op
+WorkloadPilot    3: 64 op, 108612351.00 ns, 1.6971 ms/op
+WorkloadPilot    4: 128 op, 82994512.00 ns, 648.3946 us/op
+WorkloadPilot    5: 256 op, 38211061.00 ns, 149.2620 us/op
+WorkloadPilot    6: 512 op, 70156926.00 ns, 137.0252 us/op
+WorkloadPilot    7: 1024 op, 141226090.00 ns, 137.9161 us/op
+WorkloadPilot    8: 2048 op, 279136829.00 ns, 136.2973 us/op
+WorkloadPilot    9: 4096 op, 557702194.00 ns, 136.1578 us/op
+
+OverheadWarmup   1: 4096 op, 8017.00 ns, 1.9573 ns/op
+OverheadWarmup   2: 4096 op, 6759.00 ns, 1.6501 ns/op
+OverheadWarmup   3: 4096 op, 6955.00 ns, 1.6980 ns/op
+OverheadWarmup   4: 4096 op, 6556.00 ns, 1.6006 ns/op
+OverheadWarmup   5: 4096 op, 6942.00 ns, 1.6948 ns/op
+OverheadWarmup   6: 4096 op, 6193.00 ns, 1.5120 ns/op
+
+OverheadActual   1: 4096 op, 6804.00 ns, 1.6611 ns/op
+OverheadActual   2: 4096 op, 6875.00 ns, 1.6785 ns/op
+OverheadActual   3: 4096 op, 6971.00 ns, 1.7019 ns/op
+OverheadActual   4: 4096 op, 6376.00 ns, 1.5566 ns/op
+OverheadActual   5: 4096 op, 6958.00 ns, 1.6987 ns/op
+OverheadActual   6: 4096 op, 6889.00 ns, 1.6819 ns/op
+OverheadActual   7: 4096 op, 6488.00 ns, 1.5840 ns/op
+OverheadActual   8: 4096 op, 7919.00 ns, 1.9333 ns/op
+OverheadActual   9: 4096 op, 6749.00 ns, 1.6477 ns/op
+OverheadActual  10: 4096 op, 6748.00 ns, 1.6475 ns/op
+OverheadActual  11: 4096 op, 7032.00 ns, 1.7168 ns/op
+OverheadActual  12: 4096 op, 6114.00 ns, 1.4927 ns/op
+OverheadActual  13: 4096 op, 8052.00 ns, 1.9658 ns/op
+OverheadActual  14: 4096 op, 6483.00 ns, 1.5828 ns/op
+OverheadActual  15: 4096 op, 6516.00 ns, 1.5908 ns/op
+
+WorkloadWarmup   1: 4096 op, 550831825.00 ns, 134.4804 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 4096 op, 553610588.00 ns, 135.1588 us/op
+WorkloadActual   2: 4096 op, 557711955.00 ns, 136.1601 us/op
+WorkloadActual   3: 4096 op, 569290181.00 ns, 138.9869 us/op
+
+// AfterActualRun
+WorkloadResult   1: 4096 op, 553603784.00 ns, 135.1572 us/op
+WorkloadResult   2: 4096 op, 557705151.00 ns, 136.1585 us/op
+WorkloadResult   3: 4096 op, 569283377.00 ns, 138.9852 us/op
+// GC:  0 0 0 0 4096
+// Threading:  0 0 4096
+
+// AfterAll
+// Benchmark Process 1444706 has exited with code 0.
+
+Mean = 136.767 μs, StdErr = 1.146 μs (0.84%), N = 3, StdDev = 1.985 μs
+Min = 135.157 μs, Q1 = 135.658 μs, Median = 136.158 μs, Q3 = 137.572 μs, Max = 138.985 μs
+IQR = 1.914 μs, LowerFence = 132.787 μs, UpperFence = 140.443 μs
+ConfidenceInterval = [100.549 μs; 172.985 μs] (CI 99.9%), Margin = 36.218 μs (26.48% of Mean)
+Skewness = 0.28, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 14 (87.5%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.PAKT_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.PAKT_Decode(EntryCount: 10000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 2 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 138508.00 ns, 138.5080 us/op
+
+System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> Pakt.PaktException: 3:101: Stream type must be list or map, got {path:str, size:int, mode:int, mod_time:str, is_dir:bool, owner:str, group:str, hash:str}
+   at Pakt.PaktReader.ThrowError(String message, PaktErrorCode code) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 1433
+   at Pakt.PaktReader.StepTop() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 355
+   at Pakt.PaktReader.Step() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 263
+   at Pakt.PaktReader.Read() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 119
+   at Pakt.Benchmarks.FSBenchmarks.PAKT_Decode() in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/FSBenchmarks.cs:line 48
+   at BenchmarkDotNet.Autogenerated.Runnable_2.WorkloadActionNoUnroll(Int64 invokeCount) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 710
+   at BenchmarkDotNet.Engines.Engine.Measure(Action`1 action, Int64 invokeCount)
+   at BenchmarkDotNet.Engines.Engine.RunIteration(IterationData data)
+   at BenchmarkDotNet.Engines.EngineFactory.Jit(Engine engine, Int32 jitIndex, Int32 invokeCount, Int32 unrollFactor)
+   at BenchmarkDotNet.Engines.EngineFactory.CreateReadyToRun(EngineParameters engineParameters)
+   at BenchmarkDotNet.Autogenerated.Runnable_2.Run(IHost host, String benchmarkName) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 573
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   --- End of inner exception stack trace ---
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at BenchmarkDotNet.Autogenerated.UniqueProgramName.AfterAssemblyLoadingAttached(String[] args) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 57
+// AfterAll
+No Workload Results were obtained from the run.
+// Benchmark Process 1444722 has exited with code 255.
+
+// ** Remained 13 (81.2%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.JSON_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.JSON_Decode(EntryCount: 10000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 3 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 141146.00 ns, 141.1460 us/op
+WorkloadJitting  1: 1 op, 35903912.00 ns, 35.9039 ms/op
+
+WorkloadPilot    1: 2 op, 68838594.00 ns, 34.4193 ms/op
+WorkloadPilot    2: 3 op, 103248090.00 ns, 34.4160 ms/op
+WorkloadPilot    3: 4 op, 75034903.00 ns, 18.7587 ms/op
+WorkloadPilot    4: 5 op, 30628249.00 ns, 6.1256 ms/op
+WorkloadPilot    5: 6 op, 35713739.00 ns, 5.9523 ms/op
+WorkloadPilot    6: 7 op, 25770710.00 ns, 3.6815 ms/op
+WorkloadPilot    7: 8 op, 11875109.00 ns, 1.4844 ms/op
+WorkloadPilot    8: 9 op, 13161042.00 ns, 1.4623 ms/op
+WorkloadPilot    9: 10 op, 15446310.00 ns, 1.5446 ms/op
+WorkloadPilot   10: 11 op, 16434508.00 ns, 1.4940 ms/op
+WorkloadPilot   11: 12 op, 17679727.00 ns, 1.4733 ms/op
+WorkloadPilot   12: 13 op, 18824558.00 ns, 1.4480 ms/op
+WorkloadPilot   13: 14 op, 21359480.00 ns, 1.5257 ms/op
+WorkloadPilot   14: 15 op, 20577852.00 ns, 1.3719 ms/op
+WorkloadPilot   15: 16 op, 22933298.00 ns, 1.4333 ms/op
+WorkloadPilot   16: 32 op, 45418828.00 ns, 1.4193 ms/op
+WorkloadPilot   17: 64 op, 88436504.00 ns, 1.3818 ms/op
+WorkloadPilot   18: 128 op, 177865167.00 ns, 1.3896 ms/op
+WorkloadPilot   19: 256 op, 357445800.00 ns, 1.3963 ms/op
+WorkloadPilot   20: 512 op, 708978291.00 ns, 1.3847 ms/op
+
+WorkloadWarmup   1: 512 op, 712331597.00 ns, 1.3913 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 512 op, 714723259.00 ns, 1.3959 ms/op
+WorkloadActual   2: 512 op, 713659202.00 ns, 1.3939 ms/op
+WorkloadActual   3: 512 op, 712138921.00 ns, 1.3909 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 512 op, 714723259.00 ns, 1.3959 ms/op
+WorkloadResult   2: 512 op, 713659202.00 ns, 1.3939 ms/op
+WorkloadResult   3: 512 op, 712138921.00 ns, 1.3909 ms/op
+// GC:  0 0 0 0 512
+// Threading:  0 0 512
+
+// AfterAll
+// Benchmark Process 1444730 has exited with code 0.
+
+Mean = 1.394 ms, StdErr = 0.001 ms (0.11%), N = 3, StdDev = 0.003 ms
+Min = 1.391 ms, Q1 = 1.392 ms, Median = 1.394 ms, Q3 = 1.395 ms, Max = 1.396 ms
+IQR = 0.003 ms, LowerFence = 1.389 ms, UpperFence = 1.399 ms
+ConfidenceInterval = [1.347 ms; 1.440 ms] (CI 99.9%), Margin = 0.046 ms (3.32% of Mean)
+Skewness = -0.12, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 12 (75.0%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.PAKT_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.PAKT_Deserialize(EntryCount: 1000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 4 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 168001.00 ns, 168.0010 us/op
+
+System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> Pakt.PaktException: 2:101: Stream type must be list or map, got {path:str, size:int, mode:int, mod_time:str, is_dir:bool, owner:str, group:str, hash:str}
+   at Pakt.PaktReader.ThrowError(String message, PaktErrorCode code) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 1433
+   at Pakt.PaktReader.StepTop() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 355
+   at Pakt.PaktReader.Step() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 263
+   at Pakt.PaktReader.Read() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 119
+   at Pakt.PaktStreamReader.ReadStatementAsync(CancellationToken ct) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktStreamReader.cs:line 112
+   at Pakt.Benchmarks.FSBenchmarks.PAKT_Deserialize() in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/FSBenchmarks.cs:line 82
+   at BenchmarkDotNet.Autogenerated.Runnable_4.WorkloadActionNoUnroll(Int64 invokeCount) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 1106
+   at BenchmarkDotNet.Engines.Engine.Measure(Action`1 action, Int64 invokeCount)
+   at BenchmarkDotNet.Engines.Engine.RunIteration(IterationData data)
+   at BenchmarkDotNet.Engines.EngineFactory.Jit(Engine engine, Int32 jitIndex, Int32 invokeCount, Int32 unrollFactor)
+   at BenchmarkDotNet.Engines.EngineFactory.CreateReadyToRun(EngineParameters engineParameters)
+   at BenchmarkDotNet.Autogenerated.Runnable_4.Run(IHost host, String benchmarkName) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 969
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   --- End of inner exception stack trace ---
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at BenchmarkDotNet.Autogenerated.UniqueProgramName.AfterAssemblyLoadingAttached(String[] args) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 57
+// AfterAll
+No Workload Results were obtained from the run.
+// Benchmark Process 1444753 has exited with code 255.
+
+// ** Remained 11 (68.8%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.JSON_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.JSON_Deserialize(EntryCount: 1000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 5 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 162922.00 ns, 162.9220 us/op
+WorkloadJitting  1: 1 op, 6709680.00 ns, 6.7097 ms/op
+
+OverheadJitting  2: 16 op, 335361.00 ns, 20.9601 us/op
+WorkloadJitting  2: 16 op, 64609241.00 ns, 4.0381 ms/op
+
+WorkloadPilot    1: 16 op, 62177167.00 ns, 3.8861 ms/op
+WorkloadPilot    2: 32 op, 121849461.00 ns, 3.8078 ms/op
+WorkloadPilot    3: 64 op, 103286989.00 ns, 1.6139 ms/op
+WorkloadPilot    4: 128 op, 141854451.00 ns, 1.1082 ms/op
+WorkloadPilot    5: 256 op, 230823287.00 ns, 901.6535 us/op
+WorkloadPilot    6: 512 op, 167227800.00 ns, 326.6168 us/op
+WorkloadPilot    7: 1024 op, 333711191.00 ns, 325.8898 us/op
+WorkloadPilot    8: 2048 op, 616778796.00 ns, 301.1615 us/op
+
+OverheadWarmup   1: 2048 op, 7385.00 ns, 3.6060 ns/op
+OverheadWarmup   2: 2048 op, 4684.00 ns, 2.2871 ns/op
+OverheadWarmup   3: 2048 op, 4673.00 ns, 2.2817 ns/op
+OverheadWarmup   4: 2048 op, 4334.00 ns, 2.1162 ns/op
+OverheadWarmup   5: 2048 op, 4341.00 ns, 2.1196 ns/op
+OverheadWarmup   6: 2048 op, 4279.00 ns, 2.0894 ns/op
+OverheadWarmup   7: 2048 op, 4332.00 ns, 2.1152 ns/op
+OverheadWarmup   8: 2048 op, 4256.00 ns, 2.0781 ns/op
+
+OverheadActual   1: 2048 op, 4816.00 ns, 2.3516 ns/op
+OverheadActual   2: 2048 op, 4665.00 ns, 2.2778 ns/op
+OverheadActual   3: 2048 op, 4861.00 ns, 2.3735 ns/op
+OverheadActual   4: 2048 op, 5358.00 ns, 2.6162 ns/op
+OverheadActual   5: 2048 op, 4738.00 ns, 2.3135 ns/op
+OverheadActual   6: 2048 op, 4436.00 ns, 2.1660 ns/op
+OverheadActual   7: 2048 op, 4324.00 ns, 2.1113 ns/op
+OverheadActual   8: 2048 op, 4303.00 ns, 2.1011 ns/op
+OverheadActual   9: 2048 op, 4296.00 ns, 2.0977 ns/op
+OverheadActual  10: 2048 op, 4327.00 ns, 2.1128 ns/op
+OverheadActual  11: 2048 op, 4596.00 ns, 2.2441 ns/op
+OverheadActual  12: 2048 op, 4554.00 ns, 2.2236 ns/op
+OverheadActual  13: 2048 op, 4510.00 ns, 2.2021 ns/op
+OverheadActual  14: 2048 op, 4533.00 ns, 2.2134 ns/op
+OverheadActual  15: 2048 op, 4556.00 ns, 2.2246 ns/op
+
+WorkloadWarmup   1: 2048 op, 622965654.00 ns, 304.1824 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 2048 op, 618472688.00 ns, 301.9886 us/op
+WorkloadActual   2: 2048 op, 615030979.00 ns, 300.3081 us/op
+WorkloadActual   3: 2048 op, 615228626.00 ns, 300.4046 us/op
+
+// AfterActualRun
+WorkloadResult   1: 2048 op, 618468134.00 ns, 301.9864 us/op
+WorkloadResult   2: 2048 op, 615026425.00 ns, 300.3059 us/op
+WorkloadResult   3: 2048 op, 615224072.00 ns, 300.4024 us/op
+// GC:  152 66 0 759283712 2048
+// Threading:  0 0 2048
+
+// AfterAll
+// Benchmark Process 1444760 has exited with code 0.
+
+Mean = 300.898 μs, StdErr = 0.545 μs (0.18%), N = 3, StdDev = 0.944 μs
+Min = 300.306 μs, Q1 = 300.354 μs, Median = 300.402 μs, Q3 = 301.194 μs, Max = 301.986 μs
+IQR = 0.840 μs, LowerFence = 299.094 μs, UpperFence = 302.455 μs
+ConfidenceInterval = [283.683 μs; 318.113 μs] (CI 99.9%), Margin = 17.215 μs (5.72% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 10 (62.5%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.PAKT_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.PAKT_Deserialize(EntryCount: 10000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 6 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 154537.00 ns, 154.5370 us/op
+
+System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> Pakt.PaktException: 2:101: Stream type must be list or map, got {path:str, size:int, mode:int, mod_time:str, is_dir:bool, owner:str, group:str, hash:str}
+   at Pakt.PaktReader.ThrowError(String message, PaktErrorCode code) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 1433
+   at Pakt.PaktReader.StepTop() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 355
+   at Pakt.PaktReader.Step() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 263
+   at Pakt.PaktReader.Read() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 119
+   at Pakt.PaktStreamReader.ReadStatementAsync(CancellationToken ct) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktStreamReader.cs:line 112
+   at Pakt.Benchmarks.FSBenchmarks.PAKT_Deserialize() in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/FSBenchmarks.cs:line 82
+   at BenchmarkDotNet.Autogenerated.Runnable_6.WorkloadActionNoUnroll(Int64 invokeCount) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 1502
+   at BenchmarkDotNet.Engines.Engine.Measure(Action`1 action, Int64 invokeCount)
+   at BenchmarkDotNet.Engines.Engine.RunIteration(IterationData data)
+   at BenchmarkDotNet.Engines.EngineFactory.Jit(Engine engine, Int32 jitIndex, Int32 invokeCount, Int32 unrollFactor)
+   at BenchmarkDotNet.Engines.EngineFactory.CreateReadyToRun(EngineParameters engineParameters)
+   at BenchmarkDotNet.Autogenerated.Runnable_6.Run(IHost host, String benchmarkName) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 1365
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   --- End of inner exception stack trace ---
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at BenchmarkDotNet.Autogenerated.UniqueProgramName.AfterAssemblyLoadingAttached(String[] args) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 57
+// AfterAll
+No Workload Results were obtained from the run.
+// Benchmark Process 1444780 has exited with code 255.
+
+// ** Remained 9 (56.2%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.JSON_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.JSON_Deserialize(EntryCount: 10000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 7 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 157423.00 ns, 157.4230 us/op
+WorkloadJitting  1: 1 op, 42862580.00 ns, 42.8626 ms/op
+
+WorkloadPilot    1: 2 op, 84287409.00 ns, 42.1437 ms/op
+WorkloadPilot    2: 3 op, 119202331.00 ns, 39.7341 ms/op
+WorkloadPilot    3: 4 op, 72845892.00 ns, 18.2115 ms/op
+WorkloadPilot    4: 5 op, 60209737.00 ns, 12.0419 ms/op
+WorkloadPilot    5: 6 op, 80296364.00 ns, 13.3827 ms/op
+WorkloadPilot    6: 7 op, 113138096.00 ns, 16.1626 ms/op
+WorkloadPilot    7: 8 op, 127319044.00 ns, 15.9149 ms/op
+WorkloadPilot    8: 9 op, 86130675.00 ns, 9.5701 ms/op
+WorkloadPilot    9: 10 op, 66227688.00 ns, 6.6228 ms/op
+WorkloadPilot   10: 11 op, 61244683.00 ns, 5.5677 ms/op
+WorkloadPilot   11: 12 op, 61543401.00 ns, 5.1286 ms/op
+WorkloadPilot   12: 13 op, 64085565.00 ns, 4.9297 ms/op
+WorkloadPilot   13: 14 op, 72414306.00 ns, 5.1725 ms/op
+WorkloadPilot   14: 15 op, 81088486.00 ns, 5.4059 ms/op
+WorkloadPilot   15: 16 op, 80390984.00 ns, 5.0244 ms/op
+WorkloadPilot   16: 32 op, 175140002.00 ns, 5.4731 ms/op
+WorkloadPilot   17: 64 op, 352322124.00 ns, 5.5050 ms/op
+WorkloadPilot   18: 128 op, 762729690.00 ns, 5.9588 ms/op
+
+WorkloadWarmup   1: 128 op, 739487391.00 ns, 5.7772 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 128 op, 738885232.00 ns, 5.7725 ms/op
+WorkloadActual   2: 128 op, 714698035.00 ns, 5.5836 ms/op
+WorkloadActual   3: 128 op, 709178292.00 ns, 5.5405 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 128 op, 738885232.00 ns, 5.7725 ms/op
+WorkloadResult   2: 128 op, 714698035.00 ns, 5.5836 ms/op
+WorkloadResult   3: 128 op, 709178292.00 ns, 5.5405 ms/op
+// GC:  95 63 21 486566904 128
+// Threading:  0 0 128
+
+// AfterAll
+// Benchmark Process 1444788 has exited with code 0.
+
+Mean = 5.632 ms, StdErr = 0.071 ms (1.27%), N = 3, StdDev = 0.123 ms
+Min = 5.540 ms, Q1 = 5.562 ms, Median = 5.584 ms, Q3 = 5.678 ms, Max = 5.773 ms
+IQR = 0.116 ms, LowerFence = 5.388 ms, UpperFence = 5.852 ms
+ConfidenceInterval = [3.380 ms; 7.884 ms] (CI 99.9%), Margin = 2.252 ms (39.99% of Mean)
+Skewness = 0.33, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 8 (50.0%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.PAKT_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.PAKT_Serialize(EntryCount: 1000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 8 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 153935.00 ns, 153.9350 us/op
+WorkloadJitting  1: 1 op, 1831105.00 ns, 1.8311 ms/op
+
+OverheadJitting  2: 16 op, 229452.00 ns, 14.3408 us/op
+WorkloadJitting  2: 16 op, 19562488.00 ns, 1.2227 ms/op
+
+WorkloadPilot    1: 16 op, 17099472.00 ns, 1.0687 ms/op
+WorkloadPilot    2: 32 op, 34483115.00 ns, 1.0776 ms/op
+WorkloadPilot    3: 64 op, 69378763.00 ns, 1.0840 ms/op
+WorkloadPilot    4: 128 op, 119491357.00 ns, 933.5262 us/op
+WorkloadPilot    5: 256 op, 148408483.00 ns, 579.7206 us/op
+WorkloadPilot    6: 512 op, 294197411.00 ns, 574.6043 us/op
+WorkloadPilot    7: 1024 op, 528928254.00 ns, 516.5315 us/op
+
+OverheadWarmup   1: 1024 op, 3399.00 ns, 3.3193 ns/op
+OverheadWarmup   2: 1024 op, 1888.00 ns, 1.8438 ns/op
+OverheadWarmup   3: 1024 op, 1535.00 ns, 1.4990 ns/op
+OverheadWarmup   4: 1024 op, 1708.00 ns, 1.6680 ns/op
+OverheadWarmup   5: 1024 op, 1715.00 ns, 1.6748 ns/op
+OverheadWarmup   6: 1024 op, 1737.00 ns, 1.6963 ns/op
+OverheadWarmup   7: 1024 op, 1624.00 ns, 1.5859 ns/op
+OverheadWarmup   8: 1024 op, 1489.00 ns, 1.4541 ns/op
+OverheadWarmup   9: 1024 op, 1650.00 ns, 1.6113 ns/op
+OverheadWarmup  10: 1024 op, 1929.00 ns, 1.8838 ns/op
+
+OverheadActual   1: 1024 op, 1856.00 ns, 1.8125 ns/op
+OverheadActual   2: 1024 op, 1839.00 ns, 1.7959 ns/op
+OverheadActual   3: 1024 op, 2015.00 ns, 1.9678 ns/op
+OverheadActual   4: 1024 op, 1764.00 ns, 1.7227 ns/op
+OverheadActual   5: 1024 op, 2062.00 ns, 2.0137 ns/op
+OverheadActual   6: 1024 op, 1750.00 ns, 1.7090 ns/op
+OverheadActual   7: 1024 op, 1689.00 ns, 1.6494 ns/op
+OverheadActual   8: 1024 op, 1551.00 ns, 1.5146 ns/op
+OverheadActual   9: 1024 op, 1675.00 ns, 1.6357 ns/op
+OverheadActual  10: 1024 op, 1646.00 ns, 1.6074 ns/op
+OverheadActual  11: 1024 op, 1626.00 ns, 1.5879 ns/op
+OverheadActual  12: 1024 op, 1644.00 ns, 1.6055 ns/op
+OverheadActual  13: 1024 op, 1672.00 ns, 1.6328 ns/op
+OverheadActual  14: 1024 op, 1651.00 ns, 1.6123 ns/op
+OverheadActual  15: 1024 op, 1652.00 ns, 1.6133 ns/op
+OverheadActual  16: 1024 op, 1632.00 ns, 1.5938 ns/op
+OverheadActual  17: 1024 op, 1616.00 ns, 1.5781 ns/op
+OverheadActual  18: 1024 op, 1764.00 ns, 1.7227 ns/op
+OverheadActual  19: 1024 op, 1756.00 ns, 1.7148 ns/op
+
+WorkloadWarmup   1: 1024 op, 590408905.00 ns, 576.5712 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 1024 op, 528710588.00 ns, 516.3189 us/op
+WorkloadActual   2: 1024 op, 525867843.00 ns, 513.5428 us/op
+WorkloadActual   3: 1024 op, 585958022.00 ns, 572.2246 us/op
+
+// AfterActualRun
+WorkloadResult   1: 1024 op, 528708913.00 ns, 516.3173 us/op
+WorkloadResult   2: 1024 op, 525866168.00 ns, 513.5412 us/op
+WorkloadResult   3: 1024 op, 585956347.00 ns, 572.2230 us/op
+// GC:  0 0 0 2229016 1024
+// Threading:  0 0 1024
+
+// AfterAll
+// Benchmark Process 1444816 has exited with code 0.
+
+Mean = 534.027 μs, StdErr = 19.115 μs (3.58%), N = 3, StdDev = 33.108 μs
+Min = 513.541 μs, Q1 = 514.929 μs, Median = 516.317 μs, Q3 = 544.270 μs, Max = 572.223 μs
+IQR = 29.341 μs, LowerFence = 470.918 μs, UpperFence = 588.282 μs
+ConfidenceInterval = [-69.980 μs; 1,138.034 μs] (CI 99.9%), Margin = 604.007 μs (113.10% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 7 (43.8%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.JSON_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.JSON_Serialize(EntryCount: 1000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 9 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 139788.00 ns, 139.7880 us/op
+WorkloadJitting  1: 1 op, 1144825.00 ns, 1.1448 ms/op
+
+OverheadJitting  2: 16 op, 249175.00 ns, 15.5734 us/op
+WorkloadJitting  2: 16 op, 12068224.00 ns, 754.2640 us/op
+
+WorkloadPilot    1: 16 op, 10556755.00 ns, 659.7972 us/op
+WorkloadPilot    2: 32 op, 20756597.00 ns, 648.6437 us/op
+WorkloadPilot    3: 64 op, 41696569.00 ns, 651.5089 us/op
+WorkloadPilot    4: 128 op, 83172586.00 ns, 649.7858 us/op
+WorkloadPilot    5: 256 op, 82959316.00 ns, 324.0598 us/op
+WorkloadPilot    6: 512 op, 54715928.00 ns, 106.8670 us/op
+WorkloadPilot    7: 1024 op, 110143804.00 ns, 107.5623 us/op
+WorkloadPilot    8: 2048 op, 186865246.00 ns, 91.2428 us/op
+WorkloadPilot    9: 4096 op, 371081171.00 ns, 90.5960 us/op
+WorkloadPilot   10: 8192 op, 837205872.00 ns, 102.1980 us/op
+
+OverheadWarmup   1: 8192 op, 16535.00 ns, 2.0184 ns/op
+OverheadWarmup   2: 8192 op, 12925.00 ns, 1.5778 ns/op
+OverheadWarmup   3: 8192 op, 12852.00 ns, 1.5688 ns/op
+OverheadWarmup   4: 8192 op, 11564.00 ns, 1.4116 ns/op
+OverheadWarmup   5: 8192 op, 12779.00 ns, 1.5599 ns/op
+OverheadWarmup   6: 8192 op, 12786.00 ns, 1.5608 ns/op
+OverheadWarmup   7: 8192 op, 11385.00 ns, 1.3898 ns/op
+OverheadWarmup   8: 8192 op, 12807.00 ns, 1.5634 ns/op
+OverheadWarmup   9: 8192 op, 13325.00 ns, 1.6266 ns/op
+OverheadWarmup  10: 8192 op, 11493.00 ns, 1.4030 ns/op
+
+OverheadActual   1: 8192 op, 13261.00 ns, 1.6188 ns/op
+OverheadActual   2: 8192 op, 13243.00 ns, 1.6166 ns/op
+OverheadActual   3: 8192 op, 13022.00 ns, 1.5896 ns/op
+OverheadActual   4: 8192 op, 12885.00 ns, 1.5729 ns/op
+OverheadActual   5: 8192 op, 12269.00 ns, 1.4977 ns/op
+OverheadActual   6: 8192 op, 16960.00 ns, 2.0703 ns/op
+OverheadActual   7: 8192 op, 13145.00 ns, 1.6046 ns/op
+OverheadActual   8: 8192 op, 12156.00 ns, 1.4839 ns/op
+OverheadActual   9: 8192 op, 12835.00 ns, 1.5668 ns/op
+OverheadActual  10: 8192 op, 12810.00 ns, 1.5637 ns/op
+OverheadActual  11: 8192 op, 12730.00 ns, 1.5540 ns/op
+OverheadActual  12: 8192 op, 12778.00 ns, 1.5598 ns/op
+OverheadActual  13: 8192 op, 12850.00 ns, 1.5686 ns/op
+OverheadActual  14: 8192 op, 11525.00 ns, 1.4069 ns/op
+OverheadActual  15: 8192 op, 13147.00 ns, 1.6049 ns/op
+
+WorkloadWarmup   1: 8192 op, 742650828.00 ns, 90.6556 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 8192 op, 838096968.00 ns, 102.3068 us/op
+WorkloadActual   2: 8192 op, 744096066.00 ns, 90.8320 us/op
+WorkloadActual   3: 8192 op, 743099524.00 ns, 90.7104 us/op
+
+// AfterActualRun
+WorkloadResult   1: 8192 op, 838084118.00 ns, 102.3052 us/op
+WorkloadResult   2: 8192 op, 744083216.00 ns, 90.8305 us/op
+WorkloadResult   3: 8192 op, 743086674.00 ns, 90.7088 us/op
+// GC:  0 0 0 1114112 8192
+// Threading:  0 0 8192
+
+// AfterAll
+// Benchmark Process 1444831 has exited with code 0.
+
+Mean = 94.615 μs, StdErr = 3.845 μs (4.06%), N = 3, StdDev = 6.660 μs
+Min = 90.709 μs, Q1 = 90.770 μs, Median = 90.830 μs, Q3 = 96.568 μs, Max = 102.305 μs
+IQR = 5.798 μs, LowerFence = 82.072 μs, UpperFence = 105.265 μs
+ConfidenceInterval = [-26.894 μs; 216.124 μs] (CI 99.9%), Margin = 121.509 μs (128.43% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 6 (37.5%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.PAKT_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.PAKT_Serialize(EntryCount: 10000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 10 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 138175.00 ns, 138.1750 us/op
+WorkloadJitting  1: 1 op, 14317039.00 ns, 14.3170 ms/op
+
+OverheadJitting  2: 16 op, 314862.00 ns, 19.6789 us/op
+WorkloadJitting  2: 16 op, 172779864.00 ns, 10.7987 ms/op
+
+WorkloadPilot    1: 16 op, 193880515.00 ns, 12.1175 ms/op
+WorkloadPilot    2: 32 op, 228415546.00 ns, 7.1380 ms/op
+WorkloadPilot    3: 64 op, 366017653.00 ns, 5.7190 ms/op
+WorkloadPilot    4: 128 op, 653343741.00 ns, 5.1042 ms/op
+
+OverheadWarmup   1: 128 op, 2639.00 ns, 20.6172 ns/op
+OverheadWarmup   2: 128 op, 826.00 ns, 6.4531 ns/op
+OverheadWarmup   3: 128 op, 839.00 ns, 6.5547 ns/op
+OverheadWarmup   4: 128 op, 620.00 ns, 4.8438 ns/op
+OverheadWarmup   5: 128 op, 430.00 ns, 3.3594 ns/op
+OverheadWarmup   6: 128 op, 302.00 ns, 2.3594 ns/op
+OverheadWarmup   7: 128 op, 326.00 ns, 2.5469 ns/op
+OverheadWarmup   8: 128 op, 334.00 ns, 2.6094 ns/op
+OverheadWarmup   9: 128 op, 378.00 ns, 2.9531 ns/op
+OverheadWarmup  10: 128 op, 314.00 ns, 2.4531 ns/op
+
+OverheadActual   1: 128 op, 754.00 ns, 5.8906 ns/op
+OverheadActual   2: 128 op, 809.00 ns, 6.3203 ns/op
+OverheadActual   3: 128 op, 1056.00 ns, 8.2500 ns/op
+OverheadActual   4: 128 op, 803.00 ns, 6.2734 ns/op
+OverheadActual   5: 128 op, 985.00 ns, 7.6953 ns/op
+OverheadActual   6: 128 op, 837.00 ns, 6.5391 ns/op
+OverheadActual   7: 128 op, 846.00 ns, 6.6094 ns/op
+OverheadActual   8: 128 op, 622.00 ns, 4.8594 ns/op
+OverheadActual   9: 128 op, 759.00 ns, 5.9297 ns/op
+OverheadActual  10: 128 op, 687.00 ns, 5.3672 ns/op
+OverheadActual  11: 128 op, 626.00 ns, 4.8906 ns/op
+OverheadActual  12: 128 op, 839.00 ns, 6.5547 ns/op
+OverheadActual  13: 128 op, 852.00 ns, 6.6563 ns/op
+OverheadActual  14: 128 op, 1012.00 ns, 7.9063 ns/op
+OverheadActual  15: 128 op, 540.00 ns, 4.2188 ns/op
+OverheadActual  16: 128 op, 362.00 ns, 2.8281 ns/op
+OverheadActual  17: 128 op, 336.00 ns, 2.6250 ns/op
+OverheadActual  18: 128 op, 864.00 ns, 6.7500 ns/op
+OverheadActual  19: 128 op, 517.00 ns, 4.0391 ns/op
+OverheadActual  20: 128 op, 361.00 ns, 2.8203 ns/op
+
+WorkloadWarmup   1: 128 op, 653361487.00 ns, 5.1044 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 128 op, 649431921.00 ns, 5.0737 ms/op
+WorkloadActual   2: 128 op, 654955547.00 ns, 5.1168 ms/op
+WorkloadActual   3: 128 op, 651277069.00 ns, 5.0881 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 128 op, 649431140.00 ns, 5.0737 ms/op
+WorkloadResult   2: 128 op, 654954766.00 ns, 5.1168 ms/op
+WorkloadResult   3: 128 op, 651276288.00 ns, 5.0881 ms/op
+// GC:  0 0 0 279320 128
+// Threading:  0 0 128
+
+// AfterAll
+// Benchmark Process 1444853 has exited with code 0.
+
+Mean = 5.093 ms, StdErr = 0.013 ms (0.25%), N = 3, StdDev = 0.022 ms
+Min = 5.074 ms, Q1 = 5.081 ms, Median = 5.088 ms, Q3 = 5.102 ms, Max = 5.117 ms
+IQR = 0.022 ms, LowerFence = 5.049 ms, UpperFence = 5.135 ms
+ConfidenceInterval = [4.692 ms; 5.494 ms] (CI 99.9%), Margin = 0.401 ms (7.87% of Mean)
+Skewness = 0.21, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 5 (31.2%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.JSON_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.JSON_Serialize(EntryCount: 10000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 11 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 140505.00 ns, 140.5050 us/op
+WorkloadJitting  1: 1 op, 7768563.00 ns, 7.7686 ms/op
+
+OverheadJitting  2: 16 op, 309011.00 ns, 19.3132 us/op
+WorkloadJitting  2: 16 op, 104966446.00 ns, 6.5604 ms/op
+
+WorkloadPilot    1: 16 op, 103403375.00 ns, 6.4627 ms/op
+WorkloadPilot    2: 32 op, 192591225.00 ns, 6.0185 ms/op
+WorkloadPilot    3: 64 op, 72174607.00 ns, 1.1277 ms/op
+WorkloadPilot    4: 128 op, 144258153.00 ns, 1.1270 ms/op
+WorkloadPilot    5: 256 op, 253982500.00 ns, 992.1191 us/op
+WorkloadPilot    6: 512 op, 514078003.00 ns, 1.0041 ms/op
+
+OverheadWarmup   1: 512 op, 3018.00 ns, 5.8945 ns/op
+OverheadWarmup   2: 512 op, 1332.00 ns, 2.6016 ns/op
+OverheadWarmup   3: 512 op, 1365.00 ns, 2.6660 ns/op
+OverheadWarmup   4: 512 op, 935.00 ns, 1.8262 ns/op
+OverheadWarmup   5: 512 op, 949.00 ns, 1.8535 ns/op
+OverheadWarmup   6: 512 op, 810.00 ns, 1.5820 ns/op
+
+OverheadActual   1: 512 op, 1271.00 ns, 2.4824 ns/op
+OverheadActual   2: 512 op, 1199.00 ns, 2.3418 ns/op
+OverheadActual   3: 512 op, 1450.00 ns, 2.8320 ns/op
+OverheadActual   4: 512 op, 997.00 ns, 1.9473 ns/op
+OverheadActual   5: 512 op, 1205.00 ns, 2.3535 ns/op
+OverheadActual   6: 512 op, 942.00 ns, 1.8398 ns/op
+OverheadActual   7: 512 op, 1418.00 ns, 2.7695 ns/op
+OverheadActual   8: 512 op, 1422.00 ns, 2.7773 ns/op
+OverheadActual   9: 512 op, 1085.00 ns, 2.1191 ns/op
+OverheadActual  10: 512 op, 955.00 ns, 1.8652 ns/op
+OverheadActual  11: 512 op, 887.00 ns, 1.7324 ns/op
+OverheadActual  12: 512 op, 860.00 ns, 1.6797 ns/op
+OverheadActual  13: 512 op, 862.00 ns, 1.6836 ns/op
+OverheadActual  14: 512 op, 846.00 ns, 1.6523 ns/op
+OverheadActual  15: 512 op, 898.00 ns, 1.7539 ns/op
+OverheadActual  16: 512 op, 970.00 ns, 1.8945 ns/op
+OverheadActual  17: 512 op, 852.00 ns, 1.6641 ns/op
+OverheadActual  18: 512 op, 1073.00 ns, 2.0957 ns/op
+OverheadActual  19: 512 op, 933.00 ns, 1.8223 ns/op
+OverheadActual  20: 512 op, 1010.00 ns, 1.9727 ns/op
+
+WorkloadWarmup   1: 512 op, 512282906.00 ns, 1.0006 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 512 op, 511875623.00 ns, 999.7571 us/op
+WorkloadActual   2: 512 op, 574631007.00 ns, 1.1223 ms/op
+WorkloadActual   3: 512 op, 514504355.00 ns, 1.0049 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 512 op, 511874639.50 ns, 999.7552 us/op
+WorkloadResult   2: 512 op, 574630023.50 ns, 1.1223 ms/op
+WorkloadResult   3: 512 op, 514503371.50 ns, 1.0049 ms/op
+// GC:  0 0 0 69632 512
+// Threading:  0 0 512
+
+// AfterAll
+// Benchmark Process 1444872 has exited with code 0.
+
+Mean = 1.042 ms, StdErr = 0.040 ms (3.84%), N = 3, StdDev = 0.069 ms
+Min = 1.000 ms, Q1 = 1.002 ms, Median = 1.005 ms, Q3 = 1.064 ms, Max = 1.122 ms
+IQR = 0.061 ms, LowerFence = 0.910 ms, UpperFence = 1.156 ms
+ConfidenceInterval = [-0.223 ms; 2.307 ms] (CI 99.9%), Margin = 1.265 ms (121.35% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 4 (25.0%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.PAKT_Stream: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.PAKT_Stream(EntryCount: 1000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 12 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 149733.00 ns, 149.7330 us/op
+
+System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> Pakt.PaktException: 2:101: Stream type must be list or map, got {path:str, size:int, mode:int, mod_time:str, is_dir:bool, owner:str, group:str, hash:str}
+   at Pakt.PaktReader.ThrowError(String message, PaktErrorCode code) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 1433
+   at Pakt.PaktReader.StepTop() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 355
+   at Pakt.PaktReader.Step() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 263
+   at Pakt.PaktReader.Read() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 119
+   at Pakt.PaktStreamReader.ReadStatementAsync(CancellationToken ct) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktStreamReader.cs:line 112
+   at Pakt.Benchmarks.FSBenchmarks.PAKT_Stream() in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/FSBenchmarks.cs:line 164
+   at BenchmarkDotNet.Autogenerated.Runnable_12.WorkloadActionNoUnroll(Int64 invokeCount) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 2690
+   at BenchmarkDotNet.Engines.Engine.Measure(Action`1 action, Int64 invokeCount)
+   at BenchmarkDotNet.Engines.Engine.RunIteration(IterationData data)
+   at BenchmarkDotNet.Engines.EngineFactory.Jit(Engine engine, Int32 jitIndex, Int32 invokeCount, Int32 unrollFactor)
+   at BenchmarkDotNet.Engines.EngineFactory.CreateReadyToRun(EngineParameters engineParameters)
+   at BenchmarkDotNet.Autogenerated.Runnable_12.Run(IHost host, String benchmarkName) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 2553
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   --- End of inner exception stack trace ---
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at BenchmarkDotNet.Autogenerated.UniqueProgramName.AfterAssemblyLoadingAttached(String[] args) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 57
+// AfterAll
+No Workload Results were obtained from the run.
+// Benchmark Process 1444892 has exited with code 255.
+
+// ** Remained 3 (18.8%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.JSON_FullLoad: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.JSON_FullLoad(EntryCount: 1000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 13 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 143020.00 ns, 143.0200 us/op
+WorkloadJitting  1: 1 op, 6582276.00 ns, 6.5823 ms/op
+
+OverheadJitting  2: 16 op, 234939.00 ns, 14.6837 us/op
+WorkloadJitting  2: 16 op, 64176946.00 ns, 4.0111 ms/op
+
+WorkloadPilot    1: 16 op, 62570085.00 ns, 3.9106 ms/op
+WorkloadPilot    2: 32 op, 121740685.00 ns, 3.8044 ms/op
+WorkloadPilot    3: 64 op, 101076624.00 ns, 1.5793 ms/op
+WorkloadPilot    4: 128 op, 133689870.00 ns, 1.0445 ms/op
+WorkloadPilot    5: 256 op, 233068331.00 ns, 910.4232 us/op
+WorkloadPilot    6: 512 op, 164468236.00 ns, 321.2270 us/op
+WorkloadPilot    7: 1024 op, 305374596.00 ns, 298.2174 us/op
+WorkloadPilot    8: 2048 op, 664375034.00 ns, 324.4019 us/op
+
+OverheadWarmup   1: 2048 op, 4639.00 ns, 2.2651 ns/op
+OverheadWarmup   2: 2048 op, 3387.00 ns, 1.6538 ns/op
+OverheadWarmup   3: 2048 op, 3410.00 ns, 1.6650 ns/op
+OverheadWarmup   4: 2048 op, 2891.00 ns, 1.4116 ns/op
+OverheadWarmup   5: 2048 op, 3197.00 ns, 1.5610 ns/op
+OverheadWarmup   6: 2048 op, 3245.00 ns, 1.5845 ns/op
+OverheadWarmup   7: 2048 op, 3232.00 ns, 1.5781 ns/op
+
+OverheadActual   1: 2048 op, 3619.00 ns, 1.7671 ns/op
+OverheadActual   2: 2048 op, 3603.00 ns, 1.7593 ns/op
+OverheadActual   3: 2048 op, 3636.00 ns, 1.7754 ns/op
+OverheadActual   4: 2048 op, 3439.00 ns, 1.6792 ns/op
+OverheadActual   5: 2048 op, 3547.00 ns, 1.7319 ns/op
+OverheadActual   6: 2048 op, 2963.00 ns, 1.4468 ns/op
+OverheadActual   7: 2048 op, 3308.00 ns, 1.6152 ns/op
+OverheadActual   8: 2048 op, 3202.00 ns, 1.5635 ns/op
+OverheadActual   9: 2048 op, 3306.00 ns, 1.6143 ns/op
+OverheadActual  10: 2048 op, 3313.00 ns, 1.6177 ns/op
+OverheadActual  11: 2048 op, 3451.00 ns, 1.6851 ns/op
+OverheadActual  12: 2048 op, 3730.00 ns, 1.8213 ns/op
+OverheadActual  13: 2048 op, 3350.00 ns, 1.6357 ns/op
+OverheadActual  14: 2048 op, 3237.00 ns, 1.5806 ns/op
+OverheadActual  15: 2048 op, 3211.00 ns, 1.5679 ns/op
+OverheadActual  16: 2048 op, 3220.00 ns, 1.5723 ns/op
+OverheadActual  17: 2048 op, 3648.00 ns, 1.7813 ns/op
+OverheadActual  18: 2048 op, 4045.00 ns, 1.9751 ns/op
+OverheadActual  19: 2048 op, 3280.00 ns, 1.6016 ns/op
+OverheadActual  20: 2048 op, 2937.00 ns, 1.4341 ns/op
+
+WorkloadWarmup   1: 2048 op, 618104374.00 ns, 301.8088 us/op
+
+// BeforeActualRun
+WorkloadActual   1: 2048 op, 611666514.00 ns, 298.6653 us/op
+WorkloadActual   2: 2048 op, 615511554.00 ns, 300.5428 us/op
+WorkloadActual   3: 2048 op, 618249514.00 ns, 301.8796 us/op
+
+// AfterActualRun
+WorkloadResult   1: 2048 op, 611663182.50 ns, 298.6637 us/op
+WorkloadResult   2: 2048 op, 615508222.50 ns, 300.5411 us/op
+WorkloadResult   3: 2048 op, 618246182.50 ns, 301.8780 us/op
+// GC:  152 66 0 759283712 2048
+// Threading:  0 0 2048
+
+// AfterAll
+// Benchmark Process 1444899 has exited with code 0.
+
+Mean = 300.361 μs, StdErr = 0.932 μs (0.31%), N = 3, StdDev = 1.615 μs
+Min = 298.664 μs, Q1 = 299.602 μs, Median = 300.541 μs, Q3 = 301.210 μs, Max = 301.878 μs
+IQR = 1.607 μs, LowerFence = 297.192 μs, UpperFence = 303.620 μs
+ConfidenceInterval = [270.902 μs; 329.820 μs] (CI 99.9%), Margin = 29.459 μs (9.81% of Mean)
+Skewness = -0.11, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 2 (12.5%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.PAKT_Stream: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.PAKT_Stream(EntryCount: 10000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 14 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 140118.00 ns, 140.1180 us/op
+
+System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> Pakt.PaktException: 2:101: Stream type must be list or map, got {path:str, size:int, mode:int, mod_time:str, is_dir:bool, owner:str, group:str, hash:str}
+   at Pakt.PaktReader.ThrowError(String message, PaktErrorCode code) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 1433
+   at Pakt.PaktReader.StepTop() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 355
+   at Pakt.PaktReader.Step() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 263
+   at Pakt.PaktReader.Read() in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktReader.cs:line 119
+   at Pakt.PaktStreamReader.ReadStatementAsync(CancellationToken ct) in /home/tripp/dev/trippwill/pakt/dotnet/src/Pakt/PaktStreamReader.cs:line 112
+   at Pakt.Benchmarks.FSBenchmarks.PAKT_Stream() in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/FSBenchmarks.cs:line 164
+   at BenchmarkDotNet.Autogenerated.Runnable_14.WorkloadActionNoUnroll(Int64 invokeCount) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 3086
+   at BenchmarkDotNet.Engines.Engine.Measure(Action`1 action, Int64 invokeCount)
+   at BenchmarkDotNet.Engines.Engine.RunIteration(IterationData data)
+   at BenchmarkDotNet.Engines.EngineFactory.Jit(Engine engine, Int32 jitIndex, Int32 invokeCount, Int32 unrollFactor)
+   at BenchmarkDotNet.Engines.EngineFactory.CreateReadyToRun(EngineParameters engineParameters)
+   at BenchmarkDotNet.Autogenerated.Runnable_14.Run(IHost host, String benchmarkName) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 2949
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   --- End of inner exception stack trace ---
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+   at BenchmarkDotNet.Autogenerated.UniqueProgramName.AfterAssemblyLoadingAttached(String[] args) in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/Pakt.Benchmarks-Job-WWFMMQ-1.notcs:line 57
+// AfterAll
+No Workload Results were obtained from the run.
+// Benchmark Process 1444919 has exited with code 255.
+
+// ** Remained 1 (6.2%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// **************************
+// Benchmark: FSBenchmarks.JSON_FullLoad: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Pakt.Benchmarks-Job-WWFMMQ-1.dll --anonymousPipes 117 118 --benchmarkName "Pakt.Benchmarks.FSBenchmarks.JSON_FullLoad(EntryCount: 10000)" --job "IterationCount=3, WarmupCount=1" --benchmarkId 15 in /home/tripp/dev/trippwill/pakt/dotnet/benchmarks/Pakt.Benchmarks/bin/Release/net10.0/Pakt.Benchmarks-Job-WWFMMQ-1/bin/Release/net10.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-WWFMMQ(IterationCount=3, WarmupCount=1)
+
+OverheadJitting  1: 1 op, 175602.00 ns, 175.6020 us/op
+WorkloadJitting  1: 1 op, 44753740.00 ns, 44.7537 ms/op
+
+WorkloadPilot    1: 2 op, 84881050.00 ns, 42.4405 ms/op
+WorkloadPilot    2: 3 op, 119117379.00 ns, 39.7058 ms/op
+WorkloadPilot    3: 4 op, 68822367.00 ns, 17.2056 ms/op
+WorkloadPilot    4: 5 op, 66937135.00 ns, 13.3874 ms/op
+WorkloadPilot    5: 6 op, 79609984.00 ns, 13.2683 ms/op
+WorkloadPilot    6: 7 op, 113656392.00 ns, 16.2366 ms/op
+WorkloadPilot    7: 8 op, 124865071.00 ns, 15.6081 ms/op
+WorkloadPilot    8: 9 op, 91968916.00 ns, 10.2188 ms/op
+WorkloadPilot    9: 10 op, 65807225.00 ns, 6.5807 ms/op
+WorkloadPilot   10: 11 op, 58573141.00 ns, 5.3248 ms/op
+WorkloadPilot   11: 12 op, 67282446.00 ns, 5.6069 ms/op
+WorkloadPilot   12: 13 op, 66727070.00 ns, 5.1329 ms/op
+WorkloadPilot   13: 14 op, 80697802.00 ns, 5.7641 ms/op
+WorkloadPilot   14: 15 op, 88026338.00 ns, 5.8684 ms/op
+WorkloadPilot   15: 16 op, 85557187.00 ns, 5.3473 ms/op
+WorkloadPilot   16: 32 op, 178925760.00 ns, 5.5914 ms/op
+WorkloadPilot   17: 64 op, 364992805.00 ns, 5.7030 ms/op
+WorkloadPilot   18: 128 op, 796378325.00 ns, 6.2217 ms/op
+
+WorkloadWarmup   1: 128 op, 740803867.00 ns, 5.7875 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 128 op, 731324063.00 ns, 5.7135 ms/op
+WorkloadActual   2: 128 op, 704308746.00 ns, 5.5024 ms/op
+WorkloadActual   3: 128 op, 722931244.00 ns, 5.6479 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 128 op, 731324063.00 ns, 5.7135 ms/op
+WorkloadResult   2: 128 op, 704308746.00 ns, 5.5024 ms/op
+WorkloadResult   3: 128 op, 722931244.00 ns, 5.6479 ms/op
+// GC:  95 63 21 486558208 128
+// Threading:  0 0 128
+
+// AfterAll
+// Benchmark Process 1444927 has exited with code 0.
+
+Mean = 5.621 ms, StdErr = 0.062 ms (1.11%), N = 3, StdDev = 0.108 ms
+Min = 5.502 ms, Q1 = 5.575 ms, Median = 5.648 ms, Q3 = 5.681 ms, Max = 5.713 ms
+IQR = 0.106 ms, LowerFence = 5.417 ms, UpperFence = 5.839 ms
+ConfidenceInterval = [3.651 ms; 7.592 ms] (CI 99.9%), Margin = 1.971 ms (35.06% of Mean)
+Skewness = -0.23, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 0 (0.0%) benchmark(s) to run. Estimated finish 2026-04-06 21:26 (0h 0m from now) **
+// ***** BenchmarkRunner: Finish  *****
+
+// * Export *
+  BenchmarkDotNet.Artifacts/results/Pakt.Benchmarks.FSBenchmarks-report.csv
+  BenchmarkDotNet.Artifacts/results/Pakt.Benchmarks.FSBenchmarks-report-github.md
+  BenchmarkDotNet.Artifacts/results/Pakt.Benchmarks.FSBenchmarks-report.html
+
+// * Detailed results *
+FSBenchmarks.PAKT_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+There are not any results runs
+
+FSBenchmarks.JSON_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 136.767 μs, StdErr = 1.146 μs (0.84%), N = 3, StdDev = 1.985 μs
+Min = 135.157 μs, Q1 = 135.658 μs, Median = 136.158 μs, Q3 = 137.572 μs, Max = 138.985 μs
+IQR = 1.914 μs, LowerFence = 132.787 μs, UpperFence = 140.443 μs
+ConfidenceInterval = [100.549 μs; 172.985 μs] (CI 99.9%), Margin = 36.218 μs (26.48% of Mean)
+Skewness = 0.28, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[133.851 μs ; 137.464 μs) | @@
+[137.464 μs ; 140.792 μs) | @
+---------------------------------------------------
+
+FSBenchmarks.PAKT_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+There are not any results runs
+
+FSBenchmarks.JSON_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 1.394 ms, StdErr = 0.001 ms (0.11%), N = 3, StdDev = 0.003 ms
+Min = 1.391 ms, Q1 = 1.392 ms, Median = 1.394 ms, Q3 = 1.395 ms, Max = 1.396 ms
+IQR = 0.003 ms, LowerFence = 1.389 ms, UpperFence = 1.399 ms
+ConfidenceInterval = [1.347 ms; 1.440 ms] (CI 99.9%), Margin = 0.046 ms (3.32% of Mean)
+Skewness = -0.12, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[1.389 ms ; 1.398 ms) | @@@
+---------------------------------------------------
+
+FSBenchmarks.PAKT_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+There are not any results runs
+
+FSBenchmarks.JSON_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 300.898 μs, StdErr = 0.545 μs (0.18%), N = 3, StdDev = 0.944 μs
+Min = 300.306 μs, Q1 = 300.354 μs, Median = 300.402 μs, Q3 = 301.194 μs, Max = 301.986 μs
+IQR = 0.840 μs, LowerFence = 299.094 μs, UpperFence = 302.455 μs
+ConfidenceInterval = [283.683 μs; 318.113 μs] (CI 99.9%), Margin = 17.215 μs (5.72% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[300.287 μs ; 302.005 μs) | @@@
+---------------------------------------------------
+
+FSBenchmarks.PAKT_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+There are not any results runs
+
+FSBenchmarks.JSON_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 5.632 ms, StdErr = 0.071 ms (1.27%), N = 3, StdDev = 0.123 ms
+Min = 5.540 ms, Q1 = 5.562 ms, Median = 5.584 ms, Q3 = 5.678 ms, Max = 5.773 ms
+IQR = 0.116 ms, LowerFence = 5.388 ms, UpperFence = 5.852 ms
+ConfidenceInterval = [3.380 ms; 7.884 ms] (CI 99.9%), Margin = 2.252 ms (39.99% of Mean)
+Skewness = 0.33, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[5.428 ms ; 5.674 ms) | @@
+[5.674 ms ; 5.885 ms) | @
+---------------------------------------------------
+
+FSBenchmarks.PAKT_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 534.027 μs, StdErr = 19.115 μs (3.58%), N = 3, StdDev = 33.108 μs
+Min = 513.541 μs, Q1 = 514.929 μs, Median = 516.317 μs, Q3 = 544.270 μs, Max = 572.223 μs
+IQR = 29.341 μs, LowerFence = 470.918 μs, UpperFence = 588.282 μs
+ConfidenceInterval = [-69.980 μs; 1,138.034 μs] (CI 99.9%), Margin = 604.007 μs (113.10% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[512.753 μs ; 573.011 μs) | @@@
+---------------------------------------------------
+
+FSBenchmarks.JSON_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 94.615 μs, StdErr = 3.845 μs (4.06%), N = 3, StdDev = 6.660 μs
+Min = 90.709 μs, Q1 = 90.770 μs, Median = 90.830 μs, Q3 = 96.568 μs, Max = 102.305 μs
+IQR = 5.798 μs, LowerFence = 82.072 μs, UpperFence = 105.265 μs
+ConfidenceInterval = [-26.894 μs; 216.124 μs] (CI 99.9%), Margin = 121.509 μs (128.43% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[90.446 μs ; 102.568 μs) | @@@
+---------------------------------------------------
+
+FSBenchmarks.PAKT_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 5.093 ms, StdErr = 0.013 ms (0.25%), N = 3, StdDev = 0.022 ms
+Min = 5.074 ms, Q1 = 5.081 ms, Median = 5.088 ms, Q3 = 5.102 ms, Max = 5.117 ms
+IQR = 0.022 ms, LowerFence = 5.049 ms, UpperFence = 5.135 ms
+ConfidenceInterval = [4.692 ms; 5.494 ms] (CI 99.9%), Margin = 0.401 ms (7.87% of Mean)
+Skewness = 0.21, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[5.054 ms ; 5.137 ms) | @@@
+---------------------------------------------------
+
+FSBenchmarks.JSON_Serialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 1.042 ms, StdErr = 0.040 ms (3.84%), N = 3, StdDev = 0.069 ms
+Min = 1.000 ms, Q1 = 1.002 ms, Median = 1.005 ms, Q3 = 1.064 ms, Max = 1.122 ms
+IQR = 0.061 ms, LowerFence = 0.910 ms, UpperFence = 1.156 ms
+ConfidenceInterval = [-0.223 ms; 2.307 ms] (CI 99.9%), Margin = 1.265 ms (121.35% of Mean)
+Skewness = 0.38, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[0.998 ms ; 1.124 ms) | @@@
+---------------------------------------------------
+
+FSBenchmarks.PAKT_Stream: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+There are not any results runs
+
+FSBenchmarks.JSON_FullLoad: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 300.361 μs, StdErr = 0.932 μs (0.31%), N = 3, StdDev = 1.615 μs
+Min = 298.664 μs, Q1 = 299.602 μs, Median = 300.541 μs, Q3 = 301.210 μs, Max = 301.878 μs
+IQR = 1.607 μs, LowerFence = 297.192 μs, UpperFence = 303.620 μs
+ConfidenceInterval = [270.902 μs; 329.820 μs] (CI 99.9%), Margin = 29.459 μs (9.81% of Mean)
+Skewness = -0.11, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[298.197 μs ; 303.347 μs) | @@@
+---------------------------------------------------
+
+FSBenchmarks.PAKT_Stream: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+There are not any results runs
+
+FSBenchmarks.JSON_FullLoad: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+Runtime = .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 5.621 ms, StdErr = 0.062 ms (1.11%), N = 3, StdDev = 0.108 ms
+Min = 5.502 ms, Q1 = 5.575 ms, Median = 5.648 ms, Q3 = 5.681 ms, Max = 5.713 ms
+IQR = 0.106 ms, LowerFence = 5.417 ms, UpperFence = 5.839 ms
+ConfidenceInterval = [3.651 ms; 7.592 ms] (CI 99.9%), Margin = 1.971 ms (35.06% of Mean)
+Skewness = -0.23, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[5.404 ms ; 5.582 ms) | @
+[5.582 ms ; 5.812 ms) | @@
+---------------------------------------------------
+
+// * Summary *
+
+BenchmarkDotNet v0.15.8, Linux Fedora Linux 43 (COSMIC)
+Intel Core Ultra 5 228V 0.40GHz, 1 CPU, 8 logical and 8 physical cores
+.NET SDK 10.0.201
+  [Host]     : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+  Job-WWFMMQ : .NET 10.0.5 (10.0.5, 10.0.526.15411), X64 RyuJIT x86-64-v3
+
+IterationCount=3  WarmupCount=1  
+
+| Method           | Categories  | EntryCount | Mean        | Error       | StdDev     | Ratio | RatioSD | Gen0     | Gen1     | Gen2     | Allocated | Alloc Ratio |
+|----------------- |------------ |----------- |------------:|------------:|-----------:|------:|--------:|---------:|---------:|---------:|----------:|------------:|
+| PAKT_Decode      | Decode      | 1000       |          NA |          NA |         NA |     ? |       ? |       NA |       NA |       NA |        NA |           ? |
+| JSON_Decode      | Decode      | 1000       |   136.77 μs |    36.22 μs |   1.985 μs |     ? |       ? |        - |        - |        - |         - |           ? |
+|                  |             |            |             |             |            |       |         |          |          |          |           |             |
+| PAKT_Decode      | Decode      | 10000      |          NA |          NA |         NA |     ? |       ? |       NA |       NA |       NA |        NA |           ? |
+| JSON_Decode      | Decode      | 10000      | 1,393.57 μs |    46.28 μs |   2.537 μs |     ? |       ? |        - |        - |        - |         - |           ? |
+|                  |             |            |             |             |            |       |         |          |          |          |           |             |
+| PAKT_Deserialize | Deserialize | 1000       |          NA |          NA |         NA |     ? |       ? |       NA |       NA |       NA |        NA |           ? |
+| JSON_Deserialize | Deserialize | 1000       |   300.90 μs |    17.22 μs |   0.944 μs |     ? |       ? |  74.2188 |  32.2266 |        - |  370744 B |           ? |
+|                  |             |            |             |             |            |       |         |          |          |          |           |             |
+| PAKT_Deserialize | Deserialize | 10000      |          NA |          NA |         NA |     ? |       ? |       NA |       NA |       NA |        NA |           ? |
+| JSON_Deserialize | Deserialize | 10000      | 5,632.19 μs | 2,252.07 μs | 123.444 μs |     ? |       ? | 742.1875 | 492.1875 | 164.0625 | 3801304 B |           ? |
+|                  |             |            |             |             |            |       |         |          |          |          |           |             |
+| PAKT_Serialize   | Serialize   | 1000       |   534.03 μs |   604.01 μs |  33.108 μs |  1.00 |    0.07 |        - |        - |        - |    2177 B |        1.00 |
+| JSON_Serialize   | Serialize   | 1000       |    94.61 μs |   121.51 μs |   6.660 μs |  0.18 |    0.01 |        - |        - |        - |     136 B |        0.06 |
+|                  |             |            |             |             |            |       |         |          |          |          |           |             |
+| PAKT_Serialize   | Serialize   | 10000      | 5,092.87 μs |   400.80 μs |  21.969 μs |  1.00 |    0.01 |        - |        - |        - |    2182 B |        1.00 |
+| JSON_Serialize   | Serialize   | 10000      | 1,042.32 μs | 1,264.85 μs |  69.331 μs |  0.20 |    0.01 |        - |        - |        - |     136 B |        0.06 |
+|                  |             |            |             |             |            |       |         |          |          |          |           |             |
+| PAKT_Stream      | Stream      | 1000       |          NA |          NA |         NA |     ? |       ? |       NA |       NA |       NA |        NA |           ? |
+| JSON_FullLoad    | Stream      | 1000       |   300.36 μs |    29.46 μs |   1.615 μs |     ? |       ? |  74.2188 |  32.2266 |        - |  370744 B |           ? |
+|                  |             |            |             |             |            |       |         |          |          |          |           |             |
+| PAKT_Stream      | Stream      | 10000      |          NA |          NA |         NA |     ? |       ? |       NA |       NA |       NA |        NA |           ? |
+| JSON_FullLoad    | Stream      | 10000      | 5,621.26 μs | 1,970.71 μs | 108.021 μs |     ? |       ? | 742.1875 | 492.1875 | 164.0625 | 3801236 B |           ? |
+
+Benchmarks with issues:
+  FSBenchmarks.PAKT_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+  FSBenchmarks.PAKT_Decode: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+  FSBenchmarks.PAKT_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+  FSBenchmarks.PAKT_Deserialize: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+  FSBenchmarks.PAKT_Stream: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=1000]
+  FSBenchmarks.PAKT_Stream: Job-WWFMMQ(IterationCount=3, WarmupCount=1) [EntryCount=10000]
+
+// * Warnings *
+BaselineCustomAnalyzer
+  Summary -> A question mark '?' symbol indicates that it was not possible to compute the (Ratio, RatioSD, Alloc Ratio) column(s) because the baseline or benchmark could not be found, or the baseline value is too close to zero.
+
+// * Legends *
+  Categories  : All categories of the corresponded method, class, and assembly
+  EntryCount  : Value of the 'EntryCount' parameter
+  Mean        : Arithmetic mean of all measurements
+  Error       : Half of 99.9% confidence interval
+  StdDev      : Standard deviation of all measurements
+  Ratio       : Mean of the ratio distribution ([Current]/[Baseline])
+  RatioSD     : Standard deviation of the ratio distribution ([Current]/[Baseline])
+  Gen0        : GC Generation 0 collects per 1000 operations
+  Gen1        : GC Generation 1 collects per 1000 operations
+  Gen2        : GC Generation 2 collects per 1000 operations
+  Allocated   : Allocated memory per single operation (managed only, inclusive, 1KB = 1024B)
+  Alloc Ratio : Allocated memory ratio distribution ([Current]/[Baseline])
+  1 μs        : 1 Microsecond (0.000001 sec)
+
+// * Diagnostic Output - MemoryDiagnoser *
+
+
+// ***** BenchmarkRunner: End *****
+Run time: 00:00:53 (53.67 sec), executed benchmarks: 16
+
+Global total time: 00:01:02 (62.8 sec), executed benchmarks: 16
+// * Artifacts cleanup *
+Artifacts cleanup is finished

@@ -3,8 +3,8 @@ languageCode = 'en-us'
 title = 'PAKT'
 
 [params]
-  description = 'A typed data interchange format. Human-authorable. Stream-parseable. Spec-projected.'
-  tagline = 'Human-authorable. Stream-parseable. Spec-projected.'
+  description = 'A typed data interchange format. Human-authorable. Streaming. Self-describing.'
+  tagline = 'Human-authorable. Streaming. Self-describing.'
   repo = 'https://github.com/trippwill/pakt'
 
 [menu]

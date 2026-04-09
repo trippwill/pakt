@@ -1,6 +1,6 @@
 # PAKT
 
-> **PAKT** — a typed data interchange format. Human-authorable. Stream-parseable. Spec-projected.
+> **PAKT** — a typed data interchange format. Human-authorable. Streaming. Self-describing.
 
 ```
 greeting:str     = 'hello world'
@@ -12,17 +12,16 @@ server:{host:str, port:int} = { 'localhost', 8080 }
 
 ## What is PAKT?
 
-PAKT is a typed data interchange format where every value carries its type. No inference, no ambiguity. Documents are self-validating — type annotations are producer assertions checked at parse time.
+PAKT is a typed data interchange format where every value carries its type. No inference, no ambiguity. Units are self-validating — type annotations are producer assertions checked at parse time.
 
-Consumer-side `.spec.pakt` files enable **projections**: a streaming parser materializes only the fields a consumer needs, skipping everything else without allocation.
-
-The current Go library and CLI implement the converged PAKT v0 surface: `;` map syntax, `bin`, raw strings, the first-content-line multi-line string rule, and top-level `<<` stream statements. Duplicate map keys are preserved in decode order; higher-level consumers decide how to interpret them.
+The current Go library and CLI implement the PAKT v0 surface: `;` map syntax, `bin`, raw strings, the first-content-line multi-line string rule, and top-level `<<` pack statements. Duplicate statement names and map keys are preserved in decode order; higher-level consumers decide how to interpret them.
 
 ## Repository Structure
 
 ```
 pakt/
 ├── encoding/       # Canonical Go library (github.com/trippwill/pakt/encoding)
+├── dotnet/         # .NET library, source generator, benchmarks
 ├── main.go         # CLI entry point (go install github.com/trippwill/pakt@latest)
 ├── spec/           # Formal specification (PAKT v0 draft)
 ├── docs/           # User guide and documentation
@@ -41,9 +40,6 @@ go install github.com/trippwill/pakt@latest
 ```sh
 # Parse a file and emit structured events
 pakt parse data.pakt
-
-# Parse with spec projection
-pakt parse data.pakt --spec deploy.spec.pakt
 
 # Validate only (exit 0/1)
 pakt validate data.pakt
@@ -97,6 +93,32 @@ for dec.More() {
         break
     }
     process(entry)
+}
+```
+
+## .NET Library
+
+The `dotnet/` directory contains a high-performance .NET implementation with source-generated serialization. See [dotnet/README.md](dotnet/README.md) for full details.
+
+```csharp
+using Pakt;
+using Pakt.Serialization;
+
+[PaktSerializable(typeof(Server))]
+public partial class AppPaktContext : PaktSerializerContext { }
+
+// Deserialize
+var server = PaktSerializer.Deserialize(paktBytes, AppPaktContext.Default.Server);
+
+// Iterate pack statements
+await using var reader = PaktStreamReader.Create(paktBytes);
+while (await reader.ReadStatementAsync())
+{
+    if (reader.IsPack)
+        await foreach (var item in reader.ReadPackElements(AppPaktContext.Default.Server))
+            Process(item);
+    else
+        var value = reader.Deserialize(AppPaktContext.Default.Server);
 }
 ```
 

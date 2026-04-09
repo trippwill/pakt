@@ -11,7 +11,6 @@ pakt/
 │   ├── reader_type.go   # Recursive-descent type annotation parser
 │   ├── reader_state.go  # State machine: parserState enum, frame stack, step() loop
 │   ├── decoder.go       # Public Decoder API
-│   ├── spec.go          # Spec projection (.spec.pakt parsing and filtering)
 │   ├── event.go         # Event types and EventKind enum
 │   ├── types.go         # PAKT type system (TypeKind, Type interface, composites)
 │   ├── errors.go        # ParseError with Pos and ErrorCode (spec §11)
@@ -29,8 +28,8 @@ pakt/
 │   └── state-machine-rewrite.md  # Decoder state machine design
 ├── site/                # Hugo website (usepakt.dev)
 ├── testdata/            # Sample .pakt files
-│   ├── valid/           # Valid documents for testing
-│   └── invalid/         # Invalid documents for error testing
+│   ├── valid/           # Valid units for testing
+│   └── invalid/         # Invalid units for error testing
 └── .github/
     ├── workflows/ci.yml # CI: build, test, lint, coverage
     ├── copilot-instructions.md
@@ -76,7 +75,7 @@ The specification (`spec/pakt-v0.md`) is the authoritative source for PAKT seman
 
 - Error codes must match spec §11 categories (`ErrorCode` in `errors.go`)
 - Event ordering must follow the contract in the spec and `design/state-machine-rewrite.md`
-- Duplicate map keys are preserved in decode order (spec design principle §0.1.3)
+- Duplicate statement names and map keys are preserved in decode order (spec design principle §0.1.3)
 - Type annotations are producer assertions checked at parse time
 - Nil is only valid for nullable types (`?` suffix)
 

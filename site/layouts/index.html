@@ -4,16 +4,16 @@
 <section class="hero">
   <div class="hero-inner">
     <span class="hero-label">Typed Data Format</span>
-    <h1 class="hero-title">Data that knows <em>its own type</em></h1>
-    <p class="hero-tagline">Human-authorable. Stream-parseable. Spec-projected. Every value carries its type — no inference, no ambiguity, no surprises.</p>
+    <h1 class="hero-title"><span class="pakt-word"><span class="pakt-copper">PA</span><span class="pakt-teal">KT</span></span> — data that knows <em>its own type</em></h1>
+    <p class="hero-tagline">Human-authorable. Streaming. Self-describing. Every value carries its type — no inference, no ambiguity, no surprises.</p>
     <div class="hero-code">
       <pre><code id="hero-code-target"><span class="pk-name">app-name</span><span class="pk-delim">:</span><span class="pk-type">str</span>     <span class="pk-op">=</span> <span class="pk-str">'midwatch'</span>
 <span class="pk-name">version</span><span class="pk-delim">:</span><span class="pk-delim">(</span><span class="pk-type">int</span><span class="pk-delim">,</span> <span class="pk-type">int</span><span class="pk-delim">,</span> <span class="pk-type">int</span><span class="pk-delim">)</span> <span class="pk-op">=</span> <span class="pk-delim">(</span><span class="pk-num">2</span><span class="pk-delim">,</span> <span class="pk-num">14</span><span class="pk-delim">,</span> <span class="pk-num">0</span><span class="pk-delim">)</span>
 <span class="pk-name">active</span><span class="pk-delim">:</span><span class="pk-type">bool</span>      <span class="pk-op">=</span> <span class="pk-bool">true</span>
 <span class="pk-name">server</span><span class="pk-delim">:</span><span class="pk-delim">{</span><span class="pk-name">host</span><span class="pk-delim">:</span><span class="pk-type">str</span><span class="pk-delim">,</span> <span class="pk-name">port</span><span class="pk-delim">:</span><span class="pk-type">int</span><span class="pk-delim">}</span> <span class="pk-op">=</span> <span class="pk-delim">{</span> <span class="pk-str">'localhost'</span><span class="pk-delim">,</span> <span class="pk-num">8080</span> <span class="pk-delim">}</span>
 
-<span class="pk-comment"># Stream events — no delimiters needed</span>
-<span class="pk-name">events</span><span class="pk-delim">:</span><span class="pk-delim">[</span><span class="pk-delim">{</span><span class="pk-name">ts</span><span class="pk-delim">:</span><span class="pk-type">str</span><span class="pk-delim">,</span> <span class="pk-name">level</span><span class="pk-delim">:</span><span class="pk-type">str</span><span class="pk-delim">}</span><span class="pk-delim">]</span> <span class="pk-op">&lt;&lt;</span>
+<span class="pk-comment"># Pack events — no delimiters needed</span>
+<span class="pk-name">events</span><span class="pk-delim">:</span><span class="pk-delim">[</span><span class="pk-delim">{</span><span class="pk-name">ts</span><span class="pk-delim">:</span><span class="pk-type">ts</span><span class="pk-delim">,</span> <span class="pk-name">level</span><span class="pk-delim">:</span><span class="pk-type">str</span><span class="pk-delim">}</span><span class="pk-delim">]</span> <span class="pk-op">&lt;&lt;</span>
     <span class="pk-delim">{</span> <span class="pk-str">'2026-06-01T14:30:00Z'</span><span class="pk-delim">,</span> <span class="pk-str">'info'</span> <span class="pk-delim">}</span>
     <span class="pk-delim">{</span> <span class="pk-str">'2026-06-01T14:31:00Z'</span><span class="pk-delim">,</span> <span class="pk-str">'warn'</span> <span class="pk-delim">}</span></code><span class="typing-cursor" id="typing-cursor"></span></pre>
     </div>
@@ -29,7 +29,7 @@
     <div class="section-header">
       <span class="section-label copper">What's probably familiar</span>
       <h2 class="section-title">You already know most of this</h2>
-      <p class="section-subtitle">If you've written JSON, YAML, or TOML, PAKT will feel right at home. Same concepts — keys, values, nesting — just with types baked in.</p>
+      <p class="section-subtitle">If you've written JSON, YAML, or TOML, <span class="pakt-word"><span class="pakt-copper">PA</span><span class="pakt-teal">KT</span></span> will feel right at home. Same concepts — keys, values, nesting — just with types baked in.</p>
     </div>
     <div class="card-grid cols-3">
       <div class="card">
@@ -56,7 +56,7 @@
     <div class="section-header">
       <span class="section-label teal">What's probably a delightful surprise</span>
       <h2 class="section-title">Here's where it gets fun</h2>
-      <p class="section-subtitle">PAKT isn't just another config format. Types, projections, and streaming make it something genuinely different.</p>
+      <p class="section-subtitle">PAKT isn't just another config format. Types and streaming make it something genuinely different.</p>
     </div>
     <div class="card-grid cols-3">
       <div class="card">
@@ -66,13 +66,13 @@
       </div>
       <div class="card">
         <div class="card-icon teal">⊟</div>
-        <h3>Spec projections</h3>
-        <p>Write a <code>.spec.pakt</code> file listing the fields you need. The parser materializes only those — skipping everything else without allocation.</p>
+        <h3>Self-describing data</h3>
+        <p>Type annotations are validated at parse time — producers assert types, parsers enforce them. No schema negotiation, no external files needed.</p>
       </div>
       <div class="card">
         <div class="card-icon teal">&lt;&lt;</div>
-        <h3>Streaming with &lt;&lt;</h3>
-        <p>Open a stream with <code>&lt;&lt;</code> and emit records one by one. No enclosing array, no delimiters between items. Data flows as it's produced.</p>
+        <h3>Packs with &lt;&lt;</h3>
+        <p>Open a pack with <code>&lt;&lt;</code> and emit records one by one. No enclosing array, no delimiters between items. Data flows as it's produced.</p>
       </div>
     </div>
   </div>
@@ -102,14 +102,14 @@
 }</code></pre>
       </div>
     </div>
-    <p class="comparison-caption">Types are built in. Structure is explicit. Projections skip what you don't need.</p>
+    <p class="comparison-caption">Types are built in. Structure is explicit. Every value is self-describing.</p>
   </div>
 </section>
 
 <section class="steps-section">
   <div class="steps-inner">
     <h2>How it works</h2>
-    <p class="steps-desc">Three concepts, one pipeline.</p>
+    <p class="steps-desc">Three steps, one pipeline.</p>
     <div class="steps-grid">
       <div class="step">
         <div class="step-number">1</div>
@@ -119,12 +119,12 @@
       <div class="step">
         <div class="step-number">2</div>
         <h3>Parse</h3>
-        <p>The LL(0) streaming parser emits events as it reads — no full-document buffering. Integer-typed events, zero string dispatch.</p>
+        <p>The streaming parser emits events as it reads — no full-unit buffering. One event per call, constant memory per nesting level.</p>
       </div>
       <div class="step">
         <div class="step-number">3</div>
-        <h3>Project</h3>
-        <p>Consumer-side <code>.spec.pakt</code> files select just the fields you need. The parser skips everything else at scan speed.</p>
+        <h3>Consume</h3>
+        <p>Unmarshal into typed structs, process events one by one, or pack values into streaming output. Your data, your way.</p>
       </div>
     </div>
   </div>

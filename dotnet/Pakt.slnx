@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Pakt.Benchmarks/Pakt.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Pakt.Generators/Pakt.Generators.csproj" />
+    <Project Path="src/Pakt/Pakt.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Pakt.Generators.Tests/Pakt.Generators.Tests.csproj" />
+    <Project Path="tests/Pakt.Tests/Pakt.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -358,6 +358,18 @@ img { max-width: 100%; height: auto; }
   color: var(--accent, #e87040);
 }
 
+.pakt-word {
+  letter-spacing: 0.04em;
+}
+
+.pakt-copper {
+  color: var(--accent, #e87040);
+}
+
+.pakt-teal {
+  color: var(--teal, #4ecdc4);
+}
+
 .hero-tagline {
   font-size: 1.2rem;
   color: #9298b4;

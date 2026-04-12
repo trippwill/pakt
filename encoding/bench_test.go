@@ -1043,8 +1043,9 @@ func BenchmarkPAKTPackIterFS1K(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dec := NewDecoder(bytes.NewReader(data))
-		for entry, err := range PackItems[benchFSEntry](dec) {
-			if err != nil {
+		for dec.More() {
+			var entry benchFSEntry
+			if err := dec.UnmarshalNext(&entry); err != nil {
 				b.Fatal(err)
 			}
 			_ = entry
@@ -1059,8 +1060,9 @@ func BenchmarkPAKTPackIterFS10K(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dec := NewDecoder(bytes.NewReader(data))
-		for entry, err := range PackItems[benchFSEntry](dec) {
-			if err != nil {
+		for dec.More() {
+			var entry benchFSEntry
+			if err := dec.UnmarshalNext(&entry); err != nil {
 				b.Fatal(err)
 			}
 			_ = entry

@@ -1,5 +1,10 @@
 package encoding
 
+import (
+	"encoding/base64"
+	"encoding/hex"
+)
+
 // readIntTo reads an integer literal into w (zero-copy variant of readInt).
 func (r *reader) readIntTo(w byteAppender) error {
 	if b, err := r.peekByte(); err == nil && b == '-' {
@@ -275,14 +280,68 @@ func (r *reader) readStringTo(w byteAppender) error {
 	return nil
 }
 
-// readBinTo reads a binary literal into w.
+// readBinTo reads a binary literal directly into w.
+// No escape processing needed — bin literals contain only hex/base64 chars.
 func (r *reader) readBinTo(w byteAppender) error {
-	val, err := r.readBin()
+	prefix, err := r.readByte()
 	if err != nil {
+		return r.wrapf(ErrUnexpectedEOF, "expected binary literal, got EOF")
+	}
+	if prefix != 'x' && prefix != 'b' {
+		r.unreadByte()
+		return r.errorf("expected binary literal, got %q", rune(prefix))
+	}
+	if err := r.expectByte('\''); err != nil {
 		return err
 	}
-	for i := range len(val) {
-		w.WriteByte(val[i]) //nolint:errcheck
+
+	// Scan the raw content between quotes into a temporary slice.
+	// We need the raw content to validate hex/base64 before writing
+	// the normalized hex output to w.
+	r.sb.Reset()
+	for {
+		ch, err := r.readByte()
+		if err != nil {
+			return r.wrapf(ErrUnexpectedEOF, "unterminated binary literal")
+		}
+		if ch == '\'' {
+			break
+		}
+		if ch == '\n' {
+			return r.errorf("newline in binary literal")
+		}
+		if ch == 0 {
+			return r.errorf("null byte in binary literal")
+		}
+		r.sb.WriteByte(ch)
 	}
-	return nil
+
+	lit := r.sb.String()
+	switch prefix {
+	case 'x':
+		if len(lit)%2 != 0 {
+			return r.errorf("hex binary literal must contain an even number of digits")
+		}
+		data, derr := hex.DecodeString(lit)
+		if derr != nil {
+			return r.errorf("invalid hex binary literal")
+		}
+		encoded := hex.EncodeToString(data)
+		for i := range len(encoded) {
+			w.WriteByte(encoded[i]) //nolint:errcheck
+		}
+		return nil
+	case 'b':
+		data, derr := base64.StdEncoding.Strict().DecodeString(lit)
+		if derr != nil {
+			return r.errorf("invalid base64 binary literal")
+		}
+		encoded := hex.EncodeToString(data)
+		for i := range len(encoded) {
+			w.WriteByte(encoded[i]) //nolint:errcheck
+		}
+		return nil
+	default:
+		return r.errorf("unknown binary literal prefix %q", rune(prefix))
+	}
 }

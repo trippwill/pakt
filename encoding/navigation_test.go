@@ -7,11 +7,11 @@ import (
 
 func TestListElements(t *testing.T) {
 	input := "tags:[str] = ['alpha', 'beta', 'gamma']\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	var items []string
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		_ = stmt
 		// Consume the ListStart event first
 		ev, err := sr.nextEvent()
@@ -35,11 +35,11 @@ func TestListElements(t *testing.T) {
 
 func TestMapEntries(t *testing.T) {
 	input := "scores:<str ; int> = <'alice' ; 100, 'bob' ; 200>\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	result := make(map[string]int64)
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		_ = stmt
 		ev, err := sr.nextEvent()
 		if err != nil {
@@ -62,12 +62,12 @@ func TestMapEntries(t *testing.T) {
 
 func TestListElementsEarlyBreak(t *testing.T) {
 	input := "nums:[int] = [1, 2, 3, 4, 5]\nname:str = 'after'\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	var first int64
 	var name string
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		switch stmt.Name {
 		case "nums":
 			ev, _ := sr.nextEvent() // ListStart

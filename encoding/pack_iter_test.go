@@ -6,11 +6,11 @@ import (
 )
 
 func TestPackItemsBasic(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader("items:[int] <<\n10\n20\n30\n"))
+	sr := NewUnitReader(strings.NewReader("items:[int] <<\n10\n20\n30\n"))
 	defer sr.Close()
 
 	var items []int64
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		if stmt.Name == "items" && stmt.IsPack {
 			for item := range PackItems[int64](sr) {
 				items = append(items, item)
@@ -32,11 +32,11 @@ func TestPackItemsStruct(t *testing.T) {
 	}
 
 	input := "files:[{name:str, size:int}] <<\n{'readme.md', 100}\n{'main.go', 500}\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	var entries []Entry
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		if stmt.IsPack {
 			for entry := range PackItems[Entry](sr) {
 				entries = append(entries, entry)
@@ -59,12 +59,12 @@ func TestPackItemsStruct(t *testing.T) {
 
 func TestPackItemsEarlyBreak(t *testing.T) {
 	input := "nums:[int] <<\n1\n2\n3\n4\n5\nname:str = 'after'\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	var firstTwo []int64
 	var afterName string
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		switch stmt.Name {
 		case "nums":
 			count := 0
@@ -96,12 +96,12 @@ func TestPackItemsEarlyBreak(t *testing.T) {
 }
 
 func TestPackItemsIntoReuse(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader("items:[str] <<\n'a'\n'b'\n'c'\n"))
+	sr := NewUnitReader(strings.NewReader("items:[str] <<\n'a'\n'b'\n'c'\n"))
 	defer sr.Close()
 
 	var collected []string
 	var buf string
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		if stmt.IsPack {
 			for p := range PackItemsInto[string](sr, &buf) {
 				collected = append(collected, *p)
@@ -119,12 +119,12 @@ func TestPackItemsIntoReuse(t *testing.T) {
 func TestPackItemsEmpty(t *testing.T) {
 	// Empty pack followed by another statement
 	input := "items:[int] <<\nname:str = 'after'\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	var packCount int
 	var afterName string
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		switch stmt.Name {
 		case "items":
 			for range PackItems[int64](sr) {

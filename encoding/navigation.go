@@ -29,10 +29,10 @@ type TupleEntry struct {
 // StructFields returns an iterator over the fields of a struct value
 // in the current statement. Each [FieldEntry] provides the field name
 // and declared type. After each yield, the caller reads the field's value
-// via [ReadValue], [ReadAs], or [StatementReader.Skip].
+// via [ReadValue], [ReadAs], or [UnitReader.Skip].
 //
-// Errors stop iteration; call [StatementReader.Err] after the loop.
-func StructFields(sr *StatementReader) iter.Seq[FieldEntry] {
+// Errors stop iteration; call [UnitReader.Err] after the loop.
+func StructFields(sr *UnitReader) iter.Seq[FieldEntry] {
 	return func(yield func(FieldEntry) bool) {
 		// Expect the first event to be StructStart (already consumed by Statements).
 		// The caller may have already consumed the StructStart via ReadValue dispatch,
@@ -74,8 +74,8 @@ func StructFields(sr *StatementReader) iter.Seq[FieldEntry] {
 // ListElements returns an iterator over elements of a list value in the
 // current statement. Each element is deserialized into type T.
 //
-// Errors stop iteration; call [StatementReader.Err] after the loop.
-func ListElements[T any](sr *StatementReader) iter.Seq[T] {
+// Errors stop iteration; call [UnitReader.Err] after the loop.
+func ListElements[T any](sr *UnitReader) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		for {
 			ev, err := sr.nextEvent()
@@ -117,8 +117,8 @@ func ListElements[T any](sr *StatementReader) iter.Seq[T] {
 // current statement. K is not constrained to comparable — iteration doesn't
 // require hashing.
 //
-// Errors stop iteration; call [StatementReader.Err] after the loop.
-func MapEntries[K, V any](sr *StatementReader) iter.Seq[MapEntry[K, V]] {
+// Errors stop iteration; call [UnitReader.Err] after the loop.
+func MapEntries[K, V any](sr *UnitReader) iter.Seq[MapEntry[K, V]] {
 	return func(yield func(MapEntry[K, V]) bool) {
 		for {
 			// Read key
@@ -177,8 +177,8 @@ func MapEntries[K, V any](sr *StatementReader) iter.Seq[MapEntry[K, V]] {
 // After each yield, the caller reads the element's value via [ReadValue]
 // or [ReadAs].
 //
-// Errors stop iteration; call [StatementReader.Err] after the loop.
-func TupleElements(sr *StatementReader) iter.Seq[TupleEntry] {
+// Errors stop iteration; call [UnitReader.Err] after the loop.
+func TupleElements(sr *UnitReader) iter.Seq[TupleEntry] {
 	return func(yield func(TupleEntry) bool) {
 		idx := 0
 		for {

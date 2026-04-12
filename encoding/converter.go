@@ -6,7 +6,7 @@ import (
 
 // ValueConverter converts PAKT values to/from a specific Go type.
 // Implementations receive a scoped [ValueReader] positioned at the value,
-// not the full [StatementReader].
+// not the full [UnitReader].
 type ValueConverter[T any] interface {
 	// FromPakt reads a PAKT value and returns T.
 	// The ValueReader is positioned at the start of the value.
@@ -41,7 +41,7 @@ func RegisterNamedConverter(name string, c any) Option {
 // It provides read access for scalars and navigation for composites.
 // A ValueReader is only valid for the duration of the converter call.
 type ValueReader struct {
-	sr    *StatementReader
+	sr    *UnitReader
 	event Event // the initial event for this value
 }
 
@@ -115,7 +115,7 @@ func (vr *ValueReader) Skip() error {
 	return skipValueEvent(vr.sr, vr.event)
 }
 
-// Err returns the StatementReader's accumulated error.
+// Err returns the UnitReader's accumulated error.
 func (vr *ValueReader) Err() error {
 	return vr.sr.Err()
 }

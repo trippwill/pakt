@@ -15,20 +15,20 @@
 //   - Composite values emit StructStart/End, TupleStart/End, ListStart/End, MapStart/End
 //   - Scalar values emit ScalarValue with a [TypeKind] (integer, not string)
 //
-// # StatementReader
+// # UnitReader
 //
-// [StatementReader] is the primary deserialization interface. It wraps a
-// [Decoder] and provides statement-level navigation with iterator-based
+// [UnitReader] is the primary deserialization interface. It wraps a
+// [Decoder] and provides property-level navigation with iterator-based
 // pack streaming:
 //
-//	sr := encoding.NewStatementReader(r)
-//	defer sr.Close()
-//	for stmt := range sr.Statements() {
-//	    switch stmt.Name {
+//	ur := encoding.NewUnitReader(r)
+//	defer ur.Close()
+//	for prop := range ur.Properties() {
+//	    switch prop.Name {
 //	    case "config":
-//	        cfg, err := encoding.ReadValue[Config](sr)
+//	        cfg, err := encoding.ReadValue[Config](ur)
 //	    case "events":
-//	        for event := range encoding.PackItems[LogEvent](sr) {
+//	        for event := range encoding.PackItems[LogEvent](ur) {
 //	            process(event)
 //	        }
 //	    }

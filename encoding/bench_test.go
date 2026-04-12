@@ -1198,8 +1198,8 @@ func BenchmarkPAKTStreamFin1K(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sr := NewStatementReaderFromBytes(data)
-		for stmt := range sr.Statements() {
+		sr := NewUnitReaderFromBytes(data)
+		for stmt := range sr.Properties() {
 			if stmt.Name == "trades" && stmt.IsPack {
 				for trade := range PackItems[benchTrade](sr) {
 					_ = trade
@@ -1215,8 +1215,8 @@ func BenchmarkPAKTStreamFin10K(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sr := NewStatementReaderFromBytes(data)
-		for stmt := range sr.Statements() {
+		sr := NewUnitReaderFromBytes(data)
+		for stmt := range sr.Properties() {
 			if stmt.Name == "trades" && stmt.IsPack {
 				for trade := range PackItems[benchTrade](sr) {
 					_ = trade

@@ -6,19 +6,19 @@ import (
 	"iter"
 )
 
-// Statement represents a top-level PAKT statement header.
-// It is valid only until the next call to [StatementReader.Statements] iteration
-// or [StatementReader.Close].
-type Statement struct {
+// Property represents a top-level PAKT statement header.
+// It is valid only until the next call to [UnitReader.Statements] iteration
+// or [UnitReader.Close].
+type Property struct {
 	Name   string // statement name (e.g., "server", "events")
 	Type   Type   // declared PAKT type annotation
 	IsPack bool   // true if << (pack statement)
 }
 
-// StatementReader reads PAKT statements one at a time from a stream.
+// UnitReader reads PAKT statements one at a time from a stream.
 // It is the primary deserialization interface, wrapping a [Decoder] and
 // providing statement-level navigation with iterator-based pack streaming.
-type StatementReader struct {
+type UnitReader struct {
 	dec     *Decoder
 	opts    *options
 	err     error  // first error encountered during iteration
@@ -27,22 +27,22 @@ type StatementReader struct {
 	inPack  bool   // true while iterating pack elements
 }
 
-// NewStatementReader creates a StatementReader from any [io.Reader].
-func NewStatementReader(r io.Reader, opts ...Option) *StatementReader {
-	return &StatementReader{
+// NewUnitReader creates a UnitReader from any [io.Reader].
+func NewUnitReader(r io.Reader, opts ...Option) *UnitReader {
+	return &UnitReader{
 		dec:  NewDecoder(r),
 		opts: buildOptions(opts),
 	}
 }
 
-// NewStatementReaderFromBytes creates a StatementReader from a byte slice.
-func NewStatementReaderFromBytes(data []byte, opts ...Option) *StatementReader {
-	return NewStatementReader(bytes.NewReader(data), opts...)
+// NewUnitReaderFromBytes creates a UnitReader from a byte slice.
+func NewUnitReaderFromBytes(data []byte, opts ...Option) *UnitReader {
+	return NewUnitReader(bytes.NewReader(data), opts...)
 }
 
-// Close releases all resources held by the StatementReader.
+// Close releases all resources held by the UnitReader.
 // It is safe to call Close multiple times.
-func (sr *StatementReader) Close() {
+func (sr *UnitReader) Close() {
 	if sr.dec != nil {
 		sr.dec.Close()
 	}
@@ -50,22 +50,22 @@ func (sr *StatementReader) Close() {
 
 // Err returns the first error encountered during iteration, or nil if
 // iteration completed successfully or hasn't started.
-func (sr *StatementReader) Err() error {
+func (sr *UnitReader) Err() error {
 	return sr.err
 }
 
 // Statements returns an iterator over the top-level statements in the PAKT unit.
-// Each [Statement] is valid only for the current iteration step.
+// Each [Property] is valid only for the current iteration step.
 //
-// On error, iteration stops. Call [StatementReader.Err] after the loop to
+// On error, iteration stops. Call [UnitReader.Err] after the loop to
 // check for errors.
 //
 // Within each iteration step, the caller should read the statement's value
-// using [ReadValue], [PackItems], or [StatementReader.Skip].
+// using [ReadValue], [PackItems], or [UnitReader.Skip].
 // If the caller does not consume the statement's value, Statements
 // automatically skips to the next statement.
-func (sr *StatementReader) Statements() iter.Seq[Statement] {
-	return func(yield func(Statement) bool) {
+func (sr *UnitReader) Properties() iter.Seq[Property] {
+	return func(yield func(Property) bool) {
 		for {
 			// If there's an unconsumed statement from the previous iteration,
 			// skip its remaining events.
@@ -105,7 +105,7 @@ func (sr *StatementReader) Statements() iter.Seq[Statement] {
 				typ = *ev.Type
 			}
 
-			stmt := Statement{
+			stmt := Property{
 				Name:   ev.Name,
 				Type:   typ,
 				IsPack: sr.inPack,
@@ -120,12 +120,12 @@ func (sr *StatementReader) Statements() iter.Seq[Statement] {
 
 // Skip advances past the current statement or pack element without
 // deserializing. Use for unknown or unwanted statements.
-func (sr *StatementReader) Skip() error {
+func (sr *UnitReader) Skip() error {
 	return sr.skipCurrent()
 }
 
 // skipCurrent consumes all remaining events for the current statement.
-func (sr *StatementReader) skipCurrent() error {
+func (sr *UnitReader) skipCurrent() error {
 	if sr.current == nil {
 		return nil
 	}
@@ -158,7 +158,7 @@ func (sr *StatementReader) skipCurrent() error {
 }
 
 // endKindForCurrent returns the EventKind that terminates the current statement.
-func (sr *StatementReader) endKindForCurrent() EventKind {
+func (sr *UnitReader) endKindForCurrent() EventKind {
 	if sr.current == nil {
 		return EventError
 	}
@@ -175,7 +175,7 @@ func (sr *StatementReader) endKindForCurrent() EventKind {
 }
 
 // setErr records the first error.
-func (sr *StatementReader) setErr(err error) {
+func (sr *UnitReader) setErr(err error) {
 	if sr.err == nil {
 		sr.err = err
 	}
@@ -183,7 +183,7 @@ func (sr *StatementReader) setErr(err error) {
 
 // nextEvent reads the next event from the decoder, tracking nesting depth.
 // It returns io.EOF when the current statement/pack is exhausted.
-func (sr *StatementReader) nextEvent() (Event, error) {
+func (sr *UnitReader) nextEvent() (Event, error) {
 	ev, err := sr.dec.Decode()
 	if err != nil {
 		return Event{}, err

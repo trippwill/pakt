@@ -7,10 +7,10 @@ import (
 )
 
 func TestReadValueString(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader("name:str = 'hello'\n"))
+	sr := NewUnitReader(strings.NewReader("name:str = 'hello'\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		if stmt.Name != "name" {
 			t.Fatalf("expected 'name', got %q", stmt.Name)
 		}
@@ -28,10 +28,10 @@ func TestReadValueString(t *testing.T) {
 }
 
 func TestReadValueInt(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader("port:int = 8080\n"))
+	sr := NewUnitReader(strings.NewReader("port:int = 8080\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		if stmt.Name != "port" {
 			t.Fatalf("expected 'port', got %q", stmt.Name)
 		}
@@ -49,10 +49,10 @@ func TestReadValueInt(t *testing.T) {
 }
 
 func TestReadValueBool(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader("debug:bool = true\n"))
+	sr := NewUnitReader(strings.NewReader("debug:bool = true\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		_ = stmt
 		val, err := ReadValue[bool](sr)
 		if err != nil {
@@ -68,10 +68,10 @@ func TestReadValueBool(t *testing.T) {
 }
 
 func TestReadValueFloat(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader("rate:float = 3.14e0\n"))
+	sr := NewUnitReader(strings.NewReader("rate:float = 3.14e0\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		_ = stmt
 		val, err := ReadValue[float64](sr)
 		if err != nil {
@@ -92,11 +92,11 @@ func TestReadValueStruct(t *testing.T) {
 		Port int64  `pakt:"port"`
 	}
 
-	sr := NewStatementReader(strings.NewReader(
+	sr := NewUnitReader(strings.NewReader(
 		"server:{host:str, port:int} = {'localhost', 8080}\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		if stmt.Name != "server" {
 			t.Fatalf("expected 'server', got %q", stmt.Name)
 		}
@@ -114,11 +114,11 @@ func TestReadValueStruct(t *testing.T) {
 }
 
 func TestReadValueList(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader(
+	sr := NewUnitReader(strings.NewReader(
 		"tags:[str] = ['alpha', 'beta', 'gamma']\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		_ = stmt
 		val, err := ReadValue[[]string](sr)
 		if err != nil {
@@ -134,11 +134,11 @@ func TestReadValueList(t *testing.T) {
 }
 
 func TestReadValueMap(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader(
+	sr := NewUnitReader(strings.NewReader(
 		"headers:<str ; str> = <'Content-Type' ; 'text/html', 'Accept' ; '*/*'>\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		_ = stmt
 		val, err := ReadValue[map[string]string](sr)
 		if err != nil {
@@ -158,14 +158,14 @@ func TestReadValueMap(t *testing.T) {
 
 func TestReadValueMultipleStatements(t *testing.T) {
 	input := "name:str = 'svc'\nport:int = 9090\ndebug:bool = false\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	var name string
 	var port int64
 	var debug bool
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		var err error
 		switch stmt.Name {
 		case "name":
@@ -189,11 +189,11 @@ func TestReadValueMultipleStatements(t *testing.T) {
 }
 
 func TestReadValueTimestamp(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader(
+	sr := NewUnitReader(strings.NewReader(
 		"created:ts = 2026-06-01T14:30:00Z\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		_ = stmt
 		val, err := ReadValue[time.Time](sr)
 		if err != nil {
@@ -209,11 +209,11 @@ func TestReadValueTimestamp(t *testing.T) {
 }
 
 func TestReadValueNullable(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader(
+	sr := NewUnitReader(strings.NewReader(
 		"label:str? = nil\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		_ = stmt
 		val, err := ReadValue[*string](sr)
 		if err != nil {
@@ -238,11 +238,11 @@ func TestReadValueNestedStruct(t *testing.T) {
 		Point Inner  `pakt:"point"`
 	}
 
-	sr := NewStatementReader(strings.NewReader(
+	sr := NewUnitReader(strings.NewReader(
 		"data:{name:str, point:{x:int, y:int}} = {'origin', {0, 0}}\n"))
 	defer sr.Close()
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		_ = stmt
 		val, err := ReadValue[Outer](sr)
 		if err != nil {

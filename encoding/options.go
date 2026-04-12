@@ -1,6 +1,6 @@
 package encoding
 
-// Option configures deserialization behavior for StatementReader and Unmarshal.
+// Option configures deserialization behavior for UnitReader and UnmarshalNew.
 type Option func(*options)
 
 type options struct {
@@ -73,7 +73,7 @@ func MissingFields(policy MissingPolicy) Option {
 	return func(o *options) { o.missingFields = policy }
 }
 
-// Duplicates sets the policy for duplicate statement names or map keys.
+// Duplicates sets the policy for duplicate property names or map keys.
 func Duplicates(policy DuplicatePolicy) Option {
 	return func(o *options) { o.duplicates = policy }
 }

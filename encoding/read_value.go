@@ -14,7 +14,7 @@ import (
 //
 // For assign statements: reads the single value.
 // For pack statements: reads the next element. Call within [PackItems] loop.
-func ReadValue[T any](sr *StatementReader) (T, error) {
+func ReadValue[T any](sr *UnitReader) (T, error) {
 	var zero T
 	target := reflect.New(reflect.TypeOf(&zero).Elem()).Elem()
 	if err := readValueReflect(sr, target); err != nil {
@@ -25,14 +25,14 @@ func ReadValue[T any](sr *StatementReader) (T, error) {
 
 // ReadValueInto reads the current value into an existing target.
 // This enables buffer reuse in hot pack-processing loops.
-func ReadValueInto[T any](sr *StatementReader, target *T) error {
+func ReadValueInto[T any](sr *UnitReader, target *T) error {
 	rv := reflect.ValueOf(target).Elem()
 	return readValueReflect(sr, rv)
 }
 
 // readValueReflect is the core event-consuming value reader.
-// It reads events from the StatementReader's decoder and populates target.
-func readValueReflect(sr *StatementReader, target reflect.Value) error {
+// It reads events from the UnitReader's decoder and populates target.
+func readValueReflect(sr *UnitReader, target reflect.Value) error {
 	ev, err := sr.nextEvent()
 	if err != nil {
 		return err
@@ -250,7 +250,7 @@ func setBinFromEvent(target reflect.Value, raw string) error {
 }
 
 // readStructFromEvents reads struct events into a Go struct or map.
-func readStructFromEvents(sr *StatementReader, startEv Event, target reflect.Value) error {
+func readStructFromEvents(sr *UnitReader, startEv Event, target reflect.Value) error {
 	if target.Kind() == reflect.Map {
 		return readStructIntoMapFromEvents(sr, target)
 	}
@@ -297,7 +297,7 @@ func readStructFromEvents(sr *StatementReader, startEv Event, target reflect.Val
 }
 
 // readStructIntoMapFromEvents reads struct events into a Go map[string]T.
-func readStructIntoMapFromEvents(sr *StatementReader, target reflect.Value) error {
+func readStructIntoMapFromEvents(sr *UnitReader, target reflect.Value) error {
 	if target.IsNil() {
 		target.Set(reflect.MakeMap(target.Type()))
 	}
@@ -321,7 +321,7 @@ func readStructIntoMapFromEvents(sr *StatementReader, target reflect.Value) erro
 }
 
 // readTupleFromEvents reads tuple events into a Go slice.
-func readTupleFromEvents(sr *StatementReader, startEv Event, target reflect.Value) error {
+func readTupleFromEvents(sr *UnitReader, startEv Event, target reflect.Value) error {
 	if target.Kind() != reflect.Slice {
 		return fmt.Errorf("cannot unmarshal tuple into %s", target.Type())
 	}
@@ -354,7 +354,7 @@ func readTupleFromEvents(sr *StatementReader, startEv Event, target reflect.Valu
 }
 
 // readListFromEvents reads list events into a Go slice.
-func readListFromEvents(sr *StatementReader, startEv Event, target reflect.Value) error {
+func readListFromEvents(sr *UnitReader, startEv Event, target reflect.Value) error {
 	if target.Kind() != reflect.Slice {
 		return fmt.Errorf("cannot unmarshal list into %s", target.Type())
 	}
@@ -387,7 +387,7 @@ func readListFromEvents(sr *StatementReader, startEv Event, target reflect.Value
 }
 
 // readMapFromEvents reads map events into a Go map.
-func readMapFromEvents(sr *StatementReader, startEv Event, target reflect.Value) error {
+func readMapFromEvents(sr *UnitReader, startEv Event, target reflect.Value) error {
 	if target.Kind() != reflect.Map {
 		return fmt.Errorf("cannot unmarshal map into %s", target.Type())
 	}
@@ -435,7 +435,7 @@ func readMapFromEvents(sr *StatementReader, startEv Event, target reflect.Value)
 
 // handleValueEvent processes a single value event (which may be a scalar
 // or the start of a composite), writing the result into target.
-func handleValueEvent(sr *StatementReader, ev Event, target reflect.Value) error {
+func handleValueEvent(sr *UnitReader, ev Event, target reflect.Value) error {
 	target = allocPtr(target)
 
 	switch ev.Kind {
@@ -458,7 +458,7 @@ func handleValueEvent(sr *StatementReader, ev Event, target reflect.Value) error
 }
 
 // skipValueEvent skips a value event and any nested events it contains.
-func skipValueEvent(sr *StatementReader, ev Event) error {
+func skipValueEvent(sr *UnitReader, ev Event) error {
 	switch {
 	case ev.Kind == EventScalarValue:
 		return nil // scalar — nothing more to consume
@@ -470,7 +470,7 @@ func skipValueEvent(sr *StatementReader, ev Event) error {
 }
 
 // skipComposite reads and discards events until the matching end event.
-func skipComposite(sr *StatementReader, startKind EventKind) error {
+func skipComposite(sr *UnitReader, startKind EventKind) error {
 	depth := 1
 	for depth > 0 {
 		ev, err := sr.nextEvent()

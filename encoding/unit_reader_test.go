@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-func TestStatementReaderBasic(t *testing.T) {
+func TestUnitReaderBasic(t *testing.T) {
 	input := "name:str = 'hello'\nport:int = 8080\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	var names []string
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		names = append(names, stmt.Name)
 		if stmt.IsPack {
 			t.Errorf("unexpected pack statement: %s", stmt.Name)
@@ -30,13 +30,13 @@ func TestStatementReaderBasic(t *testing.T) {
 	}
 }
 
-func TestStatementReaderPack(t *testing.T) {
+func TestUnitReaderPack(t *testing.T) {
 	input := "items:[int] <<\n1\n2\n3\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	var found bool
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		if stmt.Name == "items" {
 			found = true
 			if !stmt.IsPack {
@@ -55,13 +55,13 @@ func TestStatementReaderPack(t *testing.T) {
 	}
 }
 
-func TestStatementReaderSkip(t *testing.T) {
+func TestUnitReaderSkip(t *testing.T) {
 	input := "a:str = 'first'\nb:{x:int, y:int} = {1, 2}\nc:str = 'third'\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
 	var names []string
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		names = append(names, stmt.Name)
 		// All statements are auto-skipped by Statements() iterator
 	}
@@ -77,12 +77,12 @@ func TestStatementReaderSkip(t *testing.T) {
 	}
 }
 
-func TestStatementReaderEmpty(t *testing.T) {
-	sr := NewStatementReader(strings.NewReader(""))
+func TestUnitReaderEmpty(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader(""))
 	defer sr.Close()
 
 	count := 0
-	for range sr.Statements() {
+	for range sr.Properties() {
 		count++
 	}
 	if err := sr.Err(); err != nil {
@@ -93,13 +93,13 @@ func TestStatementReaderEmpty(t *testing.T) {
 	}
 }
 
-func TestStatementReaderMixed(t *testing.T) {
+func TestUnitReaderMixed(t *testing.T) {
 	input := "name:str = 'svc'\nevents:[str] <<\n'a'\n'b'\n"
-	sr := NewStatementReader(strings.NewReader(input))
+	sr := NewUnitReader(strings.NewReader(input))
 	defer sr.Close()
 
-	var stmts []Statement
-	for stmt := range sr.Statements() {
+	var stmts []Property
+	for stmt := range sr.Properties() {
 		stmts = append(stmts, stmt)
 	}
 	if err := sr.Err(); err != nil {

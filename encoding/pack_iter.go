@@ -9,12 +9,12 @@ import (
 // PackItems returns an iterator over the elements of a pack statement.
 // Each element is deserialized into type T.
 //
-// On error, iteration stops. Call [StatementReader.Err] after the loop.
+// On error, iteration stops. Call [UnitReader.Err] after the loop.
 //
 // If the caller breaks out of the loop early, the iterator drains the
 // remaining pack elements (without deserializing them) so the reader is
 // positioned at the next statement.
-func PackItems[T any](sr *StatementReader) iter.Seq[T] {
+func PackItems[T any](sr *UnitReader) iter.Seq[T] {
 	return func(yield func(T) bool) {
 		if sr.current == nil || !sr.inPack {
 			sr.setErr(&DeserializeError{Message: "PackItems called outside a pack statement"})
@@ -64,7 +64,7 @@ func PackItems[T any](sr *StatementReader) iter.Seq[T] {
 // The yielded pointer aliases the buffer — do not retain across iterations.
 //
 // Early break drains remaining pack elements.
-func PackItemsInto[T any](sr *StatementReader, buf *T) iter.Seq[*T] {
+func PackItemsInto[T any](sr *UnitReader, buf *T) iter.Seq[*T] {
 	return func(yield func(*T) bool) {
 		if sr.current == nil || !sr.inPack {
 			sr.setErr(&DeserializeError{Message: "PackItemsInto called outside a pack statement"})
@@ -107,7 +107,7 @@ func PackItemsInto[T any](sr *StatementReader, buf *T) iter.Seq[*T] {
 }
 
 // drainUntil reads and discards events until the matching end event.
-func drainUntil(sr *StatementReader, endKind EventKind) {
+func drainUntil(sr *UnitReader, endKind EventKind) {
 	depth := 0
 	for {
 		ev, err := sr.dec.Decode()

@@ -7,9 +7,9 @@ import (
 )
 
 // UnmarshalNew deserializes a complete PAKT unit from bytes into a struct of type T.
-// This is convenience sugar over [StatementReader].
+// This is convenience sugar over [UnitReader].
 //
-// T must be a struct type. Each top-level PAKT statement is matched to struct
+// T must be a struct type. Each top-level PAKT property is matched to struct
 // fields by name (using pakt struct tags or lowercase field names).
 func UnmarshalNew[T any](data []byte, opts ...Option) (T, error) {
 	var result T
@@ -27,7 +27,7 @@ func UnmarshalNewFrom[T any](r io.Reader, opts ...Option) (T, error) {
 		return result, fmt.Errorf("pakt: Unmarshal requires a struct type, got %s", rv.Type())
 	}
 
-	sr := NewStatementReader(r, opts...)
+	sr := NewUnitReader(r, opts...)
 	defer sr.Close()
 
 	if err := unmarshalIntoStruct(sr, rv); err != nil {
@@ -47,14 +47,14 @@ func UnmarshalNewInto[T any](data []byte, target *T, opts ...Option) error {
 		return fmt.Errorf("pakt: UnmarshalInto requires a pointer to a struct, got pointer to %s", rv.Type())
 	}
 
-	sr := NewStatementReaderFromBytes(data, opts...)
+	sr := NewUnitReaderFromBytes(data, opts...)
 	defer sr.Close()
 
 	return unmarshalIntoStruct(sr, rv)
 }
 
-// unmarshalIntoStruct iterates statements and maps them to struct fields.
-func unmarshalIntoStruct(sr *StatementReader, rv reflect.Value) error {
+// unmarshalIntoStruct iterates properties and maps them to struct fields.
+func unmarshalIntoStruct(sr *UnitReader, rv reflect.Value) error {
 	info, err := cachedStructFields(rv.Type())
 	if err != nil {
 		return err
@@ -62,17 +62,17 @@ func unmarshalIntoStruct(sr *StatementReader, rv reflect.Value) error {
 
 	seen := make(map[string]bool)
 
-	for stmt := range sr.Statements() {
+	for stmt := range sr.Properties() {
 		fi, ok := info.fieldMap[stmt.Name]
 		if !ok {
 			// Apply unknown field policy.
 			if sr.opts.unknownFields == ErrorUnknown {
 				return &DeserializeError{
-					Statement: stmt.Name,
-					Message:   fmt.Sprintf("unknown statement %q", stmt.Name),
+					Property: stmt.Name,
+					Message:  fmt.Sprintf("unknown property %q", stmt.Name),
 				}
 			}
-			continue // auto-skipped by Statements iterator
+			continue // auto-skipped by Properties iterator
 		}
 
 		// Handle duplicates.
@@ -80,8 +80,8 @@ func unmarshalIntoStruct(sr *StatementReader, rv reflect.Value) error {
 			switch sr.opts.duplicates {
 			case ErrorDupes:
 				return &DeserializeError{
-					Statement: stmt.Name,
-					Message:   fmt.Sprintf("duplicate statement %q", stmt.Name),
+					Property: stmt.Name,
+					Message:  fmt.Sprintf("duplicate property %q", stmt.Name),
 				}
 			case FirstWins:
 				continue // skip, auto-skipped by iterator
@@ -95,7 +95,7 @@ func unmarshalIntoStruct(sr *StatementReader, rv reflect.Value) error {
 
 		target := rv.Field(fi.Index)
 		if stmt.IsPack {
-			// For pack statements, collect all elements into the target.
+			// For pack properties, collect all elements into the target.
 			if err := unmarshalPackIntoTarget(sr, stmt, target); err != nil {
 				return err
 			}
@@ -115,7 +115,7 @@ func unmarshalIntoStruct(sr *StatementReader, rv reflect.Value) error {
 		for name := range info.fieldMap {
 			if !seen[name] {
 				return &DeserializeError{
-					Message: fmt.Sprintf("missing statement for field %q", name),
+					Message: fmt.Sprintf("missing property for field %q", name),
 				}
 			}
 		}
@@ -125,7 +125,7 @@ func unmarshalIntoStruct(sr *StatementReader, rv reflect.Value) error {
 }
 
 // unmarshalPackIntoTarget reads all pack elements into a slice or map field.
-func unmarshalPackIntoTarget(sr *StatementReader, stmt Statement, target reflect.Value) error {
+func unmarshalPackIntoTarget(sr *UnitReader, stmt Property, target reflect.Value) error {
 	target = allocPtr(target)
 
 	switch target.Kind() {

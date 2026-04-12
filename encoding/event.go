@@ -105,6 +105,7 @@ type Event struct {
 	Kind       EventKind `json:"kind"`                 // category of event
 	Pos        Pos       `json:"pos"`                  // source position
 	Name       string    `json:"name,omitempty"`       // assignment or field name (empty for positional values)
+	Type       *Type     `json:"type,omitempty"`       // declared PAKT type (populated on statement start events)
 	ScalarType TypeKind  `json:"scalarType,omitempty"` // scalar type kind (zero for structural events)
 	Value      string    `json:"value,omitempty"`      // literal value text (empty for structural events)
 	Err        error     `json:"-"`                    // non-nil only when Kind == EventError; handled by custom MarshalJSON

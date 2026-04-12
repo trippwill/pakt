@@ -74,3 +74,28 @@ func (e *ParseError) Unwrap() error {
 	}
 	return e.Wrapped
 }
+
+// DeserializeError wraps a parse or conversion error with deserialization context.
+type DeserializeError struct {
+	Pos       Pos    // source position in the PAKT data
+	Statement string // which statement (e.g., "config")
+	Field     string // which field within a composite (e.g., "port"), or empty
+	Message   string // human-readable description
+	Err       error  // wrapped underlying error
+}
+
+// Error implements the [error] interface.
+// Format: "statement.field (line:col): message" or "statement (line:col): message".
+func (e *DeserializeError) Error() string {
+	loc := fmt.Sprintf("%d:%d", e.Pos.Line, e.Pos.Col)
+	if e.Field != "" {
+		return fmt.Sprintf("%s.%s (%s): %s", e.Statement, e.Field, loc, e.Message)
+	}
+	if e.Statement != "" {
+		return fmt.Sprintf("%s (%s): %s", e.Statement, loc, e.Message)
+	}
+	return fmt.Sprintf("(%s): %s", loc, e.Message)
+}
+
+// Unwrap returns the underlying error.
+func (e *DeserializeError) Unwrap() error { return e.Err }

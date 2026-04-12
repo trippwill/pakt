@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -511,7 +510,7 @@ func BenchmarkPAKTUnmarshalSmall(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v benchSmallDoc
-		Unmarshal(data, &v) //nolint:errcheck
+		UnmarshalNewInto(data, &v) //nolint:errcheck
 	}
 }
 
@@ -718,7 +717,7 @@ func BenchmarkPAKTUnmarshalFS1K(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v benchFSDataset
-		Unmarshal(data, &v) //nolint:errcheck
+		UnmarshalNewInto(data, &v) //nolint:errcheck
 	}
 }
 
@@ -799,7 +798,7 @@ func BenchmarkPAKTUnmarshalFS10K(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var v benchFSDataset
-		Unmarshal(data, &v) //nolint:errcheck
+		UnmarshalNewInto(data, &v) //nolint:errcheck
 	}
 }
 
@@ -886,23 +885,16 @@ func benchStreamPAKT(b *testing.B, data []byte) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		dec := NewDecoder(bytes.NewReader(data))
-		// Read header assigns into a struct, then stream pack elements.
 		type header struct {
 			Root    string         `pakt:"root"`
 			Scanned string         `pakt:"scanned"`
 			Entries []benchFSEntry `pakt:"entries"`
 		}
-		var h header
-		for dec.More() {
-			if err := dec.UnmarshalNext(&h); err != nil {
-				if err == io.EOF {
-					break
-				}
-				b.Fatal(err)
-			}
+		h, err := UnmarshalNew[header](data)
+		if err != nil {
+			b.Fatal(err)
 		}
-		dec.Close()
+		_ = h
 	}
 }
 

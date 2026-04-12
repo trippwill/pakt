@@ -5,6 +5,23 @@ import (
 	"testing"
 )
 
+type withList struct {
+	Tags []string `pakt:"tags"`
+}
+
+type innerStruct struct {
+	Host string `pakt:"host"`
+	Port int64  `pakt:"port"`
+}
+
+type nestedListOfStructs struct {
+	Servers []innerStruct `pakt:"servers"`
+}
+
+type withMap struct {
+	Headers map[string]string `pakt:"headers"`
+}
+
 func TestDecodeListPack(t *testing.T) {
 	events := decodeAll(t, "ports:[int] << 80, 443, 8080")
 	if len(events) != 5 {
@@ -78,28 +95,10 @@ func TestDecodeMapPackDuplicateKeysPreserved(t *testing.T) {
 	}
 }
 
-func TestProjectionMatchesPack(t *testing.T) {
-	doc := "drop:int = 1\nports:[int] << 80, 443\nname:str = 'svc'"
-	spec := "ports:[int]\nname:str"
-	events := decodeAllWithSpec(t, doc, spec)
-	if len(events) != 7 {
-		t.Fatalf("expected 7 events, got %d: %v", len(events), events)
-	}
-	if events[0].Kind != EventListPackStart || events[0].Name != "ports" {
-		t.Fatalf("event[0] = %v", events[0])
-	}
-	if events[3].Kind != EventListPackEnd || events[3].Name != "ports" {
-		t.Fatalf("event[3] = %v", events[3])
-	}
-	if events[4].Kind != EventAssignStart || events[4].Name != "name" {
-		t.Fatalf("event[4] = %v", events[4])
-	}
-}
-
 func TestUnmarshalListPack(t *testing.T) {
 	data := []byte("tags:[str] << 'alpha', 'beta', 'gamma'")
-	var v withList
-	if err := Unmarshal(data, &v); err != nil {
+	v, err := UnmarshalNew[withList](data)
+	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"alpha", "beta", "gamma"}
@@ -110,8 +109,8 @@ func TestUnmarshalListPack(t *testing.T) {
 
 func TestUnmarshalStructListPack(t *testing.T) {
 	data := []byte("servers:[{host:str, port:int}] << { 'a', 80 }, { 'b', 443 }")
-	var v nestedListOfStructs
-	if err := Unmarshal(data, &v); err != nil {
+	v, err := UnmarshalNew[nestedListOfStructs](data)
+	if err != nil {
 		t.Fatal(err)
 	}
 	want := []innerStruct{
@@ -125,8 +124,8 @@ func TestUnmarshalStructListPack(t *testing.T) {
 
 func TestUnmarshalMapPackLastWins(t *testing.T) {
 	data := []byte("headers:<str ; str> << 'Accept' ; 'json', 'Accept' ; 'text/html'")
-	var v withMap
-	if err := Unmarshal(data, &v); err != nil {
+	v, err := UnmarshalNew[withMap](data)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if got := v.Headers["Accept"]; got != "text/html" {
@@ -136,8 +135,8 @@ func TestUnmarshalMapPackLastWins(t *testing.T) {
 
 func TestUnmarshalDelimitedMapDuplicateKeysLastWins(t *testing.T) {
 	data := []byte("headers:<str ; str> = <'Accept' ; 'json', 'Accept' ; 'text/html'>")
-	var v withMap
-	if err := Unmarshal(data, &v); err != nil {
+	v, err := UnmarshalNew[withMap](data)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if got := v.Headers["Accept"]; got != "text/html" {

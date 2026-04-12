@@ -1,0 +1,118 @@
+package encoding
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestStatementReaderBasic(t *testing.T) {
+	input := "name:str = 'hello'\nport:int = 8080\n"
+	sr := NewStatementReader(strings.NewReader(input))
+	defer sr.Close()
+
+	var names []string
+	for stmt := range sr.Statements() {
+		names = append(names, stmt.Name)
+		if stmt.IsPack {
+			t.Errorf("unexpected pack statement: %s", stmt.Name)
+		}
+		// Skip the value (we're just testing navigation)
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(names) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(names))
+	}
+	if names[0] != "name" || names[1] != "port" {
+		t.Errorf("expected [name, port], got %v", names)
+	}
+}
+
+func TestStatementReaderPack(t *testing.T) {
+	input := "items:[int] <<\n1\n2\n3\n"
+	sr := NewStatementReader(strings.NewReader(input))
+	defer sr.Close()
+
+	var found bool
+	for stmt := range sr.Statements() {
+		if stmt.Name == "items" {
+			found = true
+			if !stmt.IsPack {
+				t.Error("expected pack statement")
+			}
+			if stmt.Type.List == nil {
+				t.Error("expected list type")
+			}
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Error("expected to find 'items' statement")
+	}
+}
+
+func TestStatementReaderSkip(t *testing.T) {
+	input := "a:str = 'first'\nb:{x:int, y:int} = {1, 2}\nc:str = 'third'\n"
+	sr := NewStatementReader(strings.NewReader(input))
+	defer sr.Close()
+
+	var names []string
+	for stmt := range sr.Statements() {
+		names = append(names, stmt.Name)
+		// All statements are auto-skipped by Statements() iterator
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(names) != 3 {
+		t.Fatalf("expected 3 statements, got %d: %v", len(names), names)
+	}
+	if names[0] != "a" || names[1] != "b" || names[2] != "c" {
+		t.Errorf("expected [a, b, c], got %v", names)
+	}
+}
+
+func TestStatementReaderEmpty(t *testing.T) {
+	sr := NewStatementReader(strings.NewReader(""))
+	defer sr.Close()
+
+	count := 0
+	for range sr.Statements() {
+		count++
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 statements, got %d", count)
+	}
+}
+
+func TestStatementReaderMixed(t *testing.T) {
+	input := "name:str = 'svc'\nevents:[str] <<\n'a'\n'b'\n"
+	sr := NewStatementReader(strings.NewReader(input))
+	defer sr.Close()
+
+	var stmts []Statement
+	for stmt := range sr.Statements() {
+		stmts = append(stmts, stmt)
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(stmts))
+	}
+	if stmts[0].Name != "name" || stmts[0].IsPack {
+		t.Errorf("stmt 0: expected assign 'name', got %+v", stmts[0])
+	}
+	if stmts[1].Name != "events" || !stmts[1].IsPack {
+		t.Errorf("stmt 1: expected pack 'events', got %+v", stmts[1])
+	}
+}

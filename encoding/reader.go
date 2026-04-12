@@ -43,15 +43,6 @@ func newReader(r io.Reader) *reader {
 	return rd
 }
 
-func newReaderFromBytes(data []byte) *reader {
-	rd := &reader{
-		src: newBytesSource(data),
-		pos: Pos{Line: 1, Col: 1},
-	}
-	rd.skipBOM()
-	return rd
-}
-
 // release returns the pooled bufio.Reader.
 func (r *reader) release() {
 	if r.bufSrc != nil {

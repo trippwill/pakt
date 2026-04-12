@@ -709,16 +709,6 @@ func TestSentinelErrUnexpectedEOF(t *testing.T) {
 	}
 }
 
-func TestSentinelErrDuplicateNameInSpec(t *testing.T) {
-	_, err := ParseSpec(strings.NewReader("name:str\nname:int"))
-	if err == nil {
-		t.Fatal("expected error for duplicate name in spec")
-	}
-	if !errors.Is(err, ErrSyntax) {
-		t.Fatalf("expected errors.Is(err, ErrSyntax), got: %v", err)
-	}
-}
-
 func TestDuplicateMapKeysUnit(t *testing.T) {
 	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
 	events, err := decodeValue("< 'a' ; 1, 'a' ; 2 >", typ)
@@ -811,8 +801,8 @@ func TestNulByteTerminatesPack(t *testing.T) {
 	}
 }
 
-func TestNulByteMoreReturnsFalse(t *testing.T) {
-	// More() should return false when NUL terminates the unit.
+func TestNulByteTerminatesUnit(t *testing.T) {
+	// After NUL, the decoder should return EOF.
 	input := "name:str = 'Alice'\x00"
 	d := NewDecoder(strings.NewReader(input))
 	defer d.Close()
@@ -829,7 +819,9 @@ func TestNulByteMoreReturnsFalse(t *testing.T) {
 			break
 		}
 	}
-	if d.More() {
-		t.Fatal("More() should return false after NUL terminator")
+	// Next Decode should return EOF (NUL terminated the unit).
+	_, err := d.Decode()
+	if err != io.EOF {
+		t.Fatalf("expected io.EOF after NUL terminator, got: %v", err)
 	}
 }

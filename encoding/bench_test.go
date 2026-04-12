@@ -920,3 +920,151 @@ func benchStreamJSON(b *testing.B, data []byte) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Micro-benchmarks — isolate specific reader-level costs
+// ---------------------------------------------------------------------------
+
+var (
+	benchStringsEscapeFree []byte // 1000 escape-free string assignments
+	benchStringsWithEsc    []byte // 1000 string assignments containing escapes
+	benchNumerics          []byte // 1000 int + 1000 float assignments
+	benchPackOnlyFS1K      []byte // pack-only FS data (no header assignments)
+	benchPackOnlyFS10K     []byte // pack-only FS 10K data
+)
+
+func init() {
+	benchInitMicro()
+}
+
+func benchInitMicro() {
+	rng := rand.New(rand.NewSource(99))
+
+	// Escape-free strings: 1000 assignments like  s_0000:str = 'some random text'
+	{
+		words := []string{"alpha", "bravo", "charlie", "delta", "echo",
+			"foxtrot", "golf", "hotel", "india", "juliet"}
+		var buf strings.Builder
+		for i := 0; i < 1000; i++ {
+			// Build a string of 3-6 words.
+			n := rng.Intn(4) + 3
+			parts := make([]string, n)
+			for j := range n {
+				parts[j] = words[rng.Intn(len(words))]
+			}
+			fmt.Fprintf(&buf, "s_%04d:str = '%s'\n", i, strings.Join(parts, " "))
+		}
+		benchStringsEscapeFree = []byte(buf.String())
+	}
+
+	// Strings with escapes: 1000 assignments with \n, \t, \' escapes.
+	{
+		var buf strings.Builder
+		for i := 0; i < 1000; i++ {
+			fmt.Fprintf(&buf, "s_%04d:str = 'line one\\nline two\\ttabbed\\n%d\\'s'\n", i, i)
+		}
+		benchStringsWithEsc = []byte(buf.String())
+	}
+
+	// Numerics: 1000 ints + 1000 floats.
+	{
+		var buf strings.Builder
+		for i := 0; i < 1000; i++ {
+			fmt.Fprintf(&buf, "i_%04d:int = %d\n", i, rng.Int63n(1_000_000_000)-500_000_000)
+			fmt.Fprintf(&buf, "f_%04d:float = %e\n", i, rng.Float64()*1000-500)
+		}
+		benchNumerics = []byte(buf.String())
+	}
+
+	// Pack-only: just the entries pack statement, no root/scanned headers.
+	benchPackOnlyFS1K = benchGeneratePackOnly(benchFS1KVal.Entries)
+	benchPackOnlyFS10K = benchGeneratePackOnly(benchFS10KVal.Entries)
+}
+
+func benchGeneratePackOnly(entries []benchFSEntry) []byte {
+	var buf strings.Builder
+	buf.WriteString("entries:[{path:str, size:int, mode:int, mod_time:ts, is_dir:bool, owner:str, group:str, hash:str}] <<\n")
+	for i, e := range entries {
+		if i > 0 {
+			buf.WriteByte('\n')
+		}
+		boolStr := "false"
+		if e.IsDir {
+			boolStr = "true"
+		}
+		fmt.Fprintf(&buf, "    { '%s', %d, %d, %s, %s, '%s', '%s', '%s' }",
+			e.Path, e.Size, e.Mode, e.ModTime, boolStr, e.Owner, e.Group, e.Hash)
+	}
+	buf.WriteByte('\n')
+	return []byte(buf.String())
+}
+
+func BenchmarkPAKTDecodeStringEscapeFree(b *testing.B) {
+	runPAKTDecodeBenchmark(b, benchStringsEscapeFree)
+}
+
+func BenchmarkPAKTDecodeStringWithEscapes(b *testing.B) {
+	runPAKTDecodeBenchmark(b, benchStringsWithEsc)
+}
+
+func BenchmarkPAKTDecodeNumerics(b *testing.B) {
+	runPAKTDecodeBenchmark(b, benchNumerics)
+}
+
+func BenchmarkPAKTUnmarshalPackOnlyFS1K(b *testing.B) {
+	data := benchPackOnlyFS1K
+	type packOnly struct {
+		Entries []benchFSEntry `pakt:"entries"`
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v packOnly
+		Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTUnmarshalPackOnlyFS10K(b *testing.B) {
+	data := benchPackOnlyFS10K
+	type packOnly struct {
+		Entries []benchFSEntry `pakt:"entries"`
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v packOnly
+		Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTPackIterFS1K(b *testing.B) {
+	data := benchPackOnlyFS1K
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dec := NewDecoder(bytes.NewReader(data))
+		for entry, err := range PackItems[benchFSEntry](dec) {
+			if err != nil {
+				b.Fatal(err)
+			}
+			_ = entry
+		}
+		dec.Close()
+	}
+}
+
+func BenchmarkPAKTPackIterFS10K(b *testing.B) {
+	data := benchPackOnlyFS10K
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dec := NewDecoder(bytes.NewReader(data))
+		for entry, err := range PackItems[benchFSEntry](dec) {
+			if err != nil {
+				b.Fatal(err)
+			}
+			_ = entry
+		}
+		dec.Close()
+	}
+}

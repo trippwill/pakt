@@ -60,6 +60,8 @@ if err := dec.Err(); err != nil {
 }
 ```
 
+NOTE FROM ME: Since each inidividual entry decode and unmarshal can fail, I think we need to return [T, error] or [T, bool] from the iterator.
+
 ## Allocation profile
 
 Current streaming benchmark (FS1K, 1000 struct entries):
@@ -129,6 +131,8 @@ func (r *reader) readStringDirect() (string, bool, error) {
 ```
 
 For strings *with* escapes, fall back to the existing builder path. The branch is cheap — check for `\` during the scan.
+
+NOTE FROM ME: The cost of escape detection O(N) may not be worth the trade-off for string values specifically. 
 
 ### Event.Value
 

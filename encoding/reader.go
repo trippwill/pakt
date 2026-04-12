@@ -299,7 +299,14 @@ func (r *reader) readString() (string, error) {
 		return r.readMultiLineString(quote, raw)
 	}
 
-	// Single-line string.
+	// Fast path: scan peeked buffer for the closing quote. If the string
+	// contains no escape sequences (or is raw), we can avoid the per-byte
+	// readByte/WriteByte loop entirely.
+	if s, ok := r.tryReadStringFast(quote, raw); ok {
+		return s, nil
+	}
+
+	// Slow path: byte-by-byte with escape handling.
 	r.sb.Reset()
 	for {
 		b, err := r.readByte()
@@ -325,6 +332,30 @@ func (r *reader) readString() (string, error) {
 		}
 		r.sb.WriteByte(b)
 	}
+}
+
+// tryReadStringFast scans ahead in the peek buffer for the closing quote.
+// Returns ("", false) to signal fallback if escapes, newlines, or null bytes
+// are found, or if the string extends beyond the peek window.
+func (r *reader) tryReadStringFast(quote byte, raw bool) (string, bool) {
+	// Peek a modest amount — enough for typical identifiers, paths, and short
+	// text. Strings longer than 256 bytes fall back to the byte-by-byte path.
+	p, _ := r.src.Peek(256)
+	for i, b := range p {
+		if b == quote {
+			s := string(p[:i])
+			r.src.Discard(i + 1)
+			r.pos.Col += i + 1
+			return s, true
+		}
+		if !raw && b == '\\' {
+			return "", false
+		}
+		if b == '\n' || b == '\r' || b == 0 {
+			return "", false
+		}
+	}
+	return "", false
 }
 
 // readEscape reads the character after '\' and returns the decoded rune.

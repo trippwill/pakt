@@ -912,3 +912,304 @@ func benchStreamJSON(b *testing.B, data []byte) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Financial Benchmark: Trade + Position data
+//
+// Domain: trade execution log with a map-pack of portfolio positions.
+// Designed to stress non-string scalars (int, dec, bool, ts, uuid),
+// atom sets, and embedded composites (list inside struct).
+// ---------------------------------------------------------------------------
+
+type benchTrade struct {
+	Timestamp string   `pakt:"timestamp" json:"timestamp"`
+	Ticker    string   `pakt:"ticker" json:"ticker"`
+	Side      string   `pakt:"side" json:"side"`
+	Quantity  int64    `pakt:"quantity" json:"quantity"`
+	Price     string   `pakt:"price" json:"price"` // dec → string
+	Fees      string   `pakt:"fees" json:"fees"`   // dec → string
+	Filled    bool     `pakt:"filled" json:"filled"`
+	Venue     string   `pakt:"venue" json:"venue"`
+	OrderID   string   `pakt:"order_id" json:"order_id"`
+	Tags      []string `pakt:"tags" json:"tags"`
+}
+
+type benchPosition struct {
+	Qty           int64  `pakt:"qty" json:"qty"`
+	AvgCost       string `pakt:"avg_cost" json:"avg_cost"`
+	UnrealizedPnl string `pakt:"unrealized_pnl" json:"unrealized_pnl"`
+	LastPrice     string `pakt:"last_price" json:"last_price"`
+	Updated       string `pakt:"updated" json:"updated"`
+}
+
+type benchFinDataset struct {
+	Account   string                   `pakt:"account" json:"account"`
+	AsOf      string                   `pakt:"as_of" json:"as_of"`
+	Trades    []benchTrade             `pakt:"trades" json:"trades"`
+	Positions map[string]benchPosition `pakt:"positions" json:"positions"`
+}
+
+var (
+	benchFin1KPAKT []byte
+	benchFin1KJSON []byte
+	benchFin1KVal  benchFinDataset
+
+	benchFin10KPAKT []byte
+	benchFin10KJSON []byte
+	benchFin10KVal  benchFinDataset
+)
+
+func init() {
+	benchInitFin()
+}
+
+func benchInitFin() {
+	benchFin1KVal, benchFin1KPAKT, benchFin1KJSON = benchGenerateFin(1000)
+	benchFin10KVal, benchFin10KPAKT, benchFin10KJSON = benchGenerateFin(10000)
+}
+
+func benchGenerateFin(n int) (benchFinDataset, []byte, []byte) {
+	rng := rand.New(rand.NewSource(77))
+
+	tickers := []string{"AAPL", "GOOG", "MSFT", "AMZN", "NVDA", "META", "TSLA", "JPM", "V", "UNH",
+		"XOM", "JNJ", "PG", "MA", "HD", "CVX", "MRK", "ABBV", "PEP", "KO"}
+	venues := []string{"NYSE", "NASDAQ", "BATS", "IEX", "EDGX", "MEMX"}
+	tagPool := []string{"algo", "manual", "dark-pool", "pre-market", "post-market", "block", "sweep", "iceberg"}
+
+	baseTime := time.Date(2026, 3, 1, 9, 30, 0, 0, time.FixedZone("EST", -5*3600))
+
+	trades := make([]benchTrade, n)
+	for i := 0; i < n; i++ {
+		ticker := tickers[rng.Intn(len(tickers))]
+
+		side := "buy"
+		if rng.Float64() < 0.45 {
+			side = "sell"
+		}
+
+		qty := int64(rng.Intn(9900) + 100)
+		priceDollars := rng.Intn(400) + 10
+		priceCents := rng.Intn(100)
+		price := fmt.Sprintf("%d.%02d", priceDollars, priceCents)
+
+		feesCents := rng.Intn(500) + 1
+		fees := fmt.Sprintf("%d.%02d", feesCents/100, feesCents%100)
+
+		filled := rng.Float64() < 0.92
+		venue := venues[rng.Intn(len(venues))]
+
+		orderID := fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+			rng.Uint32(), rng.Uint32()&0xFFFF, 0x4000|rng.Uint32()&0x0FFF,
+			0x8000|rng.Uint32()&0x3FFF, rng.Int63()&0xFFFFFFFFFFFF)
+
+		// 1-3 tags per trade
+		numTags := rng.Intn(3) + 1
+		tags := make([]string, numTags)
+		for j := range numTags {
+			tags[j] = tagPool[rng.Intn(len(tagPool))]
+		}
+
+		offset := time.Duration(i*3+rng.Intn(3)) * time.Second
+		ts := baseTime.Add(offset)
+
+		trades[i] = benchTrade{
+			Timestamp: ts.Format(time.RFC3339),
+			Ticker:    ticker,
+			Side:      side,
+			Quantity:  qty,
+			Price:     price,
+			Fees:      fees,
+			Filled:    filled,
+			Venue:     venue,
+			OrderID:   orderID,
+			Tags:      tags,
+		}
+	}
+
+	// Build positions from unique tickers seen
+	positions := make(map[string]benchPosition)
+	for _, t := range tickers {
+		priceDollars := rng.Intn(400) + 10
+		priceCents := rng.Intn(100)
+		costDollars := rng.Intn(400) + 10
+		costCents := rng.Intn(100)
+		pnl := (priceDollars - costDollars) * (rng.Intn(5000) + 100)
+
+		positions[t] = benchPosition{
+			Qty:           int64(rng.Intn(50000) + 100),
+			AvgCost:       fmt.Sprintf("%d.%02d", costDollars, costCents),
+			UnrealizedPnl: fmt.Sprintf("%d.%02d", pnl, rng.Intn(100)),
+			LastPrice:     fmt.Sprintf("%d.%02d", priceDollars, priceCents),
+			Updated:       baseTime.Add(time.Duration(n*3) * time.Second).Format(time.RFC3339),
+		}
+	}
+
+	val := benchFinDataset{
+		Account:   "ACCT-7734-PRIME",
+		AsOf:      baseTime.Add(time.Duration(n*3) * time.Second).Format(time.RFC3339),
+		Trades:    trades,
+		Positions: positions,
+	}
+
+	// Build PAKT
+	var pb strings.Builder
+	pb.WriteString("account:str = 'ACCT-7734-PRIME'\n")
+	pb.WriteString(fmt.Sprintf("as_of:ts = %s\n", val.AsOf))
+
+	// Trades as list pack
+	pb.WriteString("trades:[{timestamp:ts, ticker:str, side:|buy, sell|, quantity:int, price:dec, fees:dec, filled:bool, venue:str, order_id:uuid, tags:[str]}] <<\n")
+	for i, tr := range trades {
+		if i > 0 {
+			pb.WriteByte('\n')
+		}
+		boolStr := "false"
+		if tr.Filled {
+			boolStr = "true"
+		}
+		// Build tags list
+		var tagBuf strings.Builder
+		tagBuf.WriteByte('[')
+		for j, tag := range tr.Tags {
+			if j > 0 {
+				tagBuf.WriteString(", ")
+			}
+			fmt.Fprintf(&tagBuf, "'%s'", tag)
+		}
+		tagBuf.WriteByte(']')
+
+		fmt.Fprintf(&pb, "    { %s, '%s', |%s, %d, %s, %s, %s, '%s', %s, %s }",
+			tr.Timestamp, tr.Ticker, tr.Side, tr.Quantity, tr.Price, tr.Fees,
+			boolStr, tr.Venue, tr.OrderID, tagBuf.String())
+	}
+	pb.WriteString("\n")
+
+	// Positions as map pack
+	pb.WriteString("positions:<str ; {qty:int, avg_cost:dec, unrealized_pnl:dec, last_price:dec, updated:ts}> <<\n")
+	first := true
+	for ticker, pos := range positions {
+		if !first {
+			pb.WriteByte('\n')
+		}
+		first = false
+		fmt.Fprintf(&pb, "    '%s' ; { %d, %s, %s, %s, %s }",
+			ticker, pos.Qty, pos.AvgCost, pos.UnrealizedPnl, pos.LastPrice, pos.Updated)
+	}
+	pb.WriteString("\n")
+
+	jsonBytes, _ := json.Marshal(val)
+	return val, []byte(pb.String()), jsonBytes
+}
+
+// ---------------------------------------------------------------------------
+// Financial Benchmarks — 1K trades
+// ---------------------------------------------------------------------------
+
+func BenchmarkPAKTDecodeFin1K(b *testing.B) {
+	runPAKTDecodeBenchmark(b, benchFin1KPAKT)
+}
+
+func BenchmarkJSONDecodeFin1K(b *testing.B) {
+	data := benchFin1KJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v map[string]any
+		json.Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTUnmarshalFin1K(b *testing.B) {
+	data := benchFin1KPAKT
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v benchFinDataset
+		UnmarshalNewInto(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkJSONUnmarshalFin1K(b *testing.B) {
+	data := benchFin1KJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v benchFinDataset
+		json.Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Financial Benchmarks — 10K trades
+// ---------------------------------------------------------------------------
+
+func BenchmarkPAKTDecodeFin10K(b *testing.B) {
+	runPAKTDecodeBenchmark(b, benchFin10KPAKT)
+}
+
+func BenchmarkJSONDecodeFin10K(b *testing.B) {
+	data := benchFin10KJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v map[string]any
+		json.Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkPAKTUnmarshalFin10K(b *testing.B) {
+	data := benchFin10KPAKT
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v benchFinDataset
+		UnmarshalNewInto(data, &v) //nolint:errcheck
+	}
+}
+
+func BenchmarkJSONUnmarshalFin10K(b *testing.B) {
+	data := benchFin10KJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var v benchFinDataset
+		json.Unmarshal(data, &v) //nolint:errcheck
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Financial Benchmarks — Pack iteration (streaming trades)
+// ---------------------------------------------------------------------------
+
+func BenchmarkPAKTPackIterFin1K(b *testing.B) {
+	data := benchFin1KPAKT
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sr := NewStatementReaderFromBytes(data)
+		for stmt := range sr.Statements() {
+			if stmt.Name == "trades" && stmt.IsPack {
+				for trade := range PackItems[benchTrade](sr) {
+					_ = trade
+				}
+			}
+		}
+		sr.Close()
+	}
+}
+
+func BenchmarkPAKTPackIterFin10K(b *testing.B) {
+	data := benchFin10KPAKT
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sr := NewStatementReaderFromBytes(data)
+		for stmt := range sr.Statements() {
+			if stmt.Name == "trades" && stmt.IsPack {
+				for trade := range PackItems[benchTrade](sr) {
+					_ = trade
+				}
+			}
+		}
+		sr.Close()
+	}
+}

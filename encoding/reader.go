@@ -27,7 +27,8 @@ type reader struct {
 	pos     Pos
 	lastPos Pos
 	hitNUL  bool            // true after consuming a NUL byte (end-of-unit per spec §10.1)
-	sb      strings.Builder // reusable builder to avoid per-read allocations
+	sb      strings.Builder // reusable builder for identifiers
+	valBuf  []byte          // reusable buffer for scalar values (borrow semantics)
 }
 
 func newReader(r io.Reader) *reader {
@@ -51,6 +52,22 @@ func (r *reader) release() {
 		r.bufSrc = nil
 	}
 	r.src = nil
+}
+
+// resetValBuf resets the value buffer for reuse.
+func (r *reader) resetValBuf() {
+	r.valBuf = r.valBuf[:0]
+}
+
+// valBufWriteString appends a string to the value buffer.
+func (r *reader) valBufWriteString(s string) {
+	r.valBuf = append(r.valBuf, s...)
+}
+
+// valBufBytes returns the current value buffer content.
+// The returned slice is valid until the next resetValBuf call.
+func (r *reader) valBufBytes() []byte {
+	return r.valBuf
 }
 
 // ---------------------------------------------------------------------------

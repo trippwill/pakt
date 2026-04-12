@@ -68,7 +68,7 @@ func TestEventMarshalScalar(t *testing.T) {
 		Pos:        Pos{Line: 1, Col: 16},
 		Name:       "greeting",
 		ScalarType: TypeStr,
-		Value:      "'hello world'",
+		Value:      []byte("'hello world'"),
 	}
 
 	data, err := json.Marshal(e)
@@ -170,7 +170,7 @@ func TestEventRoundTrip(t *testing.T) {
 		Pos:        Pos{Line: 7, Col: 3},
 		Name:       "count",
 		ScalarType: TypeInt,
-		Value:      "42",
+		Value:      []byte("42"),
 	}
 
 	data, err := json.Marshal(orig)
@@ -196,7 +196,7 @@ func TestEventRoundTrip(t *testing.T) {
 	if got.ScalarType != orig.ScalarType {
 		t.Errorf("ScalarType: got %q, want %q", got.ScalarType, orig.ScalarType)
 	}
-	if got.Value != orig.Value {
+	if got.ValueString() != orig.ValueString() {
 		t.Errorf("Value: got %q, want %q", got.Value, orig.Value)
 	}
 }

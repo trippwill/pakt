@@ -343,7 +343,7 @@ func (sm *stateMachine) beginMapKeyValue(keyType Type, after parserState) (Event
 			Pos:        pos,
 			Name:       fr.keyStr,
 			ScalarType: scalarTypeKind(keyType),
-			Value:      fr.keyStr,
+			Value:      []byte(fr.keyStr),
 		}, true, nil
 
 	case !keyType.Nullable && sm.r.peekNil():
@@ -354,12 +354,12 @@ func (sm *stateMachine) beginMapKeyValue(keyType Type, after parserState) (Event
 		if err != nil {
 			return Event{}, false, err
 		}
-		fr.keyStr = val
+		fr.keyStr = string(val)
 		sm.state = after
 		return Event{
 			Kind:       EventScalarValue,
 			Pos:        pos,
-			Name:       val,
+			Name:       fr.keyStr,
 			ScalarType: *keyType.Scalar,
 			Value:      val,
 		}, true, nil
@@ -377,7 +377,7 @@ func (sm *stateMachine) beginMapKeyValue(keyType Type, after parserState) (Event
 			Pos:        pos,
 			Name:       val,
 			ScalarType: TypeAtom,
-			Value:      val,
+			Value:      []byte(val),
 		}, true, nil
 	}
 
@@ -457,7 +457,7 @@ func (sm *stateMachine) step() (Event, error) {
 						Pos:        pos,
 						Name:       name,
 						ScalarType: scalarTypeKind(typ),
-						Value:      "nil",
+						Value:      []byte("nil"),
 					}, nil
 				}
 			} else if sm.r.peekNil() {
@@ -491,7 +491,7 @@ func (sm *stateMachine) step() (Event, error) {
 					Pos:        pos,
 					Name:       name,
 					ScalarType: TypeAtom,
-					Value:      val,
+					Value:      []byte(val),
 				}, nil
 
 			case typ.Struct != nil:

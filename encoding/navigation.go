@@ -92,7 +92,7 @@ func ListElements[T any](sr *StatementReader) iter.Seq[T] {
 
 			var val T
 			target := reflect.ValueOf(&val).Elem()
-			if ev.Kind == EventScalarValue && ev.Value == "nil" {
+			if ev.Kind == EventScalarValue && ev.IsNilValue() {
 				if err := setNil(target); err != nil {
 					sr.setErr(err)
 					return
@@ -151,7 +151,7 @@ func MapEntries[K, V any](sr *StatementReader) iter.Seq[MapEntry[K, V]] {
 
 			var val V
 			valTarget := reflect.ValueOf(&val).Elem()
-			if valEv.Kind == EventScalarValue && valEv.Value == "nil" {
+			if valEv.Kind == EventScalarValue && valEv.IsNilValue() {
 				if err := setNil(valTarget); err != nil {
 					sr.setErr(err)
 					return

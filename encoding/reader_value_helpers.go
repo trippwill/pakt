@@ -53,8 +53,9 @@ func (r *reader) readSep() (bool, error) {
 // Scalar value helpers
 // ---------------------------------------------------------------------------
 
-// readScalarDirect reads a scalar value and returns it without emitting an event.
-func (r *reader) readScalarDirect(kind TypeKind) (string, Pos, error) {
+// readScalarDirect reads a scalar value into the reader's value buffer.
+// The returned slice is borrowed — valid only until the next readScalarDirect call.
+func (r *reader) readScalarDirect(kind TypeKind) ([]byte, Pos, error) {
 	pos := r.pos
 	var val string
 	var err error
@@ -79,9 +80,14 @@ func (r *reader) readScalarDirect(kind TypeKind) (string, Pos, error) {
 	case TypeBin:
 		val, err = r.readBin()
 	default:
-		return "", pos, r.errorf("unknown scalar type kind %d", int(kind))
+		return nil, pos, r.errorf("unknown scalar type kind %d", int(kind))
 	}
-	return val, pos, err
+	if err != nil {
+		return nil, pos, err
+	}
+	r.resetValBuf()
+	r.valBufWriteString(val)
+	return r.valBufBytes(), pos, nil
 }
 
 // peekNil checks whether the next non-WS content is the keyword "nil" followed

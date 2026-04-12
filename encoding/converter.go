@@ -50,7 +50,7 @@ func (vr *ValueReader) StringValue() (string, error) {
 	if vr.event.Kind != EventScalarValue {
 		return "", &DeserializeError{Pos: vr.event.Pos, Message: "not a scalar value"}
 	}
-	return vr.event.Value, nil
+	return vr.event.ValueString(), nil
 }
 
 // IntValue returns the scalar integer value.
@@ -58,7 +58,7 @@ func (vr *ValueReader) IntValue() (int64, error) {
 	if vr.event.Kind != EventScalarValue {
 		return 0, &DeserializeError{Pos: vr.event.Pos, Message: "not a scalar value"}
 	}
-	return parseIntLiteral(vr.event.Value)
+	return parseIntLiteral(vr.event.ValueString())
 }
 
 // FloatValue returns the scalar float value.
@@ -66,7 +66,7 @@ func (vr *ValueReader) FloatValue() (float64, error) {
 	if vr.event.Kind != EventScalarValue {
 		return 0, &DeserializeError{Pos: vr.event.Pos, Message: "not a scalar value"}
 	}
-	return parseFloatLiteral(vr.event.Value)
+	return parseFloatLiteral(vr.event.ValueString())
 }
 
 // BoolValue returns the scalar boolean value.
@@ -74,13 +74,13 @@ func (vr *ValueReader) BoolValue() (bool, error) {
 	if vr.event.Kind != EventScalarValue {
 		return false, &DeserializeError{Pos: vr.event.Pos, Message: "not a scalar value"}
 	}
-	switch vr.event.Value {
+	switch string(vr.event.Value) {
 	case "true":
 		return true, nil
 	case "false":
 		return false, nil
 	default:
-		return false, &DeserializeError{Pos: vr.event.Pos, Message: "invalid bool: " + vr.event.Value}
+		return false, &DeserializeError{Pos: vr.event.Pos, Message: "invalid bool: " + vr.event.ValueString()}
 	}
 }
 
@@ -89,7 +89,7 @@ func (vr *ValueReader) DecValue() (string, error) {
 	if vr.event.Kind != EventScalarValue {
 		return "", &DeserializeError{Pos: vr.event.Pos, Message: "not a scalar value"}
 	}
-	return vr.event.Value, nil
+	return vr.event.ValueString(), nil
 }
 
 // BytesValue returns the scalar binary value as decoded bytes.
@@ -99,7 +99,7 @@ func (vr *ValueReader) BytesValue() ([]byte, error) {
 	}
 	// The event value is hex-encoded for bin
 	target := reflect.New(reflect.TypeOf([]byte{})).Elem()
-	if err := setBinFromEvent(target, vr.event.Value); err != nil {
+	if err := setBinFromEvent(target, vr.event.ValueString()); err != nil {
 		return nil, err
 	}
 	return target.Bytes(), nil
@@ -107,7 +107,7 @@ func (vr *ValueReader) BytesValue() ([]byte, error) {
 
 // IsNil returns true if the current value is nil.
 func (vr *ValueReader) IsNil() bool {
-	return vr.event.Kind == EventScalarValue && vr.event.Value == "nil"
+	return vr.event.Kind == EventScalarValue && vr.event.IsNilValue()
 }
 
 // Skip consumes and discards the current value.
@@ -133,7 +133,7 @@ func ReadAs[T any](vr *ValueReader) (T, error) {
 
 	var val T
 	target := reflect.ValueOf(&val).Elem()
-	if ev.Kind == EventScalarValue && ev.Value == "nil" {
+	if ev.Kind == EventScalarValue && ev.IsNilValue() {
 		if err := setNil(target); err != nil {
 			return val, err
 		}

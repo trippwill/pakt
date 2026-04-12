@@ -39,7 +39,7 @@ func readValueReflect(sr *StatementReader, target reflect.Value) error {
 	}
 
 	// Handle nil before pointer allocation.
-	if ev.Kind == EventScalarValue && ev.Value == "nil" {
+	if ev.Kind == EventScalarValue && ev.IsNilValue() {
 		return setNil(target)
 	}
 
@@ -108,37 +108,39 @@ func invokeConverter(conv any, vr *ValueReader, ev Event, target reflect.Value) 
 // setScalarFromEvent maps a ScalarValue event to a Go reflect.Value.
 func setScalarFromEvent(ev Event, target reflect.Value) error {
 	// Handle nil
-	if ev.Value == "nil" {
+	if ev.IsNilValue() {
 		return setNil(target)
 	}
 
+	val := ev.ValueString()
+
 	switch ev.ScalarType {
 	case TypeStr:
-		return setString(target, ev.Value)
+		return setString(target, val)
 
 	case TypeInt:
-		return setInt(target, ev.Value)
+		return setInt(target, val)
 
 	case TypeFloat:
-		return setFloat(target, ev.Value)
+		return setFloat(target, val)
 
 	case TypeDec:
-		return setDec(target, ev.Value)
+		return setDec(target, val)
 
 	case TypeBool:
-		return setBool(target, ev.Value)
+		return setBool(target, val)
 
 	case TypeDate, TypeTs:
-		return setTemporalString(target, ev.Value, target.Kind())
+		return setTemporalString(target, val, target.Kind())
 
 	case TypeUUID:
-		return setString(target, ev.Value)
+		return setString(target, val)
 
 	case TypeBin:
-		return setBinFromEvent(target, ev.Value)
+		return setBinFromEvent(target, val)
 
 	case TypeAtom:
-		return setString(target, ev.Value)
+		return setString(target, val)
 
 	case TypeNone:
 		// nil value

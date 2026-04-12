@@ -1190,10 +1190,10 @@ func BenchmarkJSONUnmarshalFin10K(b *testing.B) {
 }
 
 // ---------------------------------------------------------------------------
-// Financial Benchmarks — Pack iteration (streaming trades)
+// Financial Benchmarks — Streaming (one trade at a time)
 // ---------------------------------------------------------------------------
 
-func BenchmarkPAKTPackIterFin1K(b *testing.B) {
+func BenchmarkPAKTStreamFin1K(b *testing.B) {
 	data := benchFin1KPAKT
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -1210,7 +1210,7 @@ func BenchmarkPAKTPackIterFin1K(b *testing.B) {
 	}
 }
 
-func BenchmarkPAKTPackIterFin10K(b *testing.B) {
+func BenchmarkPAKTStreamFin10K(b *testing.B) {
 	data := benchFin10KPAKT
 	b.ReportAllocs()
 	b.ResetTimer()

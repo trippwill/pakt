@@ -950,13 +950,15 @@ type benchFinDataset struct {
 }
 
 var (
-	benchFin1KPAKT []byte
-	benchFin1KJSON []byte
-	benchFin1KVal  benchFinDataset
+	benchFin1KPAKT   []byte
+	benchFin1KJSON   []byte
+	benchFin1KVal    benchFinDataset
+	benchFin1KNDJSON []byte
 
-	benchFin10KPAKT []byte
-	benchFin10KJSON []byte
-	benchFin10KVal  benchFinDataset
+	benchFin10KPAKT   []byte
+	benchFin10KJSON   []byte
+	benchFin10KVal    benchFinDataset
+	benchFin10KNDJSON []byte
 )
 
 func init() {
@@ -966,6 +968,17 @@ func init() {
 func benchInitFin() {
 	benchFin1KVal, benchFin1KPAKT, benchFin1KJSON = benchGenerateFin(1000)
 	benchFin10KVal, benchFin10KPAKT, benchFin10KJSON = benchGenerateFin(10000)
+	benchFin1KNDJSON = benchGenerateNDJSON2(benchFin1KVal.Trades)
+	benchFin10KNDJSON = benchGenerateNDJSON2(benchFin10KVal.Trades)
+}
+
+func benchGenerateNDJSON2[T any](items []T) []byte {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	for i := range items {
+		enc.Encode(items[i]) //nolint:errcheck
+	}
+	return buf.Bytes()
 }
 
 func benchGenerateFin(n int) (benchFinDataset, []byte, []byte) {
@@ -1211,5 +1224,37 @@ func BenchmarkPAKTPackIterFin10K(b *testing.B) {
 			}
 		}
 		sr.Close()
+	}
+}
+
+func BenchmarkJSONStreamFin1K(b *testing.B) {
+	data := benchFin1KNDJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		for dec.More() {
+			var trade benchTrade
+			if err := dec.Decode(&trade); err != nil {
+				b.Fatal(err)
+			}
+			_ = trade
+		}
+	}
+}
+
+func BenchmarkJSONStreamFin10K(b *testing.B) {
+	data := benchFin10KNDJSON
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		for dec.More() {
+			var trade benchTrade
+			if err := dec.Decode(&trade); err != nil {
+				b.Fatal(err)
+			}
+			_ = trade
+		}
 	}
 }

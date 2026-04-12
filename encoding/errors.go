@@ -10,15 +10,13 @@ type ErrorCode int
 
 const (
 	ErrUnexpectedEOF  ErrorCode = 1 // unexpected end of input
-	_                 ErrorCode = 2 // reserved (formerly duplicate_name; removed per spec §6.1)
-	ErrTypeMismatch   ErrorCode = 3 // type mismatch
-	ErrNilNonNullable ErrorCode = 4 // nil on non-nullable type
-	ErrSyntax         ErrorCode = 5 // syntax error (catch-all)
+	ErrTypeMismatch   ErrorCode = 2 // type mismatch
+	ErrNilNonNullable ErrorCode = 3 // nil on non-nullable type
+	ErrSyntax         ErrorCode = 4 // syntax error (catch-all)
 )
 
 var errorCodeNames = [...]string{
 	ErrUnexpectedEOF:  "unexpected_eof",
-	2:                 "",
 	ErrTypeMismatch:   "type_mismatch",
 	ErrNilNonNullable: "nil_non_nullable",
 	ErrSyntax:         "syntax",

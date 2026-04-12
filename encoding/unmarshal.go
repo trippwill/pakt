@@ -70,7 +70,9 @@ func setInt(target reflect.Value, raw string) error {
 		target.SetFloat(float64(n))
 		return nil
 	case reflect.String:
-		target.SetString(raw)
+		// Clone to ensure the string is independently allocated
+		// (raw may be an unsafe view of borrowed bytes).
+		target.SetString(strings.Clone(raw))
 		return nil
 	default:
 		return fmt.Errorf("cannot set int into %s", target.Type())
@@ -127,7 +129,7 @@ func parseIntLiteral(raw string) (int64, error) {
 func setDec(target reflect.Value, raw string) error {
 	switch target.Kind() {
 	case reflect.String:
-		target.SetString(raw)
+		target.SetString(strings.Clone(raw))
 		return nil
 	case reflect.Float32, reflect.Float64:
 		s := raw
@@ -157,7 +159,7 @@ func setTemporalString(target reflect.Value, raw string, kind reflect.Kind) erro
 	}
 
 	if kind == reflect.String {
-		target.SetString(raw)
+		target.SetString(strings.Clone(raw))
 		return nil
 	}
 

@@ -7,6 +7,8 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
+	"unsafe"
 )
 
 // ReadValue reads the current statement's value (or current pack element)
@@ -112,43 +114,45 @@ func setScalarFromEvent(ev Event, target reflect.Value) error {
 		return setNil(target)
 	}
 
-	val := ev.ValueString()
-
 	switch ev.ScalarType {
-	case TypeStr:
-		return setString(target, val)
+	case TypeStr, TypeAtom, TypeUUID:
+		// String-like types: the target retains the value, so we must allocate.
+		return setString(target, string(ev.Value))
 
 	case TypeInt:
-		return setInt(target, val)
+		// Zero-copy string view — parsed immediately, not retained.
+		return setInt(target, unsafeString(ev.Value))
 
 	case TypeFloat:
-		return setFloat(target, val)
+		return setFloat(target, unsafeString(ev.Value))
 
 	case TypeDec:
-		return setDec(target, val)
+		return setDec(target, unsafeString(ev.Value))
 
 	case TypeBool:
-		return setBool(target, val)
+		return setBool(target, unsafeString(ev.Value))
 
 	case TypeDate, TypeTs:
-		return setTemporalString(target, val, target.Kind())
-
-	case TypeUUID:
-		return setString(target, val)
+		return setTemporalString(target, unsafeString(ev.Value), target.Kind())
 
 	case TypeBin:
-		return setBinFromEvent(target, val)
-
-	case TypeAtom:
-		return setString(target, val)
+		return setBinFromEvent(target, unsafeString(ev.Value))
 
 	case TypeNone:
-		// nil value
 		return setNil(target)
 
 	default:
 		return fmt.Errorf("unsupported scalar type: %s", ev.ScalarType)
 	}
+}
+
+// unsafeString returns a zero-copy string view of a byte slice.
+// The caller must not retain the string beyond the lifetime of the byte slice.
+func unsafeString(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	return unsafe.String(unsafe.SliceData(b), len(b))
 }
 
 // setFloat parses a PAKT float literal into a Go float target.
@@ -162,7 +166,7 @@ func setFloat(target reflect.Value, raw string) error {
 		target.SetFloat(f)
 		return nil
 	case reflect.String:
-		target.SetString(raw)
+		target.SetString(strings.Clone(raw))
 		return nil
 	default:
 		return fmt.Errorf("cannot set float into %s", target.Type())
@@ -213,7 +217,7 @@ func setBool(target reflect.Value, raw string) error {
 		}
 		return nil
 	case reflect.String:
-		target.SetString(raw)
+		target.SetString(strings.Clone(raw))
 		return nil
 	default:
 		return fmt.Errorf("cannot set bool into %s", target.Type())

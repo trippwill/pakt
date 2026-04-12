@@ -155,7 +155,7 @@ func benchInitSmall() {
 		Verbose: false, Label: "production",
 	}
 
-	fields, err := StructFields(reflect.TypeOf(benchSmallVal))
+	fields, err := ReflectStructFields(reflect.TypeOf(benchSmallVal))
 	if err != nil {
 		panic(err)
 	}

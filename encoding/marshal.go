@@ -124,7 +124,7 @@ func prepareStruct(typ Type, v reflect.Value) (map[string]any, error) {
 		return nil, fmt.Errorf("pakt: expected struct type, got %s", typ.String())
 	}
 
-	fields, err := StructFields(v.Type())
+	fields, err := ReflectStructFields(v.Type())
 	if err != nil {
 		return nil, err
 	}

@@ -26,13 +26,13 @@ type TupleEntry struct {
 	Type  Type
 }
 
-// IterStructFields returns an iterator over the fields of a struct value
+// StructFields returns an iterator over the fields of a struct value
 // in the current statement. Each [FieldEntry] provides the field name
 // and declared type. After each yield, the caller reads the field's value
 // via [ReadValue], [ReadAs], or [StatementReader.Skip].
 //
 // Errors stop iteration; call [StatementReader.Err] after the loop.
-func IterStructFields(sr *StatementReader) iter.Seq[FieldEntry] {
+func StructFields(sr *StatementReader) iter.Seq[FieldEntry] {
 	return func(yield func(FieldEntry) bool) {
 		// Expect the first event to be StructStart (already consumed by Statements).
 		// The caller may have already consumed the StructStart via ReadValue dispatch,

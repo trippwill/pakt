@@ -124,7 +124,7 @@
       <div class="step">
         <div class="step-number">3</div>
         <h3>Consume</h3>
-        <p>Unmarshal into typed structs, process events one by one, or pack values into streaming output. Your data, your way.</p>
+        <p>Iterate properties with <code>UnitReader</code>, stream pack elements with <code>PackItems[T]</code>, or unmarshal an entire unit with <code>UnmarshalNew[T]</code>.</p>
       </div>
     </div>
   </div>
@@ -145,11 +145,11 @@
           </svg>
           <h3>Go</h3>
         </div>
-        <p class="library-desc">Streaming state-machine decoder, encoder, reflection-based marshal/unmarshal. Zero-allocation hot path.</p>
+        <p class="library-desc">Streaming UnitReader with <code>iter.Seq</code> iterators, generic <code>ReadValue[T]</code>, pack streaming, custom converters.</p>
         <pre><code>go install github.com/trippwill/pakt@latest</code></pre>
         <div class="library-features">
-          <span>Streaming decoder</span>
-          <span>Marshal/Unmarshal</span>
+          <span>UnitReader + PackItems</span>
+          <span>UnmarshalNew[T]</span>
           <span>CLI tool</span>
         </div>
         <a href="/docs/install/" class="library-link">Get started →</a>

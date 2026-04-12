@@ -57,36 +57,49 @@ func (r *reader) readSep() (bool, error) {
 // The returned slice is borrowed — valid only until the next readScalarDirect call.
 func (r *reader) readScalarDirect(kind TypeKind) ([]byte, Pos, error) {
 	pos := r.pos
-	var val string
-	var err error
+	r.resetValBuf()
+	w := r.valBufAppender()
 
 	switch kind {
 	case TypeStr:
-		val, err = r.readString()
+		if err := r.readStringTo(w); err != nil {
+			return nil, pos, err
+		}
 	case TypeInt:
-		val, err = r.readInt()
+		if err := r.readIntTo(w); err != nil {
+			return nil, pos, err
+		}
 	case TypeDec:
-		val, err = r.readDec()
+		if err := r.readDecTo(w); err != nil {
+			return nil, pos, err
+		}
 	case TypeFloat:
-		val, err = r.readFloat()
+		if err := r.readFloatTo(w); err != nil {
+			return nil, pos, err
+		}
 	case TypeBool:
-		val, err = r.readBool()
+		if err := r.readBoolTo(w); err != nil {
+			return nil, pos, err
+		}
 	case TypeUUID:
-		val, err = r.readUUID()
+		if err := r.readUUIDTo(w); err != nil {
+			return nil, pos, err
+		}
 	case TypeDate:
-		val, err = r.readDate()
+		if err := r.readDateTo(w); err != nil {
+			return nil, pos, err
+		}
 	case TypeTs:
-		val, err = r.readTs()
+		if err := r.readTsTo(w); err != nil {
+			return nil, pos, err
+		}
 	case TypeBin:
-		val, err = r.readBin()
+		if err := r.readBinTo(w); err != nil {
+			return nil, pos, err
+		}
 	default:
 		return nil, pos, r.errorf("unknown scalar type kind %d", int(kind))
 	}
-	if err != nil {
-		return nil, pos, err
-	}
-	r.resetValBuf()
-	r.valBufWriteString(val)
 	return r.valBufBytes(), pos, nil
 }
 

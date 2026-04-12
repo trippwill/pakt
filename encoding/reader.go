@@ -31,6 +31,39 @@ type reader struct {
 	valBuf  []byte          // reusable buffer for scalar values (borrow semantics)
 }
 
+// byteAppender is the interface for writing bytes during scalar parsing.
+// Both strings.Builder (for idents) and the valBuf adapter (for scalar
+// values) satisfy this interface.
+type byteAppender interface {
+	WriteByte(c byte) error
+	WriteRune(r rune) (int, error)
+}
+
+// valBufAdapter adapts *reader's valBuf as a byteAppender.
+type valBufAdapter struct {
+	r *reader
+}
+
+func (a valBufAdapter) WriteByte(c byte) error {
+	a.r.valBuf = append(a.r.valBuf, c)
+	return nil
+}
+
+func (a valBufAdapter) WriteRune(ch rune) (int, error) {
+	if ch < utf8.RuneSelf {
+		a.r.valBuf = append(a.r.valBuf, byte(ch))
+		return 1, nil
+	}
+	var buf [4]byte
+	n := utf8.EncodeRune(buf[:], ch)
+	a.r.valBuf = append(a.r.valBuf, buf[:n]...)
+	return n, nil
+}
+
+func (r *reader) valBufAppender() valBufAdapter {
+	return valBufAdapter{r: r}
+}
+
 func newReader(r io.Reader) *reader {
 	br := bufPool.Get().(*bufio.Reader)
 	br.Reset(r)
@@ -57,11 +90,6 @@ func (r *reader) release() {
 // resetValBuf resets the value buffer for reuse.
 func (r *reader) resetValBuf() {
 	r.valBuf = r.valBuf[:0]
-}
-
-// valBufWriteString appends a string to the value buffer.
-func (r *reader) valBufWriteString(s string) {
-	r.valBuf = append(r.valBuf, s...)
 }
 
 // valBufBytes returns the current value buffer content.
@@ -649,7 +677,7 @@ func parseHexDigits(s string) (rune, bool) {
 // ---------------------------------------------------------------------------
 
 // readDigitSep reads DIGIT_SEP = DIGIT (DIGIT | '_')*.
-func (r *reader) readDigitSep(sb *strings.Builder) error {
+func (r *reader) readDigitSep(sb byteAppender) error {
 	b, err := r.readByte()
 	if err != nil {
 		return r.wrapf(ErrUnexpectedEOF, "expected digit, got EOF")
@@ -658,15 +686,15 @@ func (r *reader) readDigitSep(sb *strings.Builder) error {
 		r.unreadByte()
 		return r.errorf("expected digit, got %q", rune(b))
 	}
-	sb.WriteByte(b)
+	sb.WriteByte(b) //nolint:errcheck
 	for {
 		b, err = r.peekByte()
 		if err != nil {
 			break
 		}
 		if isDigit(b) || b == '_' {
-			r.readByte() //nolint:errcheck
-			sb.WriteByte(b)
+			r.readByte()    //nolint:errcheck
+			sb.WriteByte(b) //nolint:errcheck
 		} else {
 			break
 		}
@@ -675,7 +703,7 @@ func (r *reader) readDigitSep(sb *strings.Builder) error {
 }
 
 // readExactDigits reads exactly n decimal digits.
-func (r *reader) readExactDigits(sb *strings.Builder, n int) error {
+func (r *reader) readExactDigits(sb byteAppender, n int) error {
 	for range n {
 		b, err := r.readByte()
 		if err != nil {
@@ -685,13 +713,13 @@ func (r *reader) readExactDigits(sb *strings.Builder, n int) error {
 			r.unreadByte()
 			return r.errorf("expected digit, got %q", rune(b))
 		}
-		sb.WriteByte(b)
+		sb.WriteByte(b) //nolint:errcheck
 	}
 	return nil
 }
 
 // readExactHex reads exactly n hex digits.
-func (r *reader) readExactHex(sb *strings.Builder, n int) error {
+func (r *reader) readExactHex(sb byteAppender, n int) error {
 	for range n {
 		b, err := r.readByte()
 		if err != nil {
@@ -701,14 +729,14 @@ func (r *reader) readExactHex(sb *strings.Builder, n int) error {
 			r.unreadByte()
 			return r.errorf("expected hex digit, got %q", rune(b))
 		}
-		sb.WriteByte(b)
+		sb.WriteByte(b) //nolint:errcheck
 	}
 	return nil
 }
 
 // readPrefixedDigits reads digits for 0x/0b/0o literals.
 // check validates whether a byte is a valid digit for the given base.
-func (r *reader) readPrefixedDigits(sb *strings.Builder, check func(byte) bool) error {
+func (r *reader) readPrefixedDigits(sb byteAppender, check func(byte) bool) error {
 	b, err := r.readByte()
 	if err != nil {
 		return r.wrapf(ErrUnexpectedEOF, "expected digit after base prefix, got EOF")
@@ -717,15 +745,15 @@ func (r *reader) readPrefixedDigits(sb *strings.Builder, check func(byte) bool) 
 		r.unreadByte()
 		return r.errorf("expected digit after base prefix, got %q", rune(b))
 	}
-	sb.WriteByte(b)
+	sb.WriteByte(b) //nolint:errcheck
 	for {
 		b, err = r.peekByte()
 		if err != nil {
 			break
 		}
 		if check(b) || b == '_' {
-			r.readByte() //nolint:errcheck
-			sb.WriteByte(b)
+			r.readByte()    //nolint:errcheck
+			sb.WriteByte(b) //nolint:errcheck
 		} else {
 			break
 		}

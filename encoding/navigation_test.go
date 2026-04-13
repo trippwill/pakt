@@ -114,8 +114,8 @@ func TestStructFields(t *testing.T) {
 		var fieldNames []string
 		for field := range StructFields(sr) {
 			fieldNames = append(fieldNames, field.Name)
-			// StructFields already consumed the field event (scalar value included).
-			// For scalar fields, no further read is needed.
+			// StructFields identifies the field and leaves its value event pending on
+			// the UnitReader so callers can consume it with ReadValue or Skip.
 		}
 		if err := sr.Err(); err != nil {
 			t.Fatal(err)

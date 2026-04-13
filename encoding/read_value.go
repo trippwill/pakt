@@ -28,6 +28,9 @@ func ReadValue[T any](sr *UnitReader) (T, error) {
 // ReadValueInto reads the current value into an existing target.
 // This enables buffer reuse in hot pack-processing loops.
 func ReadValueInto[T any](sr *UnitReader, target *T) error {
+	if target == nil {
+		return &DeserializeError{Message: "ReadValueInto requires a non-nil pointer"}
+	}
 	rv := reflect.ValueOf(target).Elem()
 	return readValueReflect(sr, rv)
 }
@@ -303,6 +306,8 @@ func readStructFromEvents(sr *UnitReader, startEv Event, target reflect.Value) e
 }
 
 // readStructIntoMapFromEvents reads struct events into a Go map[string]T.
+// Struct field names are always strings, so the map key type must be string.
+// For general maps with non-string keys, use readMapFromEvents.
 func readStructIntoMapFromEvents(sr *UnitReader, target reflect.Value) error {
 	if target.IsNil() {
 		target.Set(reflect.MakeMap(target.Type()))

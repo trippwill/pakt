@@ -142,19 +142,13 @@ func unmarshalPackIntoTarget(sr *UnitReader, stmt Property, target reflect.Value
 		elemType := target.Type().Elem()
 		target.Set(reflect.MakeSlice(target.Type(), 0, 64))
 
-		endKind := sr.endKindForCurrent()
 		for {
-			ev, err := sr.dec.Decode()
+			ev, err := sr.nextEvent()
 			if err != nil {
 				if err == io.EOF {
-					sr.current = nil
 					return nil
 				}
 				return err
-			}
-			if ev.Kind == endKind {
-				sr.current = nil
-				return nil
 			}
 
 			target.Grow(1)
@@ -176,20 +170,14 @@ func unmarshalPackIntoTarget(sr *UnitReader, stmt Property, target reflect.Value
 		keyType := target.Type().Key()
 		valType := target.Type().Elem()
 
-		endKind := sr.endKindForCurrent()
 		for {
 			// Read key
-			keyEv, err := sr.dec.Decode()
+			keyEv, err := sr.nextEvent()
 			if err != nil {
 				if err == io.EOF {
-					sr.current = nil
 					return nil
 				}
 				return err
-			}
-			if keyEv.Kind == endKind {
-				sr.current = nil
-				return nil
 			}
 
 			key := reflect.New(keyType).Elem()
@@ -198,7 +186,7 @@ func unmarshalPackIntoTarget(sr *UnitReader, stmt Property, target reflect.Value
 			}
 
 			// Read value
-			valEv, err := sr.dec.Decode()
+			valEv, err := sr.nextEvent()
 			if err != nil {
 				return fmt.Errorf("pakt: field %q value: %w", stmt.Name, err)
 			}

@@ -21,21 +21,13 @@ func PackItems[T any](sr *UnitReader) iter.Seq[T] {
 			return
 		}
 
-		endKind := sr.endKindForCurrent()
-
 		for {
-			ev, err := sr.dec.Decode()
+			ev, err := sr.nextEvent()
 			if err != nil {
 				if err != io.EOF {
 					sr.setErr(err)
 				}
-				sr.current = nil
-				return
-			}
-
-			// Check for pack end.
-			if ev.Kind == endKind {
-				sr.current = nil
+				// EOF or pack-end: nextEvent cleared sr.current
 				return
 			}
 
@@ -46,13 +38,13 @@ func PackItems[T any](sr *UnitReader) iter.Seq[T] {
 			if err := handleValueEvent(sr, ev, target); err != nil {
 				sr.setErr(err)
 				// Drain remaining pack events.
-				drainUntil(sr, endKind)
+				sr.drainCurrent()
 				return
 			}
 
 			if !yield(val) {
 				// Caller broke out of loop — drain remaining pack events.
-				drainUntil(sr, endKind)
+				sr.drainCurrent()
 				return
 			}
 		}
@@ -75,20 +67,13 @@ func PackItemsInto[T any](sr *UnitReader, buf *T) iter.Seq[*T] {
 			return
 		}
 
-		endKind := sr.endKindForCurrent()
-
 		for {
-			ev, err := sr.dec.Decode()
+			ev, err := sr.nextEvent()
 			if err != nil {
 				if err != io.EOF {
 					sr.setErr(err)
 				}
-				sr.current = nil
-				return
-			}
-
-			if ev.Kind == endKind {
-				sr.current = nil
+				// EOF or pack-end: nextEvent cleared sr.current
 				return
 			}
 
@@ -98,35 +83,26 @@ func PackItemsInto[T any](sr *UnitReader, buf *T) iter.Seq[*T] {
 			target = allocPtr(target)
 			if err := handleValueEvent(sr, ev, target); err != nil {
 				sr.setErr(err)
-				drainUntil(sr, endKind)
+				sr.drainCurrent()
 				return
 			}
 
 			if !yield(buf) {
-				drainUntil(sr, endKind)
+				sr.drainCurrent()
 				return
 			}
 		}
 	}
 }
 
-// drainUntil reads and discards events until the matching end event.
-func drainUntil(sr *UnitReader, endKind EventKind) {
-	depth := 0
+// drainCurrent reads and discards events until the current statement ends.
+// It uses nextEvent to properly track nesting depth.
+func (sr *UnitReader) drainCurrent() {
 	for {
-		ev, err := sr.dec.Decode()
+		_, err := sr.nextEvent()
 		if err != nil {
-			sr.current = nil
+			// io.EOF means statement ended; other errors are also terminal.
 			return
-		}
-		if ev.Kind.IsCompositeStart() || ev.Kind.IsPackStart() {
-			depth++
-		} else if ev.Kind.IsCompositeEnd() || ev.Kind.IsPackEnd() {
-			if depth == 0 && ev.Kind == endKind {
-				sr.current = nil
-				return
-			}
-			depth--
 		}
 	}
 }

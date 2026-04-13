@@ -46,7 +46,11 @@ type LogEvent struct {
 }
 
 func main() {
-    f, _ := os.Open("data.pakt")
+    f, err := os.Open("data.pakt")
+    if err != nil {
+        fmt.Fprintln(os.Stderr, err)
+        os.Exit(1)
+    }
     defer f.Close()
 
     ur := encoding.NewUnitReader(f)
@@ -95,6 +99,16 @@ cfg, err := encoding.UnmarshalNew[AppConfig](data)
 For custom processing, use the low-level event decoder:
 
 ```go
+import (
+    "fmt"
+    "io"
+    "os"
+
+    "github.com/trippwill/pakt/encoding"
+)
+
+// ...
+
 dec := encoding.NewDecoder(f)
 defer dec.Close()
 

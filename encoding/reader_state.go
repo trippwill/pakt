@@ -85,11 +85,12 @@ type statementHeader struct {
 }
 
 type stateMachine struct {
-	r       *reader
-	stack   []frame
-	state   parserState
-	valType Type
-	valName string
+	r        *reader
+	stack    []frame
+	state    parserState
+	valType  Type
+	valName  string
+	stmtType Type // full type annotation of the current top-level statement
 }
 
 func newStateMachine(r *reader) *stateMachine {
@@ -99,6 +100,7 @@ func newStateMachine(r *reader) *stateMachine {
 	sm.state = stateTop
 	sm.valType = Type{}
 	sm.valName = ""
+	sm.stmtType = Type{}
 	return sm
 }
 
@@ -224,35 +226,12 @@ func (sm *stateMachine) beginPack(h statementHeader) {
 }
 
 func (sm *stateMachine) beginStatement(h statementHeader) {
+	sm.stmtType = h.typ
 	if h.pack {
 		sm.beginPack(h)
 		return
 	}
 	sm.beginAssignment(h)
-}
-
-func (sm *stateMachine) primeNextMatchedStatement(spec *Spec) (string, error) {
-	for {
-		h, err := sm.readStatementHeader()
-		if err != nil {
-			return "", err
-		}
-
-		specType, ok := spec.Fields[h.name]
-		if !ok {
-			if err := sm.r.skipStatementBody(h); err != nil {
-				return "", err
-			}
-			continue
-		}
-
-		if specType.String() != h.typ.String() {
-			return "", Wrapf(h.pos, ErrTypeMismatch, "spec field %q expected type %s, got %s", h.name, specType.String(), h.typ.String())
-		}
-
-		sm.beginStatement(h)
-		return h.name, nil
-	}
 }
 
 // packTerminated checks whether the pack has ended (EOF, NUL, or next
@@ -364,7 +343,7 @@ func (sm *stateMachine) beginMapKeyValue(keyType Type, after parserState) (Event
 			Pos:        pos,
 			Name:       fr.keyStr,
 			ScalarType: scalarTypeKind(keyType),
-			Value:      fr.keyStr,
+			Value:      []byte(fr.keyStr),
 		}, true, nil
 
 	case !keyType.Nullable && sm.r.peekNil():
@@ -375,12 +354,12 @@ func (sm *stateMachine) beginMapKeyValue(keyType Type, after parserState) (Event
 		if err != nil {
 			return Event{}, false, err
 		}
-		fr.keyStr = val
+		fr.keyStr = string(val)
 		sm.state = after
 		return Event{
 			Kind:       EventScalarValue,
 			Pos:        pos,
-			Name:       val,
+			Name:       fr.keyStr,
 			ScalarType: *keyType.Scalar,
 			Value:      val,
 		}, true, nil
@@ -398,7 +377,7 @@ func (sm *stateMachine) beginMapKeyValue(keyType Type, after parserState) (Event
 			Pos:        pos,
 			Name:       val,
 			ScalarType: TypeAtom,
-			Value:      val,
+			Value:      []byte(val),
 		}, true, nil
 	}
 
@@ -438,6 +417,7 @@ func (sm *stateMachine) step() (Event, error) {
 				Kind: EventAssignStart,
 				Pos:  fr.pos,
 				Name: fr.name,
+				Type: &sm.stmtType,
 			}, nil
 
 		case statePackStart:
@@ -456,6 +436,7 @@ func (sm *stateMachine) step() (Event, error) {
 				Kind: kind,
 				Pos:  fr.pos,
 				Name: fr.name,
+				Type: &sm.stmtType,
 			}, nil
 
 		case stateValue:
@@ -476,7 +457,7 @@ func (sm *stateMachine) step() (Event, error) {
 						Pos:        pos,
 						Name:       name,
 						ScalarType: scalarTypeKind(typ),
-						Value:      "nil",
+						Value:      []byte("nil"),
 					}, nil
 				}
 			} else if sm.r.peekNil() {
@@ -510,7 +491,7 @@ func (sm *stateMachine) step() (Event, error) {
 					Pos:        pos,
 					Name:       name,
 					ScalarType: TypeAtom,
-					Value:      val,
+					Value:      []byte(val),
 				}, nil
 
 			case typ.Struct != nil:

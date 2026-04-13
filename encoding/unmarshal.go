@@ -1,95 +1,13 @@
 package encoding
 
 import (
-	"encoding/hex"
 	"fmt"
-	"io"
 	"math"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 )
-
-// Unmarshal parses PAKT data and stores the result in the value pointed to by v.
-// v must be a pointer to a struct. Each top-level PAKT statement is matched
-// to struct fields by name (using pakt struct tags or lowercase field names).
-//
-// Unmarshal uses an optimized path that reads directly from the input byte slice
-// without buffering, and populates struct fields via a visitor-driven parser that
-// bypasses Event creation. For incremental use cases, prefer [Decoder.UnmarshalNext].
-func Unmarshal(data []byte, v any) error {
-	if v == nil {
-		return fmt.Errorf("pakt: Unmarshal requires a non-nil pointer")
-	}
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Pointer {
-		return fmt.Errorf("pakt: Unmarshal requires a pointer, got %s", rv.Type())
-	}
-	if rv.IsNil() {
-		return fmt.Errorf("pakt: Unmarshal requires a non-nil pointer")
-	}
-	rv = rv.Elem()
-	if rv.Kind() != reflect.Struct {
-		return fmt.Errorf("pakt: Unmarshal requires a pointer to a struct, got pointer to %s", rv.Type())
-	}
-
-	info, err := cachedStructFields(rv.Type())
-	if err != nil {
-		return err
-	}
-
-	rd := newReaderFromBytes(data)
-	sm := newStateMachine(rd)
-	defer func() {
-		sm.release()
-		rd.release()
-	}()
-
-	for {
-		rd.skipInsignificant(true)
-		if _, err := rd.peekByte(); err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-
-		h, err := sm.readStatementHeader()
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-
-		fi, ok := info.fieldMap[h.name]
-		if !ok {
-			if err := rd.skipStatementBody(h); err != nil {
-				return err
-			}
-			continue
-		}
-
-		target := rv.Field(fi.Index)
-		if h.pack {
-			var serr error
-			if h.typ.List != nil {
-				serr = sm.unmarshalPackList(h.typ.List, target)
-			} else {
-				serr = sm.unmarshalPackMap(h.typ.Map, target)
-			}
-			if serr != nil {
-				return fmt.Errorf("pakt: field %q: %w", h.name, serr)
-			}
-		} else {
-			rd.skipWS()
-			if err := sm.unmarshalValue(h.typ, target); err != nil {
-				return fmt.Errorf("pakt: field %q: %w", h.name, err)
-			}
-		}
-	}
-}
 
 // setNil sets a value to its zero value, or nil for pointers/maps/slices.
 func setNil(target reflect.Value) error {
@@ -125,22 +43,6 @@ func setString(target reflect.Value, val string) error {
 	return fmt.Errorf("cannot set string into %s", target.Type())
 }
 
-func setBin(target reflect.Value, raw string) error {
-	data, err := hex.DecodeString(raw)
-	if err != nil {
-		return fmt.Errorf("invalid bin value %q: %w", raw, err)
-	}
-	if target.Kind() == reflect.Slice && target.Type().Elem().Kind() == reflect.Uint8 {
-		target.SetBytes(data)
-		return nil
-	}
-	if target.Kind() == reflect.String {
-		target.SetString(string(data))
-		return nil
-	}
-	return fmt.Errorf("cannot set bin into %s", target.Type())
-}
-
 func setInt(target reflect.Value, raw string) error {
 	n, err := parseIntLiteral(raw)
 	if err != nil {
@@ -168,7 +70,9 @@ func setInt(target reflect.Value, raw string) error {
 		target.SetFloat(float64(n))
 		return nil
 	case reflect.String:
-		target.SetString(raw)
+		// Clone to ensure the string is independently allocated
+		// (raw may be an unsafe view of borrowed bytes).
+		target.SetString(strings.Clone(raw))
 		return nil
 	default:
 		return fmt.Errorf("cannot set int into %s", target.Type())
@@ -214,7 +118,7 @@ func parseIntLiteral(raw string) (int64, error) {
 		if val > math.MaxInt64+1 {
 			return 0, fmt.Errorf("int literal %q overflows int64", raw)
 		}
-		return -int64(val), nil
+		return -int64(val), nil //nolint:gosec // overflow checked: val <= MaxInt64+1
 	}
 	if val > math.MaxInt64 {
 		return 0, fmt.Errorf("int literal %q overflows int64", raw)
@@ -225,7 +129,7 @@ func parseIntLiteral(raw string) (int64, error) {
 func setDec(target reflect.Value, raw string) error {
 	switch target.Kind() {
 	case reflect.String:
-		target.SetString(raw)
+		target.SetString(strings.Clone(raw))
 		return nil
 	case reflect.Float32, reflect.Float64:
 		s := raw
@@ -255,7 +159,7 @@ func setTemporalString(target reflect.Value, raw string, kind reflect.Kind) erro
 	}
 
 	if kind == reflect.String {
-		target.SetString(raw)
+		target.SetString(strings.Clone(raw))
 		return nil
 	}
 

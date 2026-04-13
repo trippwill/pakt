@@ -3,6 +3,7 @@ package encoding
 import (
 	"bytes"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -51,6 +52,7 @@ func roundTrip(t *testing.T, name string, typ Type, v any) []Event {
 		if err != nil {
 			t.Fatalf("Decode failed on input %q: %v", buf.String(), err)
 		}
+		ev.Value = slices.Clone(ev.Value)
 		events = append(events, ev)
 	}
 	return events
@@ -457,7 +459,7 @@ func TestRoundTripStr(t *testing.T) {
 	if events[0].Kind != EventAssignStart || events[0].Name != "name" {
 		t.Errorf("event[0] = %v", events[0])
 	}
-	if events[1].Kind != EventScalarValue || events[1].Value != "hello" {
+	if events[1].Kind != EventScalarValue || events[1].ValueString() != "hello" {
 		t.Errorf("event[1] = %v", events[1])
 	}
 	if events[2].Kind != EventAssignEnd {
@@ -467,22 +469,22 @@ func TestRoundTripStr(t *testing.T) {
 
 func TestRoundTripInt(t *testing.T) {
 	events := roundTrip(t, "n", scalarType(TypeInt), int64(-42))
-	if events[1].Value != "-42" {
-		t.Errorf("got value %q, want %q", events[1].Value, "-42")
+	if events[1].ValueString() != "-42" {
+		t.Errorf("got value %q, want %q", events[1].ValueString(), "-42")
 	}
 }
 
 func TestRoundTripBool(t *testing.T) {
 	events := roundTrip(t, "b", scalarType(TypeBool), true)
-	if events[1].Value != "true" {
-		t.Errorf("got value %q, want %q", events[1].Value, "true")
+	if events[1].ValueString() != "true" {
+		t.Errorf("got value %q, want %q", events[1].ValueString(), "true")
 	}
 }
 
 func TestRoundTripDec(t *testing.T) {
 	events := roundTrip(t, "d", scalarType(TypeDec), "1000.50")
-	if events[1].Value != "1000.50" {
-		t.Errorf("got value %q, want %q", events[1].Value, "1000.50")
+	if events[1].ValueString() != "1000.50" {
+		t.Errorf("got value %q, want %q", events[1].ValueString(), "1000.50")
 	}
 }
 
@@ -497,37 +499,37 @@ func TestRoundTripFloat(t *testing.T) {
 func TestRoundTripUUID(t *testing.T) {
 	uuid := "550e8400-e29b-41d4-a716-446655440000"
 	events := roundTrip(t, "id", scalarType(TypeUUID), uuid)
-	if events[1].Value != uuid {
+	if events[1].ValueString() != uuid {
 		t.Errorf("got value %q, want %q", events[1].Value, uuid)
 	}
 }
 
 func TestRoundTripDate(t *testing.T) {
 	events := roundTrip(t, "d", scalarType(TypeDate), "2026-06-01")
-	if events[1].Value != "2026-06-01" {
-		t.Errorf("got value %q, want %q", events[1].Value, "2026-06-01")
+	if events[1].ValueString() != "2026-06-01" {
+		t.Errorf("got value %q, want %q", events[1].ValueString(), "2026-06-01")
 	}
 }
 
 func TestRoundTripTs(t *testing.T) {
 	events := roundTrip(t, "dt", scalarType(TypeTs), "2026-06-01T14:30:00Z")
-	if events[1].Value != "2026-06-01T14:30:00Z" {
-		t.Errorf("got value %q, want %q", events[1].Value, "2026-06-01T14:30:00Z")
+	if events[1].ValueString() != "2026-06-01T14:30:00Z" {
+		t.Errorf("got value %q, want %q", events[1].ValueString(), "2026-06-01T14:30:00Z")
 	}
 }
 
 func TestRoundTripNullable(t *testing.T) {
 	events := roundTrip(t, "x", nullableScalar(TypeInt), nil)
-	if events[1].Value != "nil" {
-		t.Errorf("got value %q, want %q", events[1].Value, "nil")
+	if events[1].ValueString() != "nil" {
+		t.Errorf("got value %q, want %q", events[1].ValueString(), "nil")
 	}
 }
 
 func TestRoundTripAtomSet(t *testing.T) {
 	typ := Type{AtomSet: &AtomSet{Members: []string{"dev", "staging", "prod"}}}
 	events := roundTrip(t, "env", typ, "prod")
-	if events[1].Value != "prod" {
-		t.Errorf("got value %q, want %q", events[1].Value, "prod")
+	if events[1].ValueString() != "prod" {
+		t.Errorf("got value %q, want %q", events[1].ValueString(), "prod")
 	}
 }
 
@@ -543,10 +545,10 @@ func TestRoundTripStruct(t *testing.T) {
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d: %v", len(events), events)
 	}
-	if events[2].Kind != EventScalarValue || events[2].Value != "localhost" {
+	if events[2].Kind != EventScalarValue || events[2].ValueString() != "localhost" {
 		t.Errorf("host event = %v", events[2])
 	}
-	if events[3].Kind != EventScalarValue || events[3].Value != "8080" {
+	if events[3].Kind != EventScalarValue || events[3].ValueString() != "8080" {
 		t.Errorf("port event = %v", events[3])
 	}
 }
@@ -560,7 +562,7 @@ func TestRoundTripTuple(t *testing.T) {
 	if len(events) != 7 {
 		t.Fatalf("expected 7 events, got %d: %v", len(events), events)
 	}
-	if events[2].Value != "1" || events[3].Value != "0" || events[4].Value != "0" {
+	if events[2].ValueString() != "1" || events[3].ValueString() != "0" || events[4].ValueString() != "0" {
 		t.Errorf("values: %q %q %q", events[2].Value, events[3].Value, events[4].Value)
 	}
 }
@@ -574,7 +576,7 @@ func TestRoundTripList(t *testing.T) {
 	if len(events) != 7 {
 		t.Fatalf("expected 7 events, got %d", len(events))
 	}
-	if events[2].Value != "alpha" || events[3].Value != "bravo" || events[4].Value != "charlie" {
+	if events[2].ValueString() != "alpha" || events[3].ValueString() != "bravo" || events[4].ValueString() != "charlie" {
 		t.Errorf("values: %q %q %q", events[2].Value, events[3].Value, events[4].Value)
 	}
 }
@@ -599,10 +601,10 @@ func TestRoundTripMap(t *testing.T) {
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d: %v", len(events), events)
 	}
-	if events[2].Kind != EventScalarValue || events[2].Value != "x" {
+	if events[2].Kind != EventScalarValue || events[2].ValueString() != "x" {
 		t.Errorf("key event = %v", events[2])
 	}
-	if events[3].Kind != EventScalarValue || events[3].Value != "10" {
+	if events[3].Kind != EventScalarValue || events[3].ValueString() != "10" {
 		t.Errorf("value event = %v", events[3])
 	}
 }
@@ -648,6 +650,7 @@ func TestCompactVsPrettyStruct(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Decode(%q): %v", input, err)
 			}
+			ev.Value = slices.Clone(ev.Value)
 			events = append(events, ev)
 		}
 		if len(events) != 6 {
@@ -679,6 +682,7 @@ func TestCompactVsPrettyList(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Decode(%q): %v", input, err)
 			}
+			ev.Value = slices.Clone(ev.Value)
 			events = append(events, ev)
 		}
 		// AssignStart + CompositeStart + 3 values + CompositeEnd + AssignEnd
@@ -710,6 +714,7 @@ func TestCompactVsPrettyTuple(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Decode(%q): %v", input, err)
 			}
+			ev.Value = slices.Clone(ev.Value)
 			events = append(events, ev)
 		}
 		if len(events) != 6 {
@@ -740,6 +745,7 @@ func TestCompactVsPrettyMap(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Decode(%q): %v", input, err)
 			}
+			ev.Value = slices.Clone(ev.Value)
 			events = append(events, ev)
 		}
 		if len(events) != 6 {
@@ -795,29 +801,29 @@ func TestEncodeStrTypeMismatch(t *testing.T) {
 
 func TestRoundTripStrWithTab(t *testing.T) {
 	events := roundTrip(t, "s", scalarType(TypeStr), "hello\tworld")
-	if events[1].Value != "hello\tworld" {
-		t.Errorf("got value %q, want %q", events[1].Value, "hello\tworld")
+	if events[1].ValueString() != "hello\tworld" {
+		t.Errorf("got value %q, want %q", events[1].ValueString(), "hello\tworld")
 	}
 }
 
 func TestRoundTripStrWithBackslash(t *testing.T) {
 	events := roundTrip(t, "s", scalarType(TypeStr), `path\to\file`)
-	if events[1].Value != `path\to\file` {
+	if events[1].ValueString() != `path\to\file` {
 		t.Errorf("got value %q, want %q", events[1].Value, `path\to\file`)
 	}
 }
 
 func TestRoundTripStrWithQuotes(t *testing.T) {
 	events := roundTrip(t, "s", scalarType(TypeStr), "it's fine")
-	if events[1].Value != "it's fine" {
-		t.Errorf("got value %q, want %q", events[1].Value, "it's fine")
+	if events[1].ValueString() != "it's fine" {
+		t.Errorf("got value %q, want %q", events[1].ValueString(), "it's fine")
 	}
 }
 
 func TestRoundTripMultiLineStr(t *testing.T) {
 	val := "line one\nline two"
 	events := roundTrip(t, "s", scalarType(TypeStr), val)
-	if events[1].Value != val {
+	if events[1].ValueString() != val {
 		t.Errorf("got value %q, want %q", events[1].Value, val)
 	}
 }
@@ -854,6 +860,7 @@ func TestRoundTripNestedPretty(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Decode: %v", err)
 		}
+		ev.Value = slices.Clone(ev.Value)
 		events = append(events, ev)
 	}
 
@@ -861,10 +868,10 @@ func TestRoundTripNestedPretty(t *testing.T) {
 	if len(events) != 9 {
 		t.Fatalf("expected 9 events, got %d: %v", len(events), events)
 	}
-	if events[2].Value != "test" {
+	if events[2].ValueString() != "test" {
 		t.Errorf("name value = %q", events[2].Value)
 	}
-	if events[4].Value != "10" || events[5].Value != "20" {
+	if events[4].ValueString() != "10" || events[5].ValueString() != "20" {
 		t.Errorf("list values = %q, %q", events[4].Value, events[5].Value)
 	}
 }

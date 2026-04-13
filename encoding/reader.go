@@ -2,8 +2,6 @@ package encoding
 
 import (
 	"bufio"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"slices"
@@ -27,7 +25,41 @@ type reader struct {
 	pos     Pos
 	lastPos Pos
 	hitNUL  bool            // true after consuming a NUL byte (end-of-unit per spec §10.1)
-	sb      strings.Builder // reusable builder to avoid per-read allocations
+	sb      strings.Builder // reusable builder for identifiers
+	valBuf  []byte          // reusable buffer for scalar values (borrow semantics)
+}
+
+// byteAppender is the interface for writing bytes during scalar parsing.
+// Both strings.Builder (for idents) and the valBuf adapter (for scalar
+// values) satisfy this interface.
+type byteAppender interface {
+	WriteByte(c byte) error
+	WriteRune(r rune) (int, error)
+}
+
+// valBufAdapter adapts *reader's valBuf as a byteAppender.
+type valBufAdapter struct {
+	r *reader
+}
+
+func (a valBufAdapter) WriteByte(c byte) error {
+	a.r.valBuf = append(a.r.valBuf, c)
+	return nil
+}
+
+func (a valBufAdapter) WriteRune(ch rune) (int, error) {
+	if ch < utf8.RuneSelf {
+		a.r.valBuf = append(a.r.valBuf, byte(ch)) //nolint:gosec // ch < utf8.RuneSelf (128), fits in byte
+		return 1, nil
+	}
+	var buf [4]byte
+	n := utf8.EncodeRune(buf[:], ch)
+	a.r.valBuf = append(a.r.valBuf, buf[:n]...)
+	return n, nil
+}
+
+func (r *reader) valBufAppender() valBufAdapter {
+	return valBufAdapter{r: r}
 }
 
 func newReader(r io.Reader) *reader {
@@ -43,15 +75,6 @@ func newReader(r io.Reader) *reader {
 	return rd
 }
 
-func newReaderFromBytes(data []byte) *reader {
-	rd := &reader{
-		src: newBytesSource(data),
-		pos: Pos{Line: 1, Col: 1},
-	}
-	rd.skipBOM()
-	return rd
-}
-
 // release returns the pooled bufio.Reader.
 func (r *reader) release() {
 	if r.bufSrc != nil {
@@ -60,6 +83,17 @@ func (r *reader) release() {
 		r.bufSrc = nil
 	}
 	r.src = nil
+}
+
+// resetValBuf resets the value buffer for reuse.
+func (r *reader) resetValBuf() {
+	r.valBuf = r.valBuf[:0]
+}
+
+// valBufBytes returns the current value buffer content.
+// The returned slice is valid until the next resetValBuf call.
+func (r *reader) valBufBytes() []byte {
+	return r.valBuf
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +296,8 @@ func (r *reader) readIdent() (string, error) {
 			break
 		}
 	}
-	return r.sb.String(), nil
+	return r.sb.String(), nil //nolint:nilerr // EOF on peek means ident ended at EOF
+
 }
 
 // ---------------------------------------------------------------------------
@@ -374,7 +409,7 @@ func (r *reader) readUnicodeEscape(n int) (rune, error) {
 			return 0, r.errorf("invalid hex digit in %s escape: found %q", prefix, prefix+digits.String())
 		}
 		digits.WriteByte(b)
-		val = val*16 + rune(d)
+		val = val*16 + rune(d) //nolint:gosec // d is 0-15 from hexVal
 	}
 	if val == 0 {
 		return 0, r.errorf("null byte (U+0000) not permitted in strings")
@@ -466,60 +501,6 @@ func (r *reader) consumeMultiLineString(quote byte, raw bool, out *strings.Build
 		if err := writeLine(line[baseline:]); err != nil {
 			return err
 		}
-	}
-}
-
-// readBin reads a binary literal and returns its canonical lower-case hex value.
-func (r *reader) readBin() (string, error) {
-	prefix, err := r.readByte()
-	if err != nil {
-		return "", r.wrapf(ErrUnexpectedEOF, "expected binary literal, got EOF")
-	}
-	if prefix != 'x' && prefix != 'b' {
-		r.unreadByte()
-		return "", r.errorf("expected binary literal, got %q", rune(prefix))
-	}
-	if err := r.expectByte('\''); err != nil {
-		return "", err
-	}
-
-	r.sb.Reset()
-	for {
-		b, err := r.readByte()
-		if err != nil {
-			return "", r.wrapf(ErrUnexpectedEOF, "unterminated binary literal")
-		}
-		if b == '\'' {
-			break
-		}
-		if b == '\n' {
-			return "", r.errorf("newline in binary literal")
-		}
-		if b == 0 {
-			return "", r.errorf("null byte in binary literal")
-		}
-		r.sb.WriteByte(b)
-	}
-
-	lit := r.sb.String()
-	switch prefix {
-	case 'x':
-		if len(lit)%2 != 0 {
-			return "", r.errorf("hex binary literal must contain an even number of digits")
-		}
-		data, err := hex.DecodeString(lit)
-		if err != nil {
-			return "", r.errorf("invalid hex binary literal")
-		}
-		return hex.EncodeToString(data), nil
-	case 'b':
-		data, err := base64.StdEncoding.Strict().DecodeString(lit)
-		if err != nil {
-			return "", r.errorf("invalid base64 binary literal")
-		}
-		return hex.EncodeToString(data), nil
-	default:
-		return "", r.errorf("unknown binary literal prefix %q", rune(prefix))
 	}
 }
 
@@ -631,7 +612,7 @@ func parseHexDigits(s string) (rune, bool) {
 		if d < 0 {
 			return 0, false
 		}
-		val = val*16 + rune(d)
+		val = val*16 + rune(d) //nolint:gosec // d is 0-15 from hexVal
 	}
 	return val, true
 }
@@ -641,7 +622,7 @@ func parseHexDigits(s string) (rune, bool) {
 // ---------------------------------------------------------------------------
 
 // readDigitSep reads DIGIT_SEP = DIGIT (DIGIT | '_')*.
-func (r *reader) readDigitSep(sb *strings.Builder) error {
+func (r *reader) readDigitSep(sb byteAppender) error {
 	b, err := r.readByte()
 	if err != nil {
 		return r.wrapf(ErrUnexpectedEOF, "expected digit, got EOF")
@@ -650,24 +631,25 @@ func (r *reader) readDigitSep(sb *strings.Builder) error {
 		r.unreadByte()
 		return r.errorf("expected digit, got %q", rune(b))
 	}
-	sb.WriteByte(b)
+	sb.WriteByte(b) //nolint:errcheck
 	for {
 		b, err = r.peekByte()
 		if err != nil {
 			break
 		}
 		if isDigit(b) || b == '_' {
-			r.readByte() //nolint:errcheck
-			sb.WriteByte(b)
+			r.readByte()    //nolint:errcheck
+			sb.WriteByte(b) //nolint:errcheck
 		} else {
 			break
 		}
 	}
-	return nil
+	return nil //nolint:nilerr // EOF on peek means digits ended at EOF
+
 }
 
 // readExactDigits reads exactly n decimal digits.
-func (r *reader) readExactDigits(sb *strings.Builder, n int) error {
+func (r *reader) readExactDigits(sb byteAppender, n int) error {
 	for range n {
 		b, err := r.readByte()
 		if err != nil {
@@ -677,13 +659,13 @@ func (r *reader) readExactDigits(sb *strings.Builder, n int) error {
 			r.unreadByte()
 			return r.errorf("expected digit, got %q", rune(b))
 		}
-		sb.WriteByte(b)
+		sb.WriteByte(b) //nolint:errcheck
 	}
 	return nil
 }
 
 // readExactHex reads exactly n hex digits.
-func (r *reader) readExactHex(sb *strings.Builder, n int) error {
+func (r *reader) readExactHex(sb byteAppender, n int) error {
 	for range n {
 		b, err := r.readByte()
 		if err != nil {
@@ -693,14 +675,14 @@ func (r *reader) readExactHex(sb *strings.Builder, n int) error {
 			r.unreadByte()
 			return r.errorf("expected hex digit, got %q", rune(b))
 		}
-		sb.WriteByte(b)
+		sb.WriteByte(b) //nolint:errcheck
 	}
 	return nil
 }
 
 // readPrefixedDigits reads digits for 0x/0b/0o literals.
 // check validates whether a byte is a valid digit for the given base.
-func (r *reader) readPrefixedDigits(sb *strings.Builder, check func(byte) bool) error {
+func (r *reader) readPrefixedDigits(sb byteAppender, check func(byte) bool) error {
 	b, err := r.readByte()
 	if err != nil {
 		return r.wrapf(ErrUnexpectedEOF, "expected digit after base prefix, got EOF")
@@ -709,205 +691,21 @@ func (r *reader) readPrefixedDigits(sb *strings.Builder, check func(byte) bool) 
 		r.unreadByte()
 		return r.errorf("expected digit after base prefix, got %q", rune(b))
 	}
-	sb.WriteByte(b)
+	sb.WriteByte(b) //nolint:errcheck
 	for {
 		b, err = r.peekByte()
 		if err != nil {
 			break
 		}
 		if check(b) || b == '_' {
-			r.readByte() //nolint:errcheck
-			sb.WriteByte(b)
+			r.readByte()    //nolint:errcheck
+			sb.WriteByte(b) //nolint:errcheck
 		} else {
 			break
 		}
 	}
-	return nil
-}
+	return nil //nolint:nilerr // EOF on peek means digits ended at EOF
 
-// ---------------------------------------------------------------------------
-// Integer reading
-// ---------------------------------------------------------------------------
-
-// readInt reads INT = ['-'] DIGIT_SEP | ['-'] '0x' HEX_SEP | etc.
-func (r *reader) readInt() (string, error) {
-	r.sb.Reset()
-
-	// Optional negative sign.
-	if b, err := r.peekByte(); err == nil && b == '-' {
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte('-')
-	}
-
-	// Peek at first digit.
-	first, err := r.peekByte()
-	if err != nil {
-		return "", r.wrapf(ErrUnexpectedEOF, "expected digit in integer, got EOF")
-	}
-	if !isDigit(first) {
-		return "", r.errorf("expected digit in integer, got %q", rune(first))
-	}
-
-	if first == '0' {
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte('0')
-		// Check for base prefix.
-		if b, err := r.peekByte(); err == nil {
-			switch b {
-			case 'x':
-				r.readByte() //nolint:errcheck
-				r.sb.WriteByte('x')
-				if err := r.readPrefixedDigits(&r.sb, isHex); err != nil {
-					return "", err
-				}
-				return r.sb.String(), nil
-			case 'b':
-				r.readByte() //nolint:errcheck
-				r.sb.WriteByte('b')
-				if err := r.readPrefixedDigits(&r.sb, isBin); err != nil {
-					return "", err
-				}
-				return r.sb.String(), nil
-			case 'o':
-				r.readByte() //nolint:errcheck
-				r.sb.WriteByte('o')
-				if err := r.readPrefixedDigits(&r.sb, isOct); err != nil {
-					return "", err
-				}
-				return r.sb.String(), nil
-			}
-		}
-		// Plain decimal that starts with 0. Continue reading digits.
-		for {
-			b, err := r.peekByte()
-			if err != nil {
-				break
-			}
-			if isDigit(b) || b == '_' {
-				r.readByte() //nolint:errcheck
-				r.sb.WriteByte(b)
-			} else {
-				break
-			}
-		}
-		return r.sb.String(), nil
-	}
-
-	// Regular decimal DIGIT_SEP.
-	if err := r.readDigitSep(&r.sb); err != nil {
-		return "", err
-	}
-	return r.sb.String(), nil
-}
-
-// ---------------------------------------------------------------------------
-// Decimal reading
-// ---------------------------------------------------------------------------
-
-// readDec reads DEC = ['-'] DIGIT_SEP? '.' DIGIT_SEP.
-func (r *reader) readDec() (string, error) {
-	r.sb.Reset()
-
-	if b, err := r.peekByte(); err == nil && b == '-' {
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte('-')
-	}
-	// Leading digits are optional: .5 is valid
-	if b, err := r.peekByte(); err == nil && b != '.' {
-		if err := r.readDigitSep(&r.sb); err != nil {
-			return "", err
-		}
-	}
-	if err := r.expectByte('.'); err != nil {
-		return "", err
-	}
-	r.sb.WriteByte('.')
-	if err := r.readDigitSep(&r.sb); err != nil {
-		return "", err
-	}
-	return r.sb.String(), nil
-}
-
-// ---------------------------------------------------------------------------
-// Float reading
-// ---------------------------------------------------------------------------
-
-// readFloat reads FLOAT = ['-'] DIGIT_SEP? ('.' DIGIT_SEP)? ('e'|'E') [+-]? DIGIT+.
-func (r *reader) readFloat() (string, error) {
-	r.sb.Reset()
-
-	if b, err := r.peekByte(); err == nil && b == '-' {
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte('-')
-	}
-	// Leading digits are optional when followed by '.' or exponent.
-	if b, err := r.peekByte(); err == nil && b != '.' && b != 'e' && b != 'E' {
-		if err := r.readDigitSep(&r.sb); err != nil {
-			return "", err
-		}
-	}
-
-	// Optional '.' DIGIT_SEP.
-	if b, err := r.peekByte(); err == nil && b == '.' {
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte('.')
-		if err := r.readDigitSep(&r.sb); err != nil {
-			return "", err
-		}
-	}
-
-	// Mandatory exponent.
-	b, err := r.peekByte()
-	if err != nil {
-		return "", r.wrapf(ErrUnexpectedEOF, "expected exponent ('e' or 'E') in float, got EOF")
-	}
-	if b != 'e' && b != 'E' {
-		return "", r.errorf("expected exponent ('e' or 'E') in float, got %q", rune(b))
-	}
-	r.readByte() //nolint:errcheck
-	r.sb.WriteByte(b)
-
-	// Optional sign.
-	if b, err := r.peekByte(); err == nil && (b == '+' || b == '-') {
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte(b)
-	}
-
-	// DIGIT+ (no underscores in exponent per spec).
-	count := 0
-	for {
-		b, err := r.peekByte()
-		if err != nil || !isDigit(b) {
-			break
-		}
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte(b)
-		count++
-	}
-	if count == 0 {
-		if b, err := r.peekByte(); err != nil {
-			return "", r.wrapf(ErrUnexpectedEOF, "expected digits in float exponent, got EOF")
-		} else {
-			return "", r.errorf("expected digits in float exponent, got %q", rune(b))
-		}
-	}
-	return r.sb.String(), nil
-}
-
-// ---------------------------------------------------------------------------
-// Keyword reading
-// ---------------------------------------------------------------------------
-
-// readBool reads "true" or "false".
-func (r *reader) readBool() (string, error) {
-	id, err := r.readIdent()
-	if err != nil {
-		return "", err
-	}
-	if id != "true" && id != "false" {
-		return "", r.errorf("expected 'true' or 'false', got %q", id)
-	}
-	return id, nil
 }
 
 // readNil reads the keyword "nil".
@@ -920,147 +718,6 @@ func (r *reader) readNil() error {
 		return r.errorf("expected 'nil', got %q", id)
 	}
 	return nil
-}
-
-// ---------------------------------------------------------------------------
-// Temporal reading
-// ---------------------------------------------------------------------------
-
-// readDate reads DATE = DIGIT{4}-DIGIT{2}-DIGIT{2}.
-func (r *reader) readDate() (string, error) {
-	r.sb.Reset()
-	if err := r.readExactDigits(&r.sb, 4); err != nil {
-		return "", err
-	}
-	if err := r.expectByte('-'); err != nil {
-		return "", err
-	}
-	r.sb.WriteByte('-')
-	if err := r.readExactDigits(&r.sb, 2); err != nil {
-		return "", err
-	}
-	if err := r.expectByte('-'); err != nil {
-		return "", err
-	}
-	r.sb.WriteByte('-')
-	if err := r.readExactDigits(&r.sb, 2); err != nil {
-		return "", err
-	}
-	return r.sb.String(), nil
-}
-
-// readTimePart reads the time portion: DIGIT{2}:DIGIT{2}:DIGIT{2}(.DIGIT+)? TZ.
-func (r *reader) readTimePart() (string, error) {
-	r.sb.Reset()
-	if err := r.readExactDigits(&r.sb, 2); err != nil {
-		return "", err
-	}
-	if err := r.expectByte(':'); err != nil {
-		return "", err
-	}
-	r.sb.WriteByte(':')
-	if err := r.readExactDigits(&r.sb, 2); err != nil {
-		return "", err
-	}
-	if err := r.expectByte(':'); err != nil {
-		return "", err
-	}
-	r.sb.WriteByte(':')
-	if err := r.readExactDigits(&r.sb, 2); err != nil {
-		return "", err
-	}
-
-	// Optional fractional seconds.
-	if b, err := r.peekByte(); err == nil && b == '.' {
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte('.')
-		count := 0
-		for {
-			b, err := r.peekByte()
-			if err != nil || !isDigit(b) {
-				break
-			}
-			r.readByte() //nolint:errcheck
-			r.sb.WriteByte(b)
-			count++
-		}
-		if count == 0 {
-			if b, err := r.peekByte(); err != nil {
-				return "", r.wrapf(ErrUnexpectedEOF, "expected digits after '.' in time, got EOF")
-			} else {
-				return "", r.errorf("expected digits after '.' in time, got %q", rune(b))
-			}
-		}
-	}
-
-	// Timezone.
-	b, err := r.peekByte()
-	if err != nil {
-		return "", r.wrapf(ErrUnexpectedEOF, "expected timezone in time, got EOF")
-	}
-	switch b {
-	case 'Z':
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte('Z')
-	case '+', '-':
-		r.readByte() //nolint:errcheck
-		r.sb.WriteByte(b)
-		if err := r.readExactDigits(&r.sb, 2); err != nil {
-			return "", err
-		}
-		if err := r.expectByte(':'); err != nil {
-			return "", err
-		}
-		r.sb.WriteByte(':')
-		if err := r.readExactDigits(&r.sb, 2); err != nil {
-			return "", err
-		}
-	default:
-		return "", r.errorf("expected timezone (Z or ±HH:MM) in time, got %q", rune(b))
-	}
-	return r.sb.String(), nil
-}
-
-// readTs reads TS = DATE 'T' TIME.
-func (r *reader) readTs() (string, error) {
-	date, err := r.readDate()
-	if err != nil {
-		return "", err
-	}
-	if err := r.expectByte('T'); err != nil {
-		return "", err
-	}
-	t, err := r.readTimePart()
-	if err != nil {
-		return "", err
-	}
-	r.sb.Reset()
-	r.sb.WriteString(date)
-	r.sb.WriteByte('T')
-	r.sb.WriteString(t)
-	return r.sb.String(), nil
-}
-
-// ---------------------------------------------------------------------------
-// UUID reading
-// ---------------------------------------------------------------------------
-
-// readUUID reads UUID = HEX{8}-HEX{4}-HEX{4}-HEX{4}-HEX{12}.
-func (r *reader) readUUID() (string, error) {
-	r.sb.Reset()
-	segments := [5]int{8, 4, 4, 4, 12}
-	for i, n := range segments {
-		if i > 0 {
-			if err := r.expectByte('-'); err != nil {
-				return "", err
-			}
-			r.sb.WriteByte('-')
-		}
-		if err := r.readExactHex(&r.sb, n); err != nil {
-			return "", err
-		}
-	}
-	return r.sb.String(), nil
 }
 
 // ---------------------------------------------------------------------------

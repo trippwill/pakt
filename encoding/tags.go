@@ -146,15 +146,15 @@ func typeOfReflect(t reflect.Type, seen map[reflect.Type]bool) (Type, error) {
 	}
 }
 
-// StructFields returns the PAKT field mapping for a Go struct type.
+// ReflectStructFields returns the PAKT field mapping for a Go struct type.
 // t must be a struct type (or pointer to struct); otherwise an error is returned.
 // Results are cached per type for subsequent calls.
-func StructFields(t reflect.Type) ([]FieldInfo, error) {
+func ReflectStructFields(t reflect.Type) ([]FieldInfo, error) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	if t.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("pakt: StructFields requires struct type, got %s", t.Kind())
+		return nil, fmt.Errorf("pakt: ReflectStructFields requires struct type, got %s", t.Kind())
 	}
 	info, err := cachedStructFields(t)
 	if err != nil {

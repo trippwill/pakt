@@ -366,7 +366,7 @@ func TestStructFields_OmitEmpty(t *testing.T) {
 		Name  string `pakt:",omitempty"`
 		Value int    `pakt:"val,omitempty"`
 	}
-	fields, err := StructFields(reflect.TypeOf(WithOmit{}))
+	fields, err := ReflectStructFields(reflect.TypeOf(WithOmit{}))
 	if err != nil {
 		t.Fatalf("StructFields: %v", err)
 	}
@@ -391,9 +391,9 @@ func TestStructFields_PointerToStruct(t *testing.T) {
 	type S struct {
 		X int
 	}
-	fields, err := StructFields(reflect.TypeOf(&S{}))
+	fields, err := ReflectStructFields(reflect.TypeOf(&S{}))
 	if err != nil {
-		t.Fatalf("StructFields(*S): %v", err)
+		t.Fatalf("ReflectStructFields(*S): %v", err)
 	}
 	if len(fields) != 1 {
 		t.Fatalf("expected 1 field, got %d", len(fields))
@@ -404,9 +404,9 @@ func TestStructFields_PointerToStruct(t *testing.T) {
 }
 
 func TestStructFields_NonStruct(t *testing.T) {
-	_, err := StructFields(reflect.TypeOf("hello"))
+	_, err := ReflectStructFields(reflect.TypeOf("hello"))
 	if err == nil {
-		t.Error("StructFields(string) should return error")
+		t.Error("ReflectStructFields(string) should return error")
 	}
 }
 
@@ -456,7 +456,7 @@ func TestStructFields_Index(t *testing.T) {
 		B int
 		C bool
 	}
-	fields, err := StructFields(reflect.TypeOf(S{}))
+	fields, err := ReflectStructFields(reflect.TypeOf(S{}))
 	if err != nil {
 		t.Fatalf("StructFields: %v", err)
 	}

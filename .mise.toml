@@ -1,4 +1,5 @@
 [tools]
 go = "1.25"
+golangci-lint = "2.11.4"
 hugo = "latest"
 node = "22"

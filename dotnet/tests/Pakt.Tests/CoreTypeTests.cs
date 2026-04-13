@@ -128,10 +128,9 @@ public class PaktExceptionTests
 
     [Theory]
     [InlineData(PaktErrorCode.UnexpectedEof, 1)]
-    [InlineData(PaktErrorCode.DuplicateName, 2)]
-    [InlineData(PaktErrorCode.TypeMismatch, 3)]
-    [InlineData(PaktErrorCode.NilNonNullable, 4)]
-    [InlineData(PaktErrorCode.Syntax, 5)]
+    [InlineData(PaktErrorCode.TypeMismatch, 2)]
+    [InlineData(PaktErrorCode.NilNonNullable, 3)]
+    [InlineData(PaktErrorCode.Syntax, 4)]
     public void ErrorCodes_MatchSpecValues(PaktErrorCode code, int expected)
     {
         Assert.Equal(expected, (int)code);

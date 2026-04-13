@@ -14,6 +14,16 @@ func mkReader(s string) *reader {
 	return newReader(strings.NewReader(s))
 }
 
+// readScalar is a test helper that reads a scalar of the given kind
+// via readScalarDirect and returns the result as a string.
+func readScalar(r *reader, kind TypeKind) (string, error) {
+	b, _, err := r.readScalarDirect(kind)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
 // ---------------------------------------------------------------------------
 // BOM handling
 // ---------------------------------------------------------------------------
@@ -381,7 +391,7 @@ func TestReadRawStringMultiLine(t *testing.T) {
 
 func TestReadBinHex(t *testing.T) {
 	r := mkReader(`x'48656C6C6F'`)
-	got, err := r.readBin()
+	got, err := readScalar(r, TypeBin)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,7 +402,7 @@ func TestReadBinHex(t *testing.T) {
 
 func TestReadBinBase64(t *testing.T) {
 	r := mkReader(`b'SGVsbG8='`)
-	got, err := r.readBin()
+	got, err := readScalar(r, TypeBin)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +439,7 @@ func TestReadInt(t *testing.T) {
 	}
 	for _, tc := range tests {
 		r := mkReader(tc.input)
-		got, err := r.readInt()
+		got, err := readScalar(r, TypeInt)
 		if err != nil {
 			t.Errorf("readInt(%q): %v", tc.input, err)
 			continue
@@ -442,7 +452,7 @@ func TestReadInt(t *testing.T) {
 
 func TestReadIntBad(t *testing.T) {
 	r := mkReader("abc")
-	_, err := r.readInt()
+	_, err := readScalar(r, TypeInt)
 	if err == nil {
 		t.Fatal("expected error for non-integer")
 	}
@@ -467,7 +477,7 @@ func TestReadDec(t *testing.T) {
 	}
 	for _, tc := range tests {
 		r := mkReader(tc.input)
-		got, err := r.readDec()
+		got, err := readScalar(r, TypeDec)
 		if err != nil {
 			t.Errorf("readDec(%q): %v", tc.input, err)
 			continue
@@ -497,7 +507,7 @@ func TestReadFloat(t *testing.T) {
 	}
 	for _, tc := range tests {
 		r := mkReader(tc.input)
-		got, err := r.readFloat()
+		got, err := readScalar(r, TypeFloat)
 		if err != nil {
 			t.Errorf("readFloat(%q): %v", tc.input, err)
 			continue
@@ -510,7 +520,7 @@ func TestReadFloat(t *testing.T) {
 
 func TestReadFloatMissingExponent(t *testing.T) {
 	r := mkReader("3.14")
-	_, err := r.readFloat()
+	_, err := readScalar(r, TypeFloat)
 	if err == nil {
 		t.Fatal("expected error when exponent is missing")
 	}
@@ -523,7 +533,7 @@ func TestReadFloatMissingExponent(t *testing.T) {
 func TestReadBool(t *testing.T) {
 	for _, kw := range []string{"true", "false"} {
 		r := mkReader(kw)
-		got, err := r.readBool()
+		got, err := readScalar(r, TypeBool)
 		if err != nil {
 			t.Errorf("readBool(%q): %v", kw, err)
 			continue
@@ -536,7 +546,7 @@ func TestReadBool(t *testing.T) {
 
 func TestReadBoolBad(t *testing.T) {
 	r := mkReader("maybe")
-	_, err := r.readBool()
+	_, err := readScalar(r, TypeBool)
 	if err == nil {
 		t.Fatal("expected error for non-bool keyword")
 	}
@@ -562,7 +572,7 @@ func TestReadNilBad(t *testing.T) {
 
 func TestReadDate(t *testing.T) {
 	r := mkReader("2026-06-01")
-	got, err := r.readDate()
+	got, err := readScalar(r, TypeDate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -571,42 +581,42 @@ func TestReadDate(t *testing.T) {
 	}
 }
 
-func TestReadTimePartZ(t *testing.T) {
-	r := mkReader("14:30:00Z")
-	got, err := r.readTimePart()
+func TestReadTsZ(t *testing.T) {
+	r := mkReader("2026-06-01T14:30:00Z")
+	got, err := readScalar(r, TypeTs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "14:30:00Z" {
+	if got != "2026-06-01T14:30:00Z" {
 		t.Fatalf("got %q", got)
 	}
 }
 
-func TestReadTimePartOffset(t *testing.T) {
-	r := mkReader("14:30:00-04:00")
-	got, err := r.readTimePart()
+func TestReadTsWithOffset(t *testing.T) {
+	r := mkReader("2026-06-01T14:30:00-04:00")
+	got, err := readScalar(r, TypeTs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "14:30:00-04:00" {
+	if got != "2026-06-01T14:30:00-04:00" {
 		t.Fatalf("got %q", got)
 	}
 }
 
-func TestReadTimePartFractional(t *testing.T) {
-	r := mkReader("14:30:00.123Z")
-	got, err := r.readTimePart()
+func TestReadTsFractional(t *testing.T) {
+	r := mkReader("2026-06-01T14:30:00.123Z")
+	got, err := readScalar(r, TypeTs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "14:30:00.123Z" {
+	if got != "2026-06-01T14:30:00.123Z" {
 		t.Fatalf("got %q", got)
 	}
 }
 
 func TestReadTs(t *testing.T) {
 	r := mkReader("2026-06-01T14:30:00Z")
-	got, err := r.readTs()
+	got, err := readScalar(r, TypeTs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -617,7 +627,7 @@ func TestReadTs(t *testing.T) {
 
 func TestReadTsOffset(t *testing.T) {
 	r := mkReader("2026-06-01T14:30:00.500+05:30")
-	got, err := r.readTs()
+	got, err := readScalar(r, TypeTs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -632,7 +642,7 @@ func TestReadTsOffset(t *testing.T) {
 
 func TestReadUUID(t *testing.T) {
 	r := mkReader("550e8400-e29b-41d4-a716-446655440000")
-	got, err := r.readUUID()
+	got, err := readScalar(r, TypeUUID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -643,7 +653,7 @@ func TestReadUUID(t *testing.T) {
 
 func TestReadUUIDBad(t *testing.T) {
 	r := mkReader("550e8400-e29b-41d4-a716-44665544000") // too short
-	_, err := r.readUUID()
+	_, err := readScalar(r, TypeUUID)
 	if err == nil {
 		t.Fatal("expected error for short UUID")
 	}

@@ -130,19 +130,6 @@ func TestParseStdin(t *testing.T) {
 	}
 }
 
-func TestParseWithSpec(t *testing.T) {
-	cmd := exec.Command(binaryPath, "parse", "testdata/valid/full.pakt",
-		"--spec", "testdata/valid/spec-example.spec.pakt")
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) == 0 {
-		t.Fatal("expected output with spec projection, got none")
-	}
-}
-
 func TestFormatEnvVar(t *testing.T) {
 	cmd := exec.Command(binaryPath, "parse", "testdata/valid/scalars.pakt")
 	cmd.Env = append(os.Environ(), "PAKT_FORMAT=json")

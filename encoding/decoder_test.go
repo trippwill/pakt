@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"io"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -22,6 +23,8 @@ func decodeAll(t *testing.T, input string) []Event {
 		if err != nil {
 			t.Fatalf("Decode(): %v", err)
 		}
+		// Clone borrowed Value bytes so they survive across Decode calls.
+		ev.Value = slices.Clone(ev.Value)
 		events = append(events, ev)
 	}
 	return events
@@ -39,7 +42,7 @@ func TestDecodeSimpleStr(t *testing.T) {
 	if events[0].Kind != EventAssignStart || events[0].Name != "name" {
 		t.Fatalf("event[0] = %v", events[0])
 	}
-	if events[1].Kind != EventScalarValue || events[1].Value != "hello" {
+	if events[1].Kind != EventScalarValue || events[1].ValueString() != "hello" {
 		t.Fatalf("event[1] = %v", events[1])
 	}
 	if events[1].Name != "name" {
@@ -55,8 +58,8 @@ func TestDecodeSimpleInt(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
-	if events[1].Value != "42" {
-		t.Fatalf("value = %q, want %q", events[1].Value, "42")
+	if events[1].ValueString() != "42" {
+		t.Fatalf("value = %q, want %q", events[1].ValueString(), "42")
 	}
 }
 
@@ -65,7 +68,7 @@ func TestDecodeSimpleBool(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
-	if events[1].Value != "true" {
+	if events[1].ValueString() != "true" {
 		t.Fatalf("value = %q", events[1].Value)
 	}
 }
@@ -107,10 +110,10 @@ func TestDecodeStructAssignment(t *testing.T) {
 	if events[1].Kind != EventStructStart {
 		t.Fatalf("event[1] = %v", events[1])
 	}
-	if events[2].Kind != EventScalarValue || events[2].Name != "host" || events[2].Value != "localhost" {
+	if events[2].Kind != EventScalarValue || events[2].Name != "host" || events[2].ValueString() != "localhost" {
 		t.Fatalf("event[2] = %v", events[2])
 	}
-	if events[3].Kind != EventScalarValue || events[3].Name != "port" || events[3].Value != "8080" {
+	if events[3].Kind != EventScalarValue || events[3].Name != "port" || events[3].ValueString() != "8080" {
 		t.Fatalf("event[3] = %v", events[3])
 	}
 	if events[4].Kind != EventStructEnd {
@@ -128,7 +131,7 @@ func TestDecodeTupleAssignment(t *testing.T) {
 	if len(events) != 7 {
 		t.Fatalf("expected 7 events, got %d: %v", len(events), events)
 	}
-	if events[2].Name != "[0]" || events[2].Value != "1" {
+	if events[2].Name != "[0]" || events[2].ValueString() != "1" {
 		t.Fatalf("event[2] = %v", events[2])
 	}
 }
@@ -162,10 +165,10 @@ func TestDecodeDuplicateRootNamePreserved(t *testing.T) {
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events for two duplicate statements, got %d: %v", len(events), events)
 	}
-	if events[0].Name != "name" || events[1].Value != "a" {
+	if events[0].Name != "name" || events[1].ValueString() != "a" {
 		t.Fatalf("first statement not preserved: %v", events[:3])
 	}
-	if events[3].Name != "name" || events[4].Value != "b" {
+	if events[3].Name != "name" || events[4].ValueString() != "b" {
 		t.Fatalf("second statement not preserved: %v", events[3:])
 	}
 }
@@ -237,7 +240,7 @@ func TestDecodeBlockInlineEquivalence(t *testing.T) {
 		if inlineEvents[i].Name != blockEvents[i].Name {
 			t.Errorf("event[%d] name: inline=%q, block=%q", i, inlineEvents[i].Name, blockEvents[i].Name)
 		}
-		if inlineEvents[i].Value != blockEvents[i].Value {
+		if inlineEvents[i].ValueString() != blockEvents[i].ValueString() {
 			t.Errorf("event[%d] value: inline=%q, block=%q", i, inlineEvents[i].Value, blockEvents[i].Value)
 		}
 		if inlineEvents[i].ScalarType != blockEvents[i].ScalarType {
@@ -260,7 +263,7 @@ func TestDecodeTupleBlockInlineEquivalence(t *testing.T) {
 		if inlineEvents[i].Kind != blockEvents[i].Kind {
 			t.Errorf("event[%d] kind: inline=%s, block=%s", i, inlineEvents[i].Kind, blockEvents[i].Kind)
 		}
-		if inlineEvents[i].Value != blockEvents[i].Value {
+		if inlineEvents[i].ValueString() != blockEvents[i].ValueString() {
 			t.Errorf("event[%d] value: inline=%q, block=%q", i, inlineEvents[i].Value, blockEvents[i].Value)
 		}
 	}
@@ -321,8 +324,8 @@ func TestDecodeNullableScalar(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
 	}
-	if events[1].Value != "nil" {
-		t.Fatalf("value = %q, want %q", events[1].Value, "nil")
+	if events[1].ValueString() != "nil" {
+		t.Fatalf("value = %q, want %q", events[1].ValueString(), "nil")
 	}
 	if events[1].ScalarType != TypeStr {
 		t.Fatalf("scalarType = %s, want TypeStr", events[1].ScalarType)
@@ -335,8 +338,8 @@ func TestDecodeNullableWithValue(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
-	if events[1].Value != "hello" {
-		t.Fatalf("value = %q, want %q", events[1].Value, "hello")
+	if events[1].ValueString() != "hello" {
+		t.Fatalf("value = %q, want %q", events[1].ValueString(), "hello")
 	}
 }
 
@@ -376,7 +379,7 @@ func TestDecodeEventStream(t *testing.T) {
 		if ev.ScalarType != exp.scalarType {
 			t.Errorf("event[%d]: scalarType=%s, want %s", i, ev.ScalarType, exp.scalarType)
 		}
-		if ev.Value != exp.value {
+		if ev.ValueString() != exp.value {
 			t.Errorf("event[%d]: value=%q, want %q", i, ev.Value, exp.value)
 		}
 	}
@@ -392,8 +395,8 @@ func TestDecodeAtomAssignment(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
 	}
-	if events[1].Value != "active" {
-		t.Fatalf("value = %q, want %q", events[1].Value, "active")
+	if events[1].ValueString() != "active" {
+		t.Fatalf("value = %q, want %q", events[1].ValueString(), "active")
 	}
 }
 
@@ -407,8 +410,8 @@ func TestDecodeLeadingDotDecimal(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d: %v", len(events), events)
 	}
-	if events[1].Value != ".99" {
-		t.Fatalf("value = %q, want %q", events[1].Value, ".99")
+	if events[1].ValueString() != ".99" {
+		t.Fatalf("value = %q, want %q", events[1].ValueString(), ".99")
 	}
 }
 
@@ -446,7 +449,7 @@ func TestDecodeNoWhitespaceAroundEquals(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events, got %d", len(events))
 	}
-	if events[1].Value != "42" {
+	if events[1].ValueString() != "42" {
 		t.Fatalf("value = %q", events[1].Value)
 	}
 }

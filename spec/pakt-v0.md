@@ -553,15 +553,14 @@ Each error MUST include:
 
 ### 11.2 Normative Error Categories
 
-Codes 1–99 are reserved for the spec. Implementations MUST support at least the active categories below (those with an identifier) and MUST allow callers to distinguish them programmatically (via sentinel errors, error codes, typed exceptions, or equivalent). Reserved slots are not active categories and impose no implementation requirement.
+Codes 1–99 are reserved for the spec. Implementations MUST support at least the categories below and MUST allow callers to distinguish them programmatically (via sentinel errors, error codes, typed exceptions, or equivalent).
 
 | Code | Identifier | Condition |
 |------|-----------|-----------|
 | 1 | `unexpected_eof` | Input ends before a syntactic construct is complete |
-| 2 | *(reserved)* | *(formerly `duplicate_name`; removed — see §6.1)* |
-| 3 | `type_mismatch` | A value does not conform to its declared type |
-| 4 | `nil_non_nullable` | `nil` appears where the type is not nullable |
-| 5 | `syntax` | Any lexical or grammatical error not covered by a more specific category |
+| 2 | `type_mismatch` | A value does not conform to its declared type |
+| 3 | `nil_non_nullable` | `nil` appears where the type is not nullable |
+| 4 | `syntax` | Any lexical or grammatical error not covered by a more specific category |
 
 ### 11.3 Extensibility
 

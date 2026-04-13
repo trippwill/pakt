@@ -12,10 +12,10 @@
 <span class="pk-name">active</span><span class="pk-delim">:</span><span class="pk-type">bool</span>      <span class="pk-op">=</span> <span class="pk-bool">true</span>
 <span class="pk-name">server</span><span class="pk-delim">:</span><span class="pk-delim">{</span><span class="pk-name">host</span><span class="pk-delim">:</span><span class="pk-type">str</span><span class="pk-delim">,</span> <span class="pk-name">port</span><span class="pk-delim">:</span><span class="pk-type">int</span><span class="pk-delim">}</span> <span class="pk-op">=</span> <span class="pk-delim">{</span> <span class="pk-str">'localhost'</span><span class="pk-delim">,</span> <span class="pk-num">8080</span> <span class="pk-delim">}</span>
 
-<span class="pk-comment"># Pack events — no delimiters needed</span>
-<span class="pk-name">events</span><span class="pk-delim">:</span><span class="pk-delim">[</span><span class="pk-delim">{</span><span class="pk-name">ts</span><span class="pk-delim">:</span><span class="pk-type">ts</span><span class="pk-delim">,</span> <span class="pk-name">level</span><span class="pk-delim">:</span><span class="pk-type">str</span><span class="pk-delim">}</span><span class="pk-delim">]</span> <span class="pk-op">&lt;&lt;</span>
-    <span class="pk-delim">{</span> <span class="pk-str">'2026-06-01T14:30:00Z'</span><span class="pk-delim">,</span> <span class="pk-str">'info'</span> <span class="pk-delim">}</span>
-    <span class="pk-delim">{</span> <span class="pk-str">'2026-06-01T14:31:00Z'</span><span class="pk-delim">,</span> <span class="pk-str">'warn'</span> <span class="pk-delim">}</span></code><span class="typing-cursor" id="typing-cursor"></span></pre>
+<span class="pk-comment"># Stream events with &lt;&lt; — one per line</span>
+<span class="pk-name">events</span><span class="pk-delim">:</span><span class="pk-delim">[</span><span class="pk-delim">{</span><span class="pk-name">ts</span><span class="pk-delim">:</span><span class="pk-type">ts</span><span class="pk-delim">,</span> <span class="pk-name">level</span><span class="pk-delim">:</span><span class="pk-delim">|</span><span class="pk-type">info</span><span class="pk-delim">,</span> <span class="pk-type">warn</span><span class="pk-delim">,</span> <span class="pk-type">error</span><span class="pk-delim">|</span><span class="pk-delim">}</span><span class="pk-delim">]</span> <span class="pk-op">&lt;&lt;</span>
+    <span class="pk-delim">{</span> <span class="pk-num">2026-06-01T14:30:00Z</span><span class="pk-delim">,</span> <span class="pk-delim">|</span><span class="pk-type">info</span> <span class="pk-delim">}</span>
+    <span class="pk-delim">{</span> <span class="pk-num">2026-06-01T14:31:00Z</span><span class="pk-delim">,</span> <span class="pk-delim">|</span><span class="pk-type">warn</span> <span class="pk-delim">}</span></code><span class="typing-cursor" id="typing-cursor"></span></pre>
     </div>
     <div class="hero-actions">
       <a href="/docs/" class="btn btn-primary">Read the Docs</a>
@@ -124,7 +124,7 @@
       <div class="step">
         <div class="step-number">3</div>
         <h3>Consume</h3>
-        <p>Unmarshal into typed structs, process events one by one, or pack values into streaming output. Your data, your way.</p>
+        <p>Iterate properties with <code>UnitReader</code>, stream pack elements with <code>PackItems[T]</code>, or unmarshal an entire unit with <code>UnmarshalNew[T]</code>.</p>
       </div>
     </div>
   </div>
@@ -145,11 +145,11 @@
           </svg>
           <h3>Go</h3>
         </div>
-        <p class="library-desc">Streaming state-machine decoder, encoder, reflection-based marshal/unmarshal. Zero-allocation hot path.</p>
+        <p class="library-desc">Streaming UnitReader with <code>iter.Seq</code> iterators, generic <code>ReadValue[T]</code>, pack streaming, custom converters.</p>
         <pre><code>go install github.com/trippwill/pakt@latest</code></pre>
         <div class="library-features">
-          <span>Streaming decoder</span>
-          <span>Marshal/Unmarshal</span>
+          <span>UnitReader + PackItems</span>
+          <span>UnmarshalNew[T]</span>
           <span>CLI tool</span>
         </div>
         <a href="/docs/install/" class="library-link">Get started →</a>

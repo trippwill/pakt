@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -17,7 +18,7 @@ import (
 // failing the test on any unexpected error.
 func fileDecodeAll(t *testing.T, path string) []Event {
 	t.Helper()
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // test fixture path
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}
@@ -33,6 +34,7 @@ func fileDecodeAll(t *testing.T, path string) []Event {
 		if err != nil {
 			t.Fatalf("Decode(%s): %v", filepath.Base(path), err)
 		}
+		ev.Value = slices.Clone(ev.Value)
 		events = append(events, ev)
 	}
 	return events
@@ -42,7 +44,7 @@ func fileDecodeAll(t *testing.T, path string) []Event {
 // if the document parses without error.
 func fileDecodeExpectError(t *testing.T, path string) error {
 	t.Helper()
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // test fixture path
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}
@@ -158,8 +160,8 @@ func TestIntegrationValidScalars(t *testing.T) {
 	for i := 0; i < len(events); i += 3 {
 		name := events[i].Name
 		if want, ok := spotChecks[name]; ok {
-			if events[i+1].Value != want {
-				t.Errorf("%s: value = %q, want %q", name, events[i+1].Value, want)
+			if events[i+1].ValueString() != want {
+				t.Errorf("%s: value = %q, want %q", name, events[i+1].ValueString(), want)
 			}
 		}
 	}
@@ -179,7 +181,7 @@ func TestIntegrationValidStrings(t *testing.T) {
 	vals := make(map[string]string)
 	for i := 0; i < len(events); i++ {
 		if events[i].Kind == EventScalarValue {
-			vals[events[i].Name] = events[i].Value
+			vals[events[i].Name] = events[i].ValueString()
 		}
 	}
 
@@ -294,7 +296,7 @@ func TestIntegrationValidNullable(t *testing.T) {
 	scalarTypes := make(map[string]TypeKind)
 	for _, ev := range events {
 		if ev.Kind == EventScalarValue && ev.Name != "" {
-			vals[ev.Name] = ev.Value
+			vals[ev.Name] = ev.ValueString()
 			scalarTypes[ev.Name] = ev.ScalarType
 		}
 	}
@@ -354,8 +356,8 @@ func TestIntegrationValidAtoms(t *testing.T) {
 	for i := 0; i < len(events); i += 3 {
 		name := events[i].Name
 		if want, ok := expectedValues[name]; ok {
-			if events[i+1].Value != want {
-				t.Errorf("%s: value = %q, want %q", name, events[i+1].Value, want)
+			if events[i+1].ValueString() != want {
+				t.Errorf("%s: value = %q, want %q", name, events[i+1].ValueString(), want)
 			}
 		}
 	}
@@ -423,8 +425,8 @@ func TestIntegrationValidFull(t *testing.T) {
 	if events[deployIdx+2].Kind != EventScalarValue || events[deployIdx+2].Name != "level" {
 		t.Errorf("deploy[2]: got %s name=%q, want ScalarValue name=level", events[deployIdx+2].Kind, events[deployIdx+2].Name)
 	}
-	if events[deployIdx+2].Value != "prod" {
-		t.Errorf("deploy level: value = %q, want %q", events[deployIdx+2].Value, "prod")
+	if events[deployIdx+2].ValueString() != "prod" {
+		t.Errorf("deploy level: value = %q, want %q", events[deployIdx+2].ValueString(), "prod")
 	}
 	if events[deployIdx+3].Kind != EventScalarValue || events[deployIdx+3].Name != "release" {
 		t.Errorf("deploy[3]: got %s name=%q, want ScalarValue name=release", events[deployIdx+3].Kind, events[deployIdx+3].Name)
@@ -454,8 +456,8 @@ func TestIntegrationValidFull(t *testing.T) {
 	featureValues := []string{"dark-mode", "notifications", "audit-log"}
 	for j, want := range featureValues {
 		ev := events[featIdx+2+j]
-		if ev.Kind != EventScalarValue || ev.Value != want {
-			t.Errorf("features[%d]: got %s value=%q, want ScalarValue value=%q", j, ev.Kind, ev.Value, want)
+		if ev.Kind != EventScalarValue || ev.ValueString() != want {
+			t.Errorf("features[%d]: got %s value=%q, want ScalarValue value=%q", j, ev.Kind, ev.ValueString(), want)
 		}
 	}
 
@@ -484,8 +486,8 @@ func TestIntegrationValidFull(t *testing.T) {
 	// Verify nullable nil: rollback-version should have nil value
 	for _, ev := range events {
 		if ev.Kind == EventScalarValue && ev.Name == "rollback-version" {
-			if ev.Value != "nil" {
-				t.Errorf("rollback-version: value = %q, want %q", ev.Value, "nil")
+			if ev.ValueString() != "nil" {
+				t.Errorf("rollback-version: value = %q, want %q", ev.ValueString(), "nil")
 			}
 			break
 		}
@@ -662,13 +664,14 @@ func TestDuplicateRootNamesPreserved(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
+		ev.Value = slices.Clone(ev.Value)
 		events = append(events, ev)
 	}
 	// Both statements preserved: AssignStart, ScalarValue, AssignEnd × 2
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events for two duplicate statements, got %d: %v", len(events), events)
 	}
-	if events[1].Value != "a" || events[4].Value != "b" {
+	if events[1].ValueString() != "a" || events[4].ValueString() != "b" {
 		t.Fatalf("duplicate names not preserved in order: %v", events)
 	}
 }
@@ -678,7 +681,7 @@ func TestDuplicateMapKeysFixtureParses(t *testing.T) {
 	if len(events) != 10 {
 		t.Fatalf("expected 10 events, got %d: %v", len(events), events)
 	}
-	if events[2].Value != "alice" || events[3].Value != "1" || events[6].Value != "alice" || events[7].Value != "3" {
+	if events[2].ValueString() != "alice" || events[3].ValueString() != "1" || events[6].ValueString() != "alice" || events[7].ValueString() != "3" {
 		t.Fatalf("unexpected duplicate-key event sequence: %v", events)
 	}
 }
@@ -709,16 +712,6 @@ func TestSentinelErrUnexpectedEOF(t *testing.T) {
 	}
 }
 
-func TestSentinelErrDuplicateNameInSpec(t *testing.T) {
-	_, err := ParseSpec(strings.NewReader("name:str\nname:int"))
-	if err == nil {
-		t.Fatal("expected error for duplicate name in spec")
-	}
-	if !errors.Is(err, ErrSyntax) {
-		t.Fatalf("expected errors.Is(err, ErrSyntax), got: %v", err)
-	}
-}
-
 func TestDuplicateMapKeysUnit(t *testing.T) {
 	typ := mapType(scalarType(TypeStr), scalarType(TypeInt))
 	events, err := decodeValue("< 'a' ; 1, 'a' ; 2 >", typ)
@@ -728,7 +721,7 @@ func TestDuplicateMapKeysUnit(t *testing.T) {
 	if len(events) != 6 {
 		t.Fatalf("expected 6 events, got %d: %v", len(events), events)
 	}
-	if events[1].Value != "a" || events[2].Value != "1" || events[3].Value != "a" || events[4].Value != "2" {
+	if events[1].ValueString() != "a" || events[2].ValueString() != "1" || events[3].ValueString() != "a" || events[4].ValueString() != "2" {
 		t.Fatalf("unexpected duplicate-key event sequence: %v", events)
 	}
 }
@@ -767,7 +760,7 @@ func TestNulByteTerminatesUnitAtTopLevel(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("expected 3 events (one statement before NUL), got %d: %v", len(events), events)
 	}
-	if events[1].Value != "Alice" {
+	if events[1].ValueString() != "Alice" {
 		t.Errorf("expected value 'Alice', got %q", events[1].Value)
 	}
 }
@@ -811,8 +804,8 @@ func TestNulByteTerminatesPack(t *testing.T) {
 	}
 }
 
-func TestNulByteMoreReturnsFalse(t *testing.T) {
-	// More() should return false when NUL terminates the unit.
+func TestNulByteTerminatesUnit(t *testing.T) {
+	// After NUL, the decoder should return EOF.
 	input := "name:str = 'Alice'\x00"
 	d := NewDecoder(strings.NewReader(input))
 	defer d.Close()
@@ -829,7 +822,9 @@ func TestNulByteMoreReturnsFalse(t *testing.T) {
 			break
 		}
 	}
-	if d.More() {
-		t.Fatal("More() should return false after NUL terminator")
+	// Next Decode should return EOF (NUL terminated the unit).
+	_, err := d.Decode()
+	if err != io.EOF {
+		t.Fatalf("expected io.EOF after NUL terminator, got: %v", err)
 	}
 }

@@ -59,14 +59,28 @@ type Config struct {
     Port int    `pakt:"port"`
 }
 
-data := []byte("host:str = 'localhost'\nport:int = 8080")
-var cfg Config
-if err := encoding.Unmarshal(data, &cfg); err != nil {
-    log.Fatal(err)
-}
+cfg, err := encoding.UnmarshalNew[Config](data)
 ```
 
-### Streaming Decode (Events)
+### Streaming (UnitReader)
+
+```go
+ur := encoding.NewUnitReader(reader)
+defer ur.Close()
+for prop := range ur.Properties() {
+    switch prop.Name {
+    case "config":
+        cfg, err := encoding.ReadValue[Config](ur)
+    case "events":
+        for event := range encoding.PackItems[LogEvent](ur) {
+            process(event)
+        }
+    }
+}
+if err := ur.Err(); err != nil { ... }
+```
+
+### Event-Level Decode
 
 ```go
 dec := encoding.NewDecoder(reader)
@@ -74,25 +88,7 @@ defer dec.Close()
 for {
     ev, err := dec.Decode()
     if err == io.EOF { break }
-    fmt.Println(ev.Kind, ev.Name, ev.Value)
-}
-```
-
-### Streaming Unmarshal (large datasets)
-
-Process stream entries one at a time with constant memory:
-
-```go
-dec := encoding.NewDecoder(reader)
-defer dec.Close()
-
-// Read top-level fields into a struct
-for dec.More() {
-    var entry FSEntry
-    if err := dec.UnmarshalNext(&entry); err != nil {
-        break
-    }
-    process(entry)
+    fmt.Println(ev.Kind, ev.Name, string(ev.Value))
 }
 ```
 

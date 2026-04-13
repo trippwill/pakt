@@ -10,15 +10,13 @@ type ErrorCode int
 
 const (
 	ErrUnexpectedEOF  ErrorCode = 1 // unexpected end of input
-	_                 ErrorCode = 2 // reserved (formerly duplicate_name; removed per spec §6.1)
-	ErrTypeMismatch   ErrorCode = 3 // type mismatch
-	ErrNilNonNullable ErrorCode = 4 // nil on non-nullable type
-	ErrSyntax         ErrorCode = 5 // syntax error (catch-all)
+	ErrTypeMismatch   ErrorCode = 2 // type mismatch
+	ErrNilNonNullable ErrorCode = 3 // nil on non-nullable type
+	ErrSyntax         ErrorCode = 4 // syntax error (catch-all)
 )
 
 var errorCodeNames = [...]string{
 	ErrUnexpectedEOF:  "unexpected_eof",
-	2:                 "",
 	ErrTypeMismatch:   "type_mismatch",
 	ErrNilNonNullable: "nil_non_nullable",
 	ErrSyntax:         "syntax",
@@ -74,3 +72,42 @@ func (e *ParseError) Unwrap() error {
 	}
 	return e.Wrapped
 }
+
+// DeserializeError wraps a parse or conversion error with deserialization context.
+type DeserializeError struct {
+	Pos      Pos    // source position in the PAKT data
+	Property string // which unit property (e.g., "config")
+	Field    string // which field within a composite (e.g., "port"), or empty
+	Message  string // human-readable description
+	Err      error  // wrapped underlying error
+}
+
+// Error implements the [error] interface.
+// Format: "property.field (line:col): message" or "property (line:col): message".
+// When Pos is zero, the position is omitted.
+func (e *DeserializeError) Error() string {
+	hasPos := e.Pos.Line != 0 || e.Pos.Col != 0
+	loc := ""
+	if hasPos {
+		loc = fmt.Sprintf("(%d:%d)", e.Pos.Line, e.Pos.Col)
+	}
+	if e.Field != "" {
+		if hasPos {
+			return fmt.Sprintf("%s.%s (%d:%d): %s", e.Property, e.Field, e.Pos.Line, e.Pos.Col, e.Message)
+		}
+		return fmt.Sprintf("%s.%s: %s", e.Property, e.Field, e.Message)
+	}
+	if e.Property != "" {
+		if hasPos {
+			return fmt.Sprintf("%s (%d:%d): %s", e.Property, e.Pos.Line, e.Pos.Col, e.Message)
+		}
+		return fmt.Sprintf("%s: %s", e.Property, e.Message)
+	}
+	if hasPos {
+		return fmt.Sprintf("%s: %s", loc, e.Message)
+	}
+	return e.Message
+}
+
+// Unwrap returns the underlying error.
+func (e *DeserializeError) Unwrap() error { return e.Err }

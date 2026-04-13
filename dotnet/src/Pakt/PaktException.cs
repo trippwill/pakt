@@ -11,17 +11,14 @@ public enum PaktErrorCode
     /// <summary>Input ends before a construct is complete.</summary>
     UnexpectedEof = 1,
 
-    /// <summary>Reserved (formerly duplicate_name; see spec §6.1).</summary>
-    DuplicateName = 2,
-
     /// <summary>A value does not conform to its declared type.</summary>
-    TypeMismatch = 3,
+    TypeMismatch = 2,
 
     /// <summary><c>nil</c> assigned to a non-nullable type.</summary>
-    NilNonNullable = 4,
+    NilNonNullable = 3,
 
     /// <summary>Lexical or grammatical error (catch-all).</summary>
-    Syntax = 5,
+    Syntax = 4,
 }
 
 /// <summary>

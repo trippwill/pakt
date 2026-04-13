@@ -19,14 +19,12 @@ type CLI struct {
 // ParseCmd reads a PAKT file and emits streaming events to stdout.
 type ParseCmd struct {
 	File   string `arg:"" help:"Path to .pakt file (use - for stdin)." type:"existingfile"`
-	Spec   string `short:"s" optional:"" help:"Path to .spec.pakt for projection." type:"existingfile" env:"PAKT_SPEC"`
 	Format string `short:"f" enum:"text,json" default:"text" help:"Output format (text or json)." env:"PAKT_FORMAT"`
 }
 
 // ValidateCmd checks a PAKT file for errors without emitting events.
 type ValidateCmd struct {
 	File string `arg:"" help:"Path to .pakt file (use - for stdin)." type:"existingfile"`
-	Spec string `short:"s" optional:"" help:"Path to .spec.pakt for projection." type:"existingfile" env:"PAKT_SPEC"`
 }
 
 // VersionCmd prints version information.
@@ -41,17 +39,7 @@ func (c *ParseCmd) Run(cli *CLI) error {
 	defer func() { _ = r.Close() }()
 
 	dec := encoding.NewDecoder(r)
-
-	if c.Spec != "" {
-		specFile, err := os.Open(c.Spec)
-		if err != nil {
-			return fmt.Errorf("opening spec: %w", err)
-		}
-		defer func() { _ = specFile.Close() }()
-		if err := dec.SetSpec(specFile); err != nil {
-			return fmt.Errorf("loading spec: %w", err)
-		}
-	}
+	defer dec.Close()
 
 	jsonEnc := json.NewEncoder(os.Stdout)
 
@@ -85,17 +73,7 @@ func (c *ValidateCmd) Run(cli *CLI) error {
 	defer func() { _ = r.Close() }()
 
 	dec := encoding.NewDecoder(r)
-
-	if c.Spec != "" {
-		specFile, err := os.Open(c.Spec)
-		if err != nil {
-			return fmt.Errorf("opening spec: %w", err)
-		}
-		defer func() { _ = specFile.Close() }()
-		if err := dec.SetSpec(specFile); err != nil {
-			return fmt.Errorf("loading spec: %w", err)
-		}
-	}
+	defer dec.Close()
 
 	hasErrors := false
 	for {

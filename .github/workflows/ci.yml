@@ -11,6 +11,7 @@ permissions:
 jobs:
   go:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -18,9 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - uses: jdx/mise-action@v2
         with:
-          go-version-file: 'go.mod'
+          install_args: go golangci-lint
 
       - name: Build
         run: go build ./...
@@ -29,7 +30,7 @@ jobs:
         run: go test ./... -count=1 -race -coverprofile=coverage.out
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v7
+        run: golangci-lint run
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest'
@@ -42,6 +43,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Coverage summary
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/github-script@v7
         with:
           script: |
@@ -56,6 +58,7 @@ jobs:
 
   dotnet:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}

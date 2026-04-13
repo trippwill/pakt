@@ -13,8 +13,18 @@ linters:
     - unused
     - ineffassign
     - misspell
+    - gosec
+    - nilerr
+    - exhaustive
   settings:
     errcheck:
       exclude-functions:
         - (io.Closer).Close
         - (*bufio.Reader).UnreadByte
+    gosec:
+      excludes:
+        - G104 # unhandled errors — covered by errcheck linter with nolint directives
+        - G204 # subprocess with variable — used in test builds
+        - G304 # file open with variable — CLI args and test fixtures
+    exhaustive:
+      default-signifies-exhaustive: true

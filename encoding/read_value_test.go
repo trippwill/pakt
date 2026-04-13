@@ -485,3 +485,73 @@ func TestReadValueTupleIntoSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestReadValueFloatIntoString(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader("v:float = 1e2\n"))
+	defer sr.Close()
+	for range sr.Properties() {
+		val, err := ReadValue[string](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val != "1e2" {
+			t.Errorf("expected '1e2', got %q", val)
+		}
+	}
+}
+
+func TestReadValueBoolIntoString(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader("v:bool = true\n"))
+	defer sr.Close()
+	for range sr.Properties() {
+		val, err := ReadValue[string](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val != "true" {
+			t.Errorf("expected 'true', got %q", val)
+		}
+	}
+}
+
+func TestReadValueIntIntoString(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader("v:int = 42\n"))
+	defer sr.Close()
+	for range sr.Properties() {
+		val, err := ReadValue[string](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val != "42" {
+			t.Errorf("expected '42', got %q", val)
+		}
+	}
+}
+
+func TestReadValueDateIntoString(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader("v:date = 2026-06-01\n"))
+	defer sr.Close()
+	for range sr.Properties() {
+		val, err := ReadValue[string](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val != "2026-06-01" {
+			t.Errorf("expected '2026-06-01', got %q", val)
+		}
+	}
+}
+
+func TestReadValueBinIntoString(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader("v:bin = x'48656C6C6F'\n"))
+	defer sr.Close()
+	for range sr.Properties() {
+		val, err := ReadValue[string](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val != "Hello" {
+			t.Errorf("expected 'Hello', got %q", val)
+		}
+	}
+}

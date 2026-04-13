@@ -6,12 +6,13 @@ import (
 	"iter"
 )
 
-// Property represents a top-level PAKT statement header.
-// It is valid only until the next call to [UnitReader.Statements] iteration
+// Property represents a top-level PAKT property header.
+// It is valid only until the next call to [UnitReader.Properties] iteration
 // or [UnitReader.Close].
 type Property struct {
-	Name   string // statement name (e.g., "server", "events")
+	Name   string // property name (e.g., "server", "events")
 	Type   Type   // declared PAKT type annotation
+	Pos    Pos    // source position of the property
 	IsPack bool   // true if << (pack statement)
 }
 
@@ -25,6 +26,7 @@ type UnitReader struct {
 	current *Event // most recently yielded statement-start event, or nil
 	depth   int    // nesting depth within current statement (0 = at statement level)
 	inPack  bool   // true while iterating pack elements
+	pending *Event // one-event pushback for navigation helpers
 }
 
 // NewUnitReader creates a UnitReader from any [io.Reader].
@@ -54,16 +56,16 @@ func (sr *UnitReader) Err() error {
 	return sr.err
 }
 
-// Statements returns an iterator over the top-level statements in the PAKT unit.
+// Properties returns an iterator over the top-level properties in the PAKT unit.
 // Each [Property] is valid only for the current iteration step.
 //
 // On error, iteration stops. Call [UnitReader.Err] after the loop to
 // check for errors.
 //
-// Within each iteration step, the caller should read the statement's value
+// Within each iteration step, the caller should read the property's value
 // using [ReadValue], [PackItems], or [UnitReader.Skip].
-// If the caller does not consume the statement's value, Statements
-// automatically skips to the next statement.
+// If the caller does not consume the property's value, Properties
+// automatically skips to the next property.
 func (sr *UnitReader) Properties() iter.Seq[Property] {
 	return func(yield func(Property) bool) {
 		for {
@@ -108,6 +110,7 @@ func (sr *UnitReader) Properties() iter.Seq[Property] {
 			stmt := Property{
 				Name:   ev.Name,
 				Type:   typ,
+				Pos:    ev.Pos,
 				IsPack: sr.inPack,
 			}
 
@@ -181,12 +184,26 @@ func (sr *UnitReader) setErr(err error) {
 	}
 }
 
+// pushBack stores an event for the next nextEvent() call.
+func (sr *UnitReader) pushBack(ev Event) {
+	sr.pending = &ev
+}
+
 // nextEvent reads the next event from the decoder, tracking nesting depth.
 // It returns io.EOF when the current statement/pack is exhausted.
+// If a pending event was pushed back, it is returned first.
 func (sr *UnitReader) nextEvent() (Event, error) {
-	ev, err := sr.dec.Decode()
-	if err != nil {
-		return Event{}, err
+	var ev Event
+	var err error
+
+	if sr.pending != nil {
+		ev = *sr.pending
+		sr.pending = nil
+	} else {
+		ev, err = sr.dec.Decode()
+		if err != nil {
+			return Event{}, err
+		}
 	}
 
 	endKind := sr.endKindForCurrent()

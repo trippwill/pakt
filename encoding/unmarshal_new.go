@@ -24,7 +24,7 @@ func UnmarshalNewFrom[T any](r io.Reader, opts ...Option) (T, error) {
 	var result T
 	rv := reflect.ValueOf(&result).Elem()
 	if rv.Kind() != reflect.Struct {
-		return result, fmt.Errorf("pakt: Unmarshal requires a struct type, got %s", rv.Type())
+		return result, fmt.Errorf("pakt: UnmarshalNewFrom requires a struct type, got %s", rv.Type())
 	}
 
 	sr := NewUnitReader(r, opts...)
@@ -40,11 +40,11 @@ func UnmarshalNewFrom[T any](r io.Reader, opts ...Option) (T, error) {
 // Useful when reusing buffers or populating embedded structs.
 func UnmarshalNewInto[T any](data []byte, target *T, opts ...Option) error {
 	if target == nil {
-		return fmt.Errorf("pakt: UnmarshalInto requires a non-nil pointer")
+		return fmt.Errorf("pakt: UnmarshalNewInto requires a non-nil pointer")
 	}
 	rv := reflect.ValueOf(target).Elem()
 	if rv.Kind() != reflect.Struct {
-		return fmt.Errorf("pakt: UnmarshalInto requires a pointer to a struct, got pointer to %s", rv.Type())
+		return fmt.Errorf("pakt: UnmarshalNewInto requires a pointer to a struct, got pointer to %s", rv.Type())
 	}
 
 	sr := NewUnitReaderFromBytes(data, opts...)
@@ -68,6 +68,7 @@ func unmarshalIntoStruct(sr *UnitReader, rv reflect.Value) error {
 			// Apply unknown field policy.
 			if sr.opts.unknownFields == ErrorUnknown {
 				return &DeserializeError{
+					Pos:      stmt.Pos,
 					Property: stmt.Name,
 					Message:  fmt.Sprintf("unknown property %q", stmt.Name),
 				}
@@ -80,6 +81,7 @@ func unmarshalIntoStruct(sr *UnitReader, rv reflect.Value) error {
 			switch sr.opts.duplicates {
 			case ErrorDupes:
 				return &DeserializeError{
+					Pos:      stmt.Pos,
 					Property: stmt.Name,
 					Message:  fmt.Sprintf("duplicate property %q", stmt.Name),
 				}
@@ -88,7 +90,11 @@ func unmarshalIntoStruct(sr *UnitReader, rv reflect.Value) error {
 			case LastWins:
 				// fall through — overwrite
 			case Accumulate:
-				// TODO: implement accumulate into slices
+				return &DeserializeError{
+					Pos:      stmt.Pos,
+					Property: stmt.Name,
+					Message:  "Accumulate duplicate policy is not yet implemented",
+				}
 			}
 		}
 		seen[stmt.Name] = true
@@ -115,6 +121,7 @@ func unmarshalIntoStruct(sr *UnitReader, rv reflect.Value) error {
 		for name := range info.fieldMap {
 			if !seen[name] {
 				return &DeserializeError{
+					Field:   name,
 					Message: fmt.Sprintf("missing property for field %q", name),
 				}
 			}

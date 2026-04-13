@@ -6,11 +6,9 @@ import (
 	"reflect"
 )
 
-// FieldEntry represents a named field within a struct value, providing
-// the field name and declared PAKT type.
+// FieldEntry represents a named field within a struct value.
 type FieldEntry struct {
 	Name string
-	Type Type
 }
 
 // MapEntry represents a key-value pair from a PAKT map value.
@@ -23,7 +21,6 @@ type MapEntry[K, V any] struct {
 // TupleEntry represents one element in a heterogeneous tuple value.
 type TupleEntry struct {
 	Index int
-	Type  Type
 }
 
 // StructFields returns an iterator over the fields of a struct value
@@ -34,9 +31,6 @@ type TupleEntry struct {
 // Errors stop iteration; call [UnitReader.Err] after the loop.
 func StructFields(sr *UnitReader) iter.Seq[FieldEntry] {
 	return func(yield func(FieldEntry) bool) {
-		// Expect the first event to be StructStart (already consumed by Statements).
-		// The caller may have already consumed the StructStart via ReadValue dispatch,
-		// so we consume the next event and look for field value events.
 		for {
 			ev, err := sr.nextEvent()
 			if err != nil {
@@ -50,23 +44,19 @@ func StructFields(sr *UnitReader) iter.Seq[FieldEntry] {
 				return
 			}
 
-			// For struct fields, the event carries the field name.
 			entry := FieldEntry{
 				Name: ev.Name,
 			}
+
+			// Push the event back so the caller's ReadValue/ReadAs
+			// picks it up as the field's value.
+			sr.pushBack(ev)
 
 			if !yield(entry) {
 				// Caller broke — skip rest of struct.
 				skipComposite(sr, EventStructStart) //nolint:errcheck
 				return
 			}
-
-			// The caller is expected to consume this field's value.
-			// If they didn't (next call to nextEvent would get the wrong thing),
-			// the value was already yielded as the current event in the iterator body.
-			// Actually the design requires the caller to read the value after yield.
-			// Since the event was already consumed, the next ReadValue/ReadAs call
-			// will read from the stream correctly.
 		}
 	}
 }
@@ -197,6 +187,10 @@ func TupleElements(sr *UnitReader) iter.Seq[TupleEntry] {
 			entry := TupleEntry{
 				Index: idx,
 			}
+
+			// Push the event back so the caller's ReadValue/ReadAs
+			// picks it up as the element's value.
+			sr.pushBack(ev)
 
 			if !yield(entry) {
 				skipComposite(sr, EventTupleStart) //nolint:errcheck

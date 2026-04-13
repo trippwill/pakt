@@ -83,7 +83,7 @@ type DeserializeError struct {
 }
 
 // Error implements the [error] interface.
-// Format: "statement.field (line:col): message" or "statement (line:col): message".
+// Format: "property.field (line:col): message" or "property (line:col): message".
 func (e *DeserializeError) Error() string {
 	loc := fmt.Sprintf("%d:%d", e.Pos.Line, e.Pos.Col)
 	if e.Field != "" {

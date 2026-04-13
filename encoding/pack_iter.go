@@ -66,6 +66,10 @@ func PackItems[T any](sr *UnitReader) iter.Seq[T] {
 // Early break drains remaining pack elements.
 func PackItemsInto[T any](sr *UnitReader, buf *T) iter.Seq[*T] {
 	return func(yield func(*T) bool) {
+		if buf == nil {
+			sr.setErr(&DeserializeError{Message: "PackItemsInto requires a non-nil buffer"})
+			return
+		}
 		if sr.current == nil || !sr.inPack {
 			sr.setErr(&DeserializeError{Message: "PackItemsInto called outside a pack statement"})
 			return

@@ -228,6 +228,170 @@ func TestReadValueNullable(t *testing.T) {
 	}
 }
 
+func TestReadValueInto(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader("name:str = 'hello'\n"))
+	defer sr.Close()
+
+	for range sr.Properties() {
+		var val string
+		err := ReadValueInto(sr, &val)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val != "hello" {
+			t.Errorf("expected 'hello', got %q", val)
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadValueIntoReuse(t *testing.T) {
+	input := "a:int = 1\nb:int = 2\nc:int = 3\n"
+	sr := NewUnitReader(strings.NewReader(input))
+	defer sr.Close()
+
+	var val int64
+	var sum int64
+	for range sr.Properties() {
+		err := ReadValueInto(sr, &val)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum += val
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if sum != 6 {
+		t.Errorf("expected sum=6, got %d", sum)
+	}
+}
+
+func TestReadValueTuple(t *testing.T) {
+	input := "point:(int, int, int) = (10, 20, 30)\n"
+	sr := NewUnitReader(strings.NewReader(input))
+	defer sr.Close()
+
+	for range sr.Properties() {
+		val, err := ReadValue[[]int64](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(val) != 3 {
+			t.Fatalf("expected 3 elements, got %d", len(val))
+		}
+		if val[0] != 10 || val[1] != 20 || val[2] != 30 {
+			t.Errorf("expected [10,20,30], got %v", val)
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadValueStructIntoMap(t *testing.T) {
+	input := "cfg:{host:str, mode:str} = {'localhost', 'debug'}\n"
+	sr := NewUnitReader(strings.NewReader(input))
+	defer sr.Close()
+
+	for range sr.Properties() {
+		val, err := ReadValue[map[string]string](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val["host"] != "localhost" {
+			t.Errorf("expected host=localhost, got %q", val["host"])
+		}
+		if val["mode"] != "debug" {
+			t.Errorf("expected mode=debug, got %q", val["mode"])
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadValueBin(t *testing.T) {
+	input := "data:bin = x'48454c4c4f'\n"
+	sr := NewUnitReader(strings.NewReader(input))
+	defer sr.Close()
+
+	for range sr.Properties() {
+		val, err := ReadValue[[]byte](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(val) != "HELLO" {
+			t.Errorf("expected 'HELLO', got %q", val)
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadValueDec(t *testing.T) {
+	input := "price:dec = 19.99\n"
+	sr := NewUnitReader(strings.NewReader(input))
+	defer sr.Close()
+
+	for range sr.Properties() {
+		val, err := ReadValue[float64](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val != 19.99 {
+			t.Errorf("expected 19.99, got %f", val)
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadValueDecIntoString(t *testing.T) {
+	input := "price:dec = 99.999\n"
+	sr := NewUnitReader(strings.NewReader(input))
+	defer sr.Close()
+
+	for range sr.Properties() {
+		val, err := ReadValue[string](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val != "99.999" {
+			t.Errorf("expected '99.999', got %q", val)
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadValueSkipUnknownField(t *testing.T) {
+	type Small struct {
+		Name string `pakt:"name"`
+	}
+	input := "data:{name:str, extra:int, bonus:{a:str}} = {'hello', 42, {'nested'}}\n"
+	sr := NewUnitReader(strings.NewReader(input))
+	defer sr.Close()
+
+	for range sr.Properties() {
+		val, err := ReadValue[Small](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val.Name != "hello" {
+			t.Errorf("expected 'hello', got %q", val.Name)
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReadValueNestedStruct(t *testing.T) {
 	type Inner struct {
 		X int64 `pakt:"x"`

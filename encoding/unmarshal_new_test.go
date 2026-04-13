@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -160,5 +161,91 @@ func TestUnmarshalNewDuplicateError(t *testing.T) {
 	_, err := UnmarshalNew[Config](data, Duplicates(ErrorDupes))
 	if err == nil {
 		t.Error("expected error for duplicate 'name'")
+	}
+}
+
+func TestUnmarshalNewFrom(t *testing.T) {
+	type Config struct {
+		Host string `pakt:"host"`
+		Port int64  `pakt:"port"`
+	}
+
+	r := strings.NewReader("host:str = 'example.com'\nport:int = 443\n")
+	cfg, err := UnmarshalNewFrom[Config](r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Host != "example.com" || cfg.Port != 443 {
+		t.Errorf("unexpected: %+v", cfg)
+	}
+}
+
+func TestUnmarshalNewMissingFieldsError(t *testing.T) {
+	type Config struct {
+		Host string `pakt:"host"`
+		Port int64  `pakt:"port"`
+	}
+
+	data := []byte("host:str = 'localhost'\n") // missing 'port'
+	_, err := UnmarshalNew[Config](data, MissingFields(ErrorMissing))
+	if err == nil {
+		t.Error("expected error for missing field 'port'")
+	}
+}
+
+func TestUnmarshalNewMissingFieldsZero(t *testing.T) {
+	type Config struct {
+		Host string `pakt:"host"`
+		Port int64  `pakt:"port"`
+	}
+
+	data := []byte("host:str = 'localhost'\n") // missing 'port'
+	cfg, err := UnmarshalNew[Config](data, MissingFields(ZeroMissing))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Host != "localhost" {
+		t.Errorf("unexpected host: %q", cfg.Host)
+	}
+	if cfg.Port != 0 {
+		t.Errorf("expected port=0, got %d", cfg.Port)
+	}
+}
+
+func TestUnmarshalNewDuplicateFirstWins(t *testing.T) {
+	type Config struct {
+		Name string `pakt:"name"`
+	}
+
+	data := []byte("name:str = 'first'\nname:str = 'second'\n")
+	cfg, err := UnmarshalNew[Config](data, Duplicates(FirstWins))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Name != "first" {
+		t.Errorf("expected 'first' (FirstWins), got %q", cfg.Name)
+	}
+}
+
+func TestUnmarshalNewDuplicateLastWins(t *testing.T) {
+	type Config struct {
+		Name string `pakt:"name"`
+	}
+
+	data := []byte("name:str = 'first'\nname:str = 'second'\n")
+	cfg, err := UnmarshalNew[Config](data, Duplicates(LastWins))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Name != "second" {
+		t.Errorf("expected 'second' (LastWins), got %q", cfg.Name)
+	}
+}
+
+func TestUnmarshalNewFromNonStruct(t *testing.T) {
+	r := strings.NewReader("x:int = 1\n")
+	_, err := UnmarshalNewFrom[int](r)
+	if err == nil {
+		t.Error("expected error for non-struct type")
 	}
 }

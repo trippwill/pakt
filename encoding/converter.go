@@ -32,8 +32,7 @@ func RegisterConverter[T any](c ValueConverter[T]) Option {
 // `converter=name` struct tag option.
 func RegisterNamedConverter(name string, c any) Option {
 	return func(o *options) {
-		reg := o.ensureConverters()
-		reg.byName[name] = c
+		panic("encoding: RegisterNamedConverter is not yet supported; use RegisterConverter instead")
 	}
 }
 

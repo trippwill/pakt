@@ -182,6 +182,8 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 	}
 	if raw.Error != "" {
 		e.Err = fmt.Errorf("%s", raw.Error)
+	} else {
+		e.Err = nil
 	}
 	return nil
 }

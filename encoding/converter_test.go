@@ -50,16 +50,21 @@ func TestRegisterConverterAndReadValue(t *testing.T) {
 }
 
 func TestRegisterNamedConverter(t *testing.T) {
-	// Verify RegisterNamedConverter stores the converter without panic.
+	// Verify RegisterNamedConverter panics with a clear message.
 	opt := RegisterNamedConverter("celsius", celsiusConverter{})
 	o := defaultOptions()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected RegisterNamedConverter to panic")
+		}
+		msg, ok := r.(string)
+		if !ok || msg != "encoding: RegisterNamedConverter is not yet supported; use RegisterConverter instead" {
+			t.Fatalf("unexpected panic message: %v", r)
+		}
+	}()
 	opt(o)
-	if o.converters == nil {
-		t.Fatal("expected converters to be initialized")
-	}
-	if _, ok := o.converters.byName["celsius"]; !ok {
-		t.Error("expected 'celsius' converter to be registered")
-	}
+	t.Fatal("should not reach here")
 }
 
 func TestValueReaderStringValue(t *testing.T) {

@@ -214,5 +214,12 @@ func (sr *UnitReader) nextEvent() (Event, error) {
 		return Event{}, io.EOF
 	}
 
+	// Track nesting depth for composite values within the statement.
+	if ev.Kind.IsCompositeStart() || ev.Kind.IsPackStart() {
+		sr.depth++
+	} else if ev.Kind.IsCompositeEnd() || ev.Kind.IsPackEnd() {
+		sr.depth--
+	}
+
 	return ev, nil
 }

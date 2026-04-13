@@ -84,15 +84,29 @@ type DeserializeError struct {
 
 // Error implements the [error] interface.
 // Format: "property.field (line:col): message" or "property (line:col): message".
+// When Pos is zero, the position is omitted.
 func (e *DeserializeError) Error() string {
-	loc := fmt.Sprintf("%d:%d", e.Pos.Line, e.Pos.Col)
+	hasPos := e.Pos.Line != 0 || e.Pos.Col != 0
+	loc := ""
+	if hasPos {
+		loc = fmt.Sprintf("(%d:%d)", e.Pos.Line, e.Pos.Col)
+	}
 	if e.Field != "" {
-		return fmt.Sprintf("%s.%s (%s): %s", e.Property, e.Field, loc, e.Message)
+		if hasPos {
+			return fmt.Sprintf("%s.%s (%d:%d): %s", e.Property, e.Field, e.Pos.Line, e.Pos.Col, e.Message)
+		}
+		return fmt.Sprintf("%s.%s: %s", e.Property, e.Field, e.Message)
 	}
 	if e.Property != "" {
-		return fmt.Sprintf("%s (%s): %s", e.Property, loc, e.Message)
+		if hasPos {
+			return fmt.Sprintf("%s (%d:%d): %s", e.Property, e.Pos.Line, e.Pos.Col, e.Message)
+		}
+		return fmt.Sprintf("%s: %s", e.Property, e.Message)
 	}
-	return fmt.Sprintf("(%s): %s", loc, e.Message)
+	if hasPos {
+		return fmt.Sprintf("%s: %s", loc, e.Message)
+	}
+	return e.Message
 }
 
 // Unwrap returns the underlying error.

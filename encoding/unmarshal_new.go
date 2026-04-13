@@ -3,7 +3,9 @@ package encoding
 import (
 	"fmt"
 	"io"
+	"maps"
 	"reflect"
+	"slices"
 )
 
 // UnmarshalNew deserializes a complete PAKT unit from bytes into a struct of type T.
@@ -118,7 +120,7 @@ func unmarshalIntoStruct(sr *UnitReader, rv reflect.Value) error {
 
 	// Check missing fields.
 	if sr.opts.missingFields == ErrorMissing {
-		for name := range info.fieldMap {
+		for _, name := range slices.Sorted(maps.Keys(info.fieldMap)) {
 			if !seen[name] {
 				return &DeserializeError{
 					Field:   name,

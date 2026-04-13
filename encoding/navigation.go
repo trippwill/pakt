@@ -24,9 +24,9 @@ type TupleEntry struct {
 }
 
 // StructFields returns an iterator over the fields of a struct value
-// in the current statement. Each [FieldEntry] provides the field name
-// and declared type. After each yield, the caller reads the field's value
-// via [ReadValue], [ReadAs], or [UnitReader.Skip].
+// in the current statement. Each [FieldEntry] provides the field name.
+// After each yield, the caller reads the field's value via [ReadValue]
+// or skips it via [UnitReader.Skip].
 //
 // Errors stop iteration; call [UnitReader.Err] after the loop.
 func StructFields(sr *UnitReader) iter.Seq[FieldEntry] {
@@ -181,7 +181,7 @@ func MapEntries[K, V any](sr *UnitReader) iter.Seq[MapEntry[K, V]] {
 // TupleElements returns an iterator over the elements of a tuple value
 // in the current statement. Each [TupleEntry] provides the element index.
 // After each yield, the caller reads the element's value via [ReadValue]
-// or [ReadAs].
+// or skips it via [UnitReader.Skip].
 //
 // Errors stop iteration; call [UnitReader.Err] after the loop.
 func TupleElements(sr *UnitReader) iter.Seq[TupleEntry] {

@@ -63,7 +63,7 @@ func TestUnitReaderSkip(t *testing.T) {
 	var names []string
 	for stmt := range sr.Properties() {
 		names = append(names, stmt.Name)
-		// All statements are auto-skipped by Statements() iterator
+		// All properties are auto-skipped by Properties() iterator
 	}
 	if err := sr.Err(); err != nil {
 		t.Fatalf("unexpected error: %v", err)

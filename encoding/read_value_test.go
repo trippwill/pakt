@@ -420,3 +420,68 @@ func TestReadValueNestedStruct(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestReadValueFloatWithUnderscores(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader("rate:float = 1_000.5e1\n"))
+	defer sr.Close()
+	for range sr.Properties() {
+		val, err := ReadValue[float64](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if val != 10005.0 {
+			t.Errorf("expected 10005.0, got %f", val)
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReadValueBinBase64(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader("data:bin = b'SGVsbG8='\n"))
+	defer sr.Close()
+	for range sr.Properties() {
+		val, err := ReadValue[[]byte](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(val) != "Hello" {
+			t.Errorf("expected 'Hello', got %q", val)
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEventString(t *testing.T) {
+	ev := Event{
+		Kind:       EventScalarValue,
+		Pos:        Pos{Line: 1, Col: 5},
+		Name:       "port",
+		ScalarType: TypeInt,
+		Value:      []byte("8080"),
+	}
+	s := ev.String()
+	if !strings.Contains(s, "ScalarValue") || !strings.Contains(s, "8080") {
+		t.Errorf("unexpected Event.String(): %q", s)
+	}
+}
+
+func TestReadValueTupleIntoSlice(t *testing.T) {
+	sr := NewUnitReader(strings.NewReader("v:(int, int, int) = (1, 2, 3)\n"))
+	defer sr.Close()
+	for range sr.Properties() {
+		val, err := ReadValue[[]int64](sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(val) != 3 || val[0] != 1 || val[1] != 2 || val[2] != 3 {
+			t.Errorf("expected [1, 2, 3], got %v", val)
+		}
+	}
+	if err := sr.Err(); err != nil {
+		t.Fatal(err)
+	}
+}

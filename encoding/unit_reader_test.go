@@ -190,3 +190,15 @@ func TestUnitReaderSkipPackStatement(t *testing.T) {
 		t.Errorf("expected 'after', got %q", name)
 	}
 }
+
+func TestUnitReaderErrOnMalformedInput(t *testing.T) {
+	// Trigger setErr path with malformed PAKT
+	sr := NewUnitReader(strings.NewReader("name:str\n"))
+	defer sr.Close()
+	for range sr.Properties() {
+		// malformed — no = or <<
+	}
+	if err := sr.Err(); err == nil {
+		t.Error("expected error for malformed input")
+	}
+}

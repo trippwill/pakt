@@ -1,0 +1,58 @@
+name: Fuzz
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Monday 4am UTC
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: 'Fuzz duration per target (Go duration string)'
+        default: '5m'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - FuzzDecode
+          - FuzzUnmarshalNew
+          - FuzzReadString
+          - FuzzParseIntLiteral
+          - FuzzParseType
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Restore fuzz corpus
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-test-fuzz
+            encoding/testdata/fuzz
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+
+      - name: Fuzz ${{ matrix.target }}
+        run: |
+          go test ./encoding/ \
+            -fuzz=${{ matrix.target }} \
+            -fuzztime=${{ inputs.fuzztime || '5m' }} \
+            -race
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: encoding/testdata/fuzz/${{ matrix.target }}/
+          retention-days: 30

@@ -28,14 +28,6 @@ func RegisterConverter[T any](c ValueConverter[T]) Option {
 	}
 }
 
-// RegisterNamedConverter registers a converter by name for use with the
-// `converter=name` struct tag option.
-func RegisterNamedConverter(name string, c any) Option {
-	return func(o *options) {
-		panic("encoding: RegisterNamedConverter is not yet supported; use RegisterConverter instead")
-	}
-}
-
 // ValueReader is a scoped view of the stream, positioned at a single value.
 // It provides read access for scalars and navigation for composites.
 // A ValueReader is only valid for the duration of the converter call.

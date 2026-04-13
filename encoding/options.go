@@ -81,15 +81,13 @@ func Duplicates(policy DuplicatePolicy) Option {
 // converterRegistry holds registered ValueConverters keyed by target type
 // and named converters for field-level overrides.
 type converterRegistry struct {
-	byType map[any]any    // reflect.Type → ValueConverter (type-erased)
-	byName map[string]any // converter name → ValueConverter (type-erased)
+	byType map[any]any // reflect.Type → ValueConverter (type-erased)
 }
 
 func (o *options) ensureConverters() *converterRegistry {
 	if o.converters == nil {
 		o.converters = &converterRegistry{
 			byType: make(map[any]any),
-			byName: make(map[string]any),
 		}
 	}
 	return o.converters

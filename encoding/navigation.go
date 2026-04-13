@@ -32,6 +32,17 @@ type TupleEntry struct {
 func StructFields(sr *UnitReader) iter.Seq[FieldEntry] {
 	return func(yield func(FieldEntry) bool) {
 		for {
+			// If the previous field's value wasn't consumed by the caller,
+			// the pending event is still set — drain it before reading the next field.
+			if sr.pending != nil {
+				ev := *sr.pending
+				sr.pending = nil
+				if err := skipValueEvent(sr, ev); err != nil {
+					sr.setErr(err)
+					return
+				}
+			}
+
 			ev, err := sr.nextEvent()
 			if err != nil {
 				if err != io.EOF {
@@ -53,7 +64,12 @@ func StructFields(sr *UnitReader) iter.Seq[FieldEntry] {
 			sr.pushBack(ev)
 
 			if !yield(entry) {
-				// Caller broke — skip rest of struct.
+				// Caller broke — drain pending + skip rest of struct.
+				if sr.pending != nil {
+					pev := *sr.pending
+					sr.pending = nil
+					skipValueEvent(sr, pev) //nolint:errcheck
+				}
 				skipComposite(sr, EventStructStart) //nolint:errcheck
 				return
 			}
@@ -172,6 +188,16 @@ func TupleElements(sr *UnitReader) iter.Seq[TupleEntry] {
 	return func(yield func(TupleEntry) bool) {
 		idx := 0
 		for {
+			// Drain unconsumed previous element.
+			if sr.pending != nil {
+				ev := *sr.pending
+				sr.pending = nil
+				if err := skipValueEvent(sr, ev); err != nil {
+					sr.setErr(err)
+					return
+				}
+			}
+
 			ev, err := sr.nextEvent()
 			if err != nil {
 				if err != io.EOF {
@@ -188,11 +214,14 @@ func TupleElements(sr *UnitReader) iter.Seq[TupleEntry] {
 				Index: idx,
 			}
 
-			// Push the event back so the caller's ReadValue/ReadAs
-			// picks it up as the element's value.
 			sr.pushBack(ev)
 
 			if !yield(entry) {
+				if sr.pending != nil {
+					pev := *sr.pending
+					sr.pending = nil
+					skipValueEvent(sr, pev) //nolint:errcheck
+				}
 				skipComposite(sr, EventTupleStart) //nolint:errcheck
 				return
 			}

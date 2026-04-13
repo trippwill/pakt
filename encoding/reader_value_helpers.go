@@ -34,7 +34,8 @@ func (r *reader) readSep() (bool, error) {
 	r.skipInsignificant(false) // skip WS and comments, but not newlines
 	b, err := r.peekByte()
 	if err != nil {
-		return false, nil // EOF is not an error for SEP
+		return false, nil //nolint:nilerr // EOF is not an error for SEP
+
 	}
 	if b == ',' {
 		r.readByte()              //nolint:errcheck

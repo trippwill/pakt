@@ -18,7 +18,7 @@ import (
 // failing the test on any unexpected error.
 func fileDecodeAll(t *testing.T, path string) []Event {
 	t.Helper()
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // test fixture path
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}
@@ -44,7 +44,7 @@ func fileDecodeAll(t *testing.T, path string) []Event {
 // if the document parses without error.
 func fileDecodeExpectError(t *testing.T, path string) error {
 	t.Helper()
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // test fixture path
 	if err != nil {
 		t.Fatalf("open %s: %v", path, err)
 	}

@@ -152,7 +152,7 @@ func unsafeString(b []byte) string {
 	if len(b) == 0 {
 		return ""
 	}
-	return unsafe.String(unsafe.SliceData(b), len(b))
+	return unsafe.String(unsafe.SliceData(b), len(b)) //nolint:gosec // audited: borrowed view consumed immediately
 }
 
 // setFloat parses a PAKT float literal into a Go float target.
@@ -249,6 +249,8 @@ func setBinFromEvent(target reflect.Value, raw string) error {
 	case reflect.String:
 		target.SetString(string(data))
 		return nil
+	default:
+		// fall through to error
 	}
 	return fmt.Errorf("cannot set bin into %s", target.Type())
 }

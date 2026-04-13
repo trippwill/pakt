@@ -296,7 +296,8 @@ func (r *reader) readIdent() (string, error) {
 			break
 		}
 	}
-	return r.sb.String(), nil
+	return r.sb.String(), nil //nolint:nilerr // EOF on peek means ident ended at EOF
+
 }
 
 // ---------------------------------------------------------------------------
@@ -643,7 +644,8 @@ func (r *reader) readDigitSep(sb byteAppender) error {
 			break
 		}
 	}
-	return nil
+	return nil //nolint:nilerr // EOF on peek means digits ended at EOF
+
 }
 
 // readExactDigits reads exactly n decimal digits.
@@ -702,7 +704,8 @@ func (r *reader) readPrefixedDigits(sb byteAppender, check func(byte) bool) erro
 			break
 		}
 	}
-	return nil
+	return nil //nolint:nilerr // EOF on peek means digits ended at EOF
+
 }
 
 // readNil reads the keyword "nil".

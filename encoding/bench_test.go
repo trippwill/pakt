@@ -360,7 +360,7 @@ func benchFSBuildEncFields(ds benchFSDataset) []benchEncField {
 }
 
 func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
-	rng := rand.New(rand.NewSource(42))
+	rng := rand.New(rand.NewSource(42)) //nolint:gosec // deterministic seed for reproducible benchmarks
 
 	extensions := []string{".csv", ".parquet", ".json", ".log", ".tmp", ".idx"}
 	subdirs := []string{"incoming", "archive", "staging", "reports", "temp", "indexes"}
@@ -982,7 +982,7 @@ func benchGenerateNDJSON2[T any](items []T) []byte {
 }
 
 func benchGenerateFin(n int) (benchFinDataset, []byte, []byte) {
-	rng := rand.New(rand.NewSource(77))
+	rng := rand.New(rand.NewSource(77)) //nolint:gosec // deterministic seed for reproducible benchmarks
 
 	tickers := []string{"AAPL", "GOOG", "MSFT", "AMZN", "NVDA", "META", "TSLA", "JPM", "V", "UNH",
 		"XOM", "JNJ", "PG", "MA", "HD", "CVX", "MRK", "ABBV", "PEP", "KO"}

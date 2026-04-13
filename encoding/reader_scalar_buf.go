@@ -51,7 +51,8 @@ func (r *reader) readIntTo(w byteAppender) error {
 				break
 			}
 		}
-		return nil
+		return nil //nolint:nilerr // EOF on peek means int ended at EOF
+
 	}
 
 	return r.readDigitSep(w)
@@ -131,7 +132,8 @@ func (r *reader) readFloatTo(w byteAppender) error {
 			break
 		}
 	}
-	return nil
+	return nil //nolint:nilerr // EOF on peek means float exponent ended at EOF
+
 }
 
 // readBoolTo reads a boolean keyword into w.

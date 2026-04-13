@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 )
@@ -94,7 +95,11 @@ func prepareValue(typ Type, v reflect.Value) (any, error) {
 		return v.Int(), nil
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return int64(v.Uint()), nil
+		u := v.Uint()
+		if u > math.MaxInt64 {
+			return nil, fmt.Errorf("pakt: uint value %d overflows int64", u)
+		}
+		return int64(u), nil //nolint:gosec // overflow checked above
 
 	case reflect.Float32, reflect.Float64:
 		return v.Float(), nil

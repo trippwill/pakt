@@ -1,6 +1,6 @@
 # Deserialization Design — PAKT
 
-## Problem Statement
+## Problem Property
 
 What should deserialization look like for PAKT — a typed, streaming, self-describing data interchange format? This document is a design exploration: principles and API sketches for what a streaming-first deserialization architecture should be, independent of specific language implementations.
 
@@ -17,7 +17,7 @@ What should deserialization look like for PAKT — a typed, streaming, self-desc
 
 Five characteristics of PAKT drive the deserialization design away from the JSON/YAML model:
 
-### 1.1 Self-Describing at the Statement Level
+### 1.1 Self-Describing at the Property Level
 
 Every top-level statement carries its type: `server:{host:str, port:int} = {'localhost', 8080}`. The parser validates values against the type annotation during parsing. By the time the deserializer sees data, it's **guaranteed well-typed** per the annotation.
 
@@ -59,7 +59,7 @@ The most fundamental deserialization operation is: **read one value from the str
 
 There is no "buffer everything then map." The deserializer pulls from the stream, one value at a time.
 
-### P2. Statement Headers Are the Navigation Layer
+### P2. Property Headers Are the Navigation Layer
 
 A PAKT unit is a sequence of statements. Each statement has a header (name, type, assign/pack). The **statement header** is how the deserializer navigates:
 
@@ -99,12 +99,12 @@ while event = decoder.Decode():
 
 ---
 
-### Tier 1: Statement Reader (the primary interface)
+### Tier 1: Unit Reader (the primary interface)
 
 The streaming-first deserialization primitive. Reads one statement at a time. Within a statement, reads one typed value (or iterates pack elements).
 
 ```pseudocode
-reader = NewStatementReader(stream)
+reader = NewUnitReader(stream)
 
 while reader.NextStatement():
     name = reader.Name()           // "server", "events", etc.
@@ -154,7 +154,7 @@ events:[{ts:ts, level:str, msg:str}] <<
 The statement reader handles this naturally:
 
 ```pseudocode
-reader = NewStatementReader(stream)
+reader = NewUnitReader(stream)
 
 while reader.NextStatement():
     switch reader.Name():
@@ -180,7 +180,7 @@ Built on Tier 1. Reads all statements in a unit and maps them to fields of a tar
 
 ```pseudocode
 func Unmarshal<T>(data, target: &T):
-    reader = NewStatementReader(data)
+    reader = NewUnitReader(data)
     fields = TypeMetadata<T>.Fields()        // cached field info
 
     while reader.NextStatement():
@@ -320,7 +320,7 @@ Because PAKT annotations are validated at parse time, the deserializer deals wit
 - PAKT `str` → host `int` (fundamental type mismatch)
 - PAKT non-nullable `nil` (caught at parse time, never reaches deserializer)
 
-### 4.2 Unknown Statement/Field Handling
+### 4.2 Unknown Property/Field Handling
 
 **Default policy:** Skip silently. This enables forward compatibility — new fields can be added to data without breaking old consumers.
 
@@ -336,7 +336,7 @@ Because PAKT annotations are validated at parse time, the deserializer deals wit
 - `ZeroValue` (default) — missing fields get the type's zero value
 - `Error` — missing required fields are an error (strict mode)
 
-### 4.3 Duplicate Statement Handling
+### 4.3 Duplicate Property Handling
 
 The decoder preserves duplicates. The deserializer must choose a policy:
 
@@ -375,7 +375,7 @@ The key requirements:
 
 Deserialization errors should include:
 - **Source position** (line, column) from the PAKT data
-- **Statement context** (which statement name)
+- **Property context** (which statement name)
 - **Field context** (which field within a composite)
 - **The nature of the failure** (type mismatch, overflow, missing field, custom deserializer error)
 
@@ -398,7 +398,7 @@ Errors are returned immediately (fail-fast), not accumulated. This is consistent
                      └───────┬───────┘
                              │
                     ┌────────▼────────┐
-                    │   Statement    │  Tier 1: Statements
+                    │   Property    │  Tier 1: Statements
                     │    Reader     │  NextStatement() → Name, Type, IsPack
                     │               │  ReadValue<T>() → one typed value
                     │               │  HasMore() → pack iteration
@@ -460,7 +460,7 @@ events:[{ts:ts, level:|info,warn,error|, msg:str}] <<
 ```
 
 ```pseudocode
-reader = NewStatementReader(stream)
+reader = NewUnitReader(stream)
 
 while reader.NextStatement():
     if reader.Name() == "events" and reader.IsPack():
@@ -479,7 +479,7 @@ metrics:<str ; float> = <'cpu' ; 0.85, 'mem' ; 0.62>
 ```
 
 ```pseudocode
-reader = NewStatementReader(stream)
+reader = NewUnitReader(stream)
 
 while reader.NextStatement():
     switch reader.Name():
@@ -540,7 +540,7 @@ struct VerifiedRowDeserializer implements ValueDeserializer<VerifiedRow>:
         return row
 
 // Usage: streaming with per-element verification
-reader = NewStatementReader(stream)
+reader = NewUnitReader(stream)
 while reader.NextStatement():
     if reader.Name() == "rows":
         while reader.HasMore():
@@ -562,7 +562,7 @@ Populate mode enables buffer reuse in hot loops (reuse the same struct for each 
 
 **Recommendation:** Support both. Create is the default for ergonomics. Populate is opt-in for performance-sensitive pack processing.
 
-### Q2. Should the Statement Reader expose the raw event stream?
+### Q2. Should the Unit Reader expose the raw event stream?
 
 Some advanced callers may want to drop down to Tier 0 within a statement (e.g., to implement a custom event-driven processor). Should the statement reader expose its underlying decoder?
 
@@ -580,7 +580,7 @@ For list packs, the producer doesn't declare an element count. The consumer read
 
 **Recommendation:** No. The streaming contract means you don't know the count until you've read everything. Callers who need a count should collect into a list. Providing a count hint would violate the streaming-first principle and couldn't be trusted anyway.
 
-### Q5. Statement-level type checking — when and how?
+### Q5. Property-level type checking — when and how?
 
 When `reader.ReadValue<Config>()` is called, when does the type check happen?
 
@@ -605,8 +605,8 @@ When `reader.ReadValue<Config>()` is called, when does the type check happen?
 
 | Feature | Relevance to PAKT |
 |---------|-------------------|
-| **`iter.Seq[V]` / `iter.Seq2[K,V]`** | Pack iteration and composite traversal return iterators. `for event := range reader.Statements()` is idiomatic. |
-| **Range-over-func (stable)** | Custom iterators compose with `for...range`. Statement readers and pack readers become rangeable. |
+| **`iter.Seq[V]` / `iter.Seq2[K,V]`** | Pack iteration and composite traversal return iterators. `for event := range reader.Properties()` is idiomatic. |
+| **Range-over-func (stable)** | Custom iterators compose with `for...range`. Property readers and pack readers become rangeable. |
 | **Generics (no core types)** | `ReadValue[T]()` is now practical. Generic deserialization functions with proper type constraints. |
 | **Bounded `sync.Pool`** | Pooled readers, state machines, and buffers with memory pressure control. |
 | **PGO (stable)** | Hot paths (scalar conversion, field lookup) optimizable from production profiles. |
@@ -634,7 +634,7 @@ When `reader.ReadValue<Config>()` is called, when does the type check happen?
 ```
 encoding/              # existing package: github.com/trippwill/pakt/encoding
     decoder.go         # Tier 0: event-level decoder (exists)
-    reader.go          # Tier 1: StatementReader
+    reader.go          # Tier 1: UnitReader
     unmarshal.go       # Tier 2: Unmarshal / UnmarshalFrom
     converter.go       # Tier 3: ValueConverter interface + registry
     options.go         # DeserializeOptions (policies)
@@ -654,50 +654,50 @@ func (d *Decoder) Decode() (Event, error)
 func (d *Decoder) Close()
 ```
 
-### 9.3 Tier 1: StatementReader — The Primary API
+### 9.3 Tier 1: UnitReader — The Primary API
 
-The `StatementReader` wraps a decoder and provides a pull-based, statement-at-a-time interface. It's the primary way callers consume PAKT data.
+The `UnitReader` wraps a decoder and provides a pull-based, statement-at-a-time interface. It's the primary way callers consume PAKT data.
 
 ```go
-// StatementReader reads PAKT statements one at a time from a stream.
+// UnitReader reads PAKT statements one at a time from a stream.
 // It is the primary deserialization interface.
-type StatementReader struct { /* unexported fields */ }
+type UnitReader struct { /* unexported fields */ }
 
-// NewStatementReader creates a reader from any io.Reader.
-func NewStatementReader(r io.Reader, opts ...Option) *StatementReader
+// NewUnitReader creates a reader from any io.Reader.
+func NewUnitReader(r io.Reader, opts ...Option) *UnitReader
 
-// NewStatementReaderFromBytes creates a reader from a byte slice (zero-copy path).
-func NewStatementReaderFromBytes(data []byte, opts ...Option) *StatementReader
+// NewUnitReaderFromBytes creates a reader from a byte slice (zero-copy path).
+func NewUnitReaderFromBytes(data []byte, opts ...Option) *UnitReader
 
 // Close releases all pooled resources. Must be called when done.
-func (sr *StatementReader) Close()
+func (sr *UnitReader) Close()
 ```
 
-#### Statement Navigation
+#### Property Navigation
 
 ```go
-// Statement represents a top-level statement header.
+// Property represents a top-level statement header.
 // It is valid only until the next call to NextStatement or Close.
-type Statement struct {
+type Property struct {
     Name   string   // statement name (e.g., "server", "events")
     Type   Type     // declared PAKT type annotation
     IsPack bool     // true if << (pack statement)
 }
 
 // Statements returns an iterator over all statements in the unit.
-// Each Statement is valid only for the current iteration step.
+// Each Property is valid only for the current iteration step.
 // On error, iteration stops; call sr.Err() to retrieve the error.
 //
 // Usage:
-//   for stmt := range reader.Statements() {
+//   for stmt := range reader.Properties() {
 //       ...
 //   }
 //   if err := reader.Err(); err != nil { ... }
-func (sr *StatementReader) Statements() iter.Seq[Statement]
+func (sr *UnitReader) Statements() iter.Seq[Property]
 
 // Err returns the first error encountered during iteration,
 // or nil if iteration completed successfully.
-func (sr *StatementReader) Err() error
+func (sr *UnitReader) Err() error
 ```
 
 #### Reading Values
@@ -708,15 +708,15 @@ func (sr *StatementReader) Err() error
 //
 // For assign statements: reads the single value.
 // For pack statements: reads the next element. Call within PackItems loop.
-func ReadValue[T any](sr *StatementReader) (T, error)
+func ReadValue[T any](sr *UnitReader) (T, error)
 
 // ReadValueInto reads the current value into an existing target.
 // This enables buffer reuse in hot pack-processing loops.
-func ReadValueInto[T any](sr *StatementReader, target *T) error
+func ReadValueInto[T any](sr *UnitReader, target *T) error
 
 // Skip advances past the current statement or pack element without
 // allocating or deserializing. Use for unknown/unwanted statements.
-func (sr *StatementReader) Skip() error
+func (sr *UnitReader) Skip() error
 ```
 
 #### Pack Iteration
@@ -731,7 +731,7 @@ func (sr *StatementReader) Skip() error
 // so the reader is positioned at the next statement.
 //
 // Usage:
-//   for stmt := range reader.Statements() {
+//   for stmt := range reader.Properties() {
 //       if stmt.IsPack {
 //           for item := range PackItems[LogEvent](reader) {
 //               process(item)
@@ -739,23 +739,23 @@ func (sr *StatementReader) Skip() error
 //           if err := reader.Err(); err != nil { ... }
 //       }
 //   }
-func PackItems[T any](sr *StatementReader) iter.Seq[T]
+func PackItems[T any](sr *UnitReader) iter.Seq[T]
 
 // PackItemsInto returns an iterator that reuses a caller-provided buffer.
 // On each iteration, the buffer is populated with the next element.
 // The yielded pointer aliases the buffer — do not retain across iterations.
 // Early break drains remaining pack elements.
-func PackItemsInto[T any](sr *StatementReader, buf *T) iter.Seq[*T]
+func PackItemsInto[T any](sr *UnitReader, buf *T) iter.Seq[*T]
 ```
 
 #### Complete Tier 1 Example
 
 ```go
 func processUnit(r io.Reader) error {
-    sr := encoding.NewStatementReader(r)
+    sr := encoding.NewUnitReader(r)
     defer sr.Close()
 
-    for stmt := range sr.Statements() {
+    for stmt := range sr.Properties() {
         switch stmt.Name {
         case "name":
             name, err := encoding.ReadValue[string](sr)
@@ -787,7 +787,7 @@ Sugar over Tier 1. Reads all statements and maps to struct fields.
 
 ```go
 // Unmarshal deserializes a complete PAKT unit from bytes into a struct.
-// This is convenience sugar over StatementReader.
+// This is convenience sugar over UnitReader.
 func Unmarshal[T any](data []byte, opts ...Option) (T, error)
 
 // UnmarshalFrom deserializes a complete PAKT unit from a reader.
@@ -834,13 +834,13 @@ dep, err := encoding.Unmarshal[Deployment](data)
 
 ### 9.5 Tier 3: Custom Value Converters
 
-Custom converters receive a scoped `ValueReader` — not the full `StatementReader`. This gives them exactly enough API to read one value (scalar or composite) without access to statement-level navigation.
+Custom converters receive a scoped `ValueReader` — not the full `UnitReader`. This gives them exactly enough API to read one value (scalar or composite) without access to statement-level navigation.
 
 ```go
 // ValueReader is a scoped view of the stream, positioned at a single value.
 // It provides read access for scalars and navigation for composites.
 // A ValueReader is only valid for the duration of the converter call.
-type ValueReader struct { /* unexported: wraps *StatementReader */ }
+type ValueReader struct { /* unexported: wraps *UnitReader */ }
 
 // --- Scalar access (only valid when positioned at a scalar) ---
 func (vr *ValueReader) StringValue() (string, error)
@@ -882,7 +882,7 @@ type TupleValueEntry struct {
 ```go
 // ValueConverter converts PAKT values to/from a specific Go type.
 // Implementations receive a scoped ValueReader positioned at the value,
-// not the full StatementReader.
+// not the full UnitReader.
 type ValueConverter[T any] interface {
     // FromPakt reads a PAKT value and returns T.
     // The ValueReader is positioned at the start of the value.
@@ -903,25 +903,9 @@ type ValueConverter[T any] interface {
 func RegisterConverter[T any](c ValueConverter[T]) Option
 
 // Usage:
-sr := encoding.NewStatementReader(r,
+sr := encoding.NewUnitReader(r,
     encoding.RegisterConverter[Instant](InstantConverter{}),
     encoding.RegisterConverter[IPAddr](IPAddrConverter{}),
-)
-```
-
-#### Field-Level Override
-
-For per-field converters, use a struct tag + registration:
-
-```go
-type Config struct {
-    // Use a custom converter for this specific field
-    Endpoint URL `pakt:"endpoint,converter=url"`
-}
-
-// Register with a name that matches the tag
-sr := encoding.NewStatementReader(r,
-    encoding.RegisterNamedConverter("url", URLConverter{}),
 )
 ```
 
@@ -969,14 +953,14 @@ func (EndpointConverter) FromPakt(vr *ValueReader, pt Type) (Endpoint, error) {
 
 #### Composite Navigation Helpers
 
-These are methods on `ValueReader` (shown above) and also available as free functions for the `StatementReader` level:
+These are methods on `ValueReader` (shown above) and also available as free functions for the `UnitReader` level:
 
 ```go
 // StructFields returns an iterator over the fields of a struct value.
 // Each FieldEntry provides the field name and declared type.
 // The caller reads each field's value via ReadAs or Skip.
 // Errors stop iteration; call sr.Err() after.
-func StructFields(sr *StatementReader) iter.Seq[FieldEntry]
+func StructFields(sr *UnitReader) iter.Seq[FieldEntry]
 
 type FieldEntry struct {
     Name string
@@ -985,12 +969,12 @@ type FieldEntry struct {
 
 // ListElements returns an iterator over elements of a list value.
 // Errors stop iteration; call sr.Err() after.
-func ListElements[T any](sr *StatementReader) iter.Seq[T]
+func ListElements[T any](sr *UnitReader) iter.Seq[T]
 
 // MapEntries returns an iterator over key-value pairs of a map value.
 // K is not constrained to comparable — iteration doesn't require hashing.
 // Errors stop iteration; call sr.Err() after.
-func MapEntries[K, V any](sr *StatementReader) iter.Seq[MapEntry[K, V]]
+func MapEntries[K, V any](sr *UnitReader) iter.Seq[MapEntry[K, V]]
 
 type MapEntry[K, V any] struct {
     Key   K
@@ -1000,7 +984,7 @@ type MapEntry[K, V any] struct {
 // TupleElements returns an iterator for heterogeneous tuples.
 // Each entry provides the index and type; the caller reads each
 // element with ReadAs of the appropriate type.
-func TupleElements(sr *StatementReader) iter.Seq[TupleEntry]
+func TupleElements(sr *UnitReader) iter.Seq[TupleEntry]
 
 type TupleEntry struct {
     Index int
@@ -1052,7 +1036,7 @@ const (
 // DeserializeError wraps a parse error with deserialization context.
 type DeserializeError struct {
     Pos       Pos        // source position in the PAKT data
-    Statement string     // which statement (e.g., "config")
+    Property string     // which statement (e.g., "config")
     Field     string     // which field within a composite (e.g., "port")
     Message   string     // human-readable description
     Err       error      // wrapped underlying error (ParseError, type mismatch, etc.)
@@ -1073,7 +1057,7 @@ func (e *DeserializeError) Unwrap() error { return e.Err }
 ```
 Pakt/
     PaktReader.cs              # Tier 0: token-level reader (exists, ref struct)
-    PaktStatementReader.cs     # Tier 1: statement-level streaming
+    PaktUnitReader.cs     # Tier 1: statement-level streaming
     PaktSerializer.cs          # Tier 2: whole-unit materialization
     Serialization/
         PaktSerializerContext.cs    # source-gen context base
@@ -1101,7 +1085,7 @@ public ref struct PaktReader
 }
 ```
 
-### 10.3 Tier 1: PaktStatementReader — The Primary API
+### 10.3 Tier 1: PaktUnitReader — The Primary API
 
 A higher-level reader that operates at the statement level. Unlike the raw `PaktReader`, this type is not a `ref struct` — it can be stored, passed, and used with `IAsyncEnumerable`.
 
@@ -1110,21 +1094,21 @@ A higher-level reader that operates at the statement level. Unlike the raw `Pakt
 /// Reads PAKT statements one at a time from a stream.
 /// This is the primary deserialization interface.
 /// </summary>
-public sealed class PaktStatementReader : IDisposable, IAsyncDisposable
+public sealed class PaktUnitReader : IDisposable, IAsyncDisposable
 {
     // --- Construction ---
 
-    public static PaktStatementReader Create(
+    public static PaktUnitReader Create(
         ReadOnlySpan<byte> data,
         PaktSerializerContext context,
         DeserializeOptions? options = null);
 
-    public static PaktStatementReader Create(
+    public static PaktUnitReader Create(
         Stream stream,
         PaktSerializerContext context,
         DeserializeOptions? options = null);
 
-    // --- Statement Navigation ---
+    // --- Property Navigation ---
 
     /// <summary>
     /// Advances to the next statement. Returns false when the unit is exhausted.
@@ -1178,7 +1162,7 @@ public sealed class PaktStatementReader : IDisposable, IAsyncDisposable
 #### Complete Tier 1 Example
 
 ```csharp
-await using var reader = PaktStatementReader.Create(stream, AppContext.Default);
+await using var reader = PaktUnitReader.Create(stream, AppContext.Default);
 
 while (await reader.ReadStatementAsync())
 {
@@ -1506,7 +1490,7 @@ Both APIs enforce the same invariant:
 
 > **Every tier reads from the same stream, in order, without buffering.** Materialization loops the streaming primitives. Custom converters read from the stream themselves.
 
-In Go, this is achieved by having `Unmarshal` internally create a `StatementReader` and iterate it. In .NET, `PaktSerializer.Deserialize` internally creates a `PaktStatementReader`.
+In Go, this is achieved by having `Unmarshal` internally create a `UnitReader` and iterate it. In .NET, `PaktSerializer.Deserialize` internally creates a `PaktUnitReader`.
 
 ### 11.2 Type Metadata Caching
 
@@ -1533,22 +1517,22 @@ In Go, this is achieved by having `Unmarshal` internally create a `StatementRead
 | Interface | `ValueConverter[T]` (generic interface) | `PaktConverter<T>` (abstract class) |
 | Receives | `*ValueReader` (scoped) + `Type` | `ref PaktReader` + `PaktType` + `PaktConvertContext` |
 | Child dispatch | `ReadAs[U](vr)` free function | `context.ReadAs<U>(ref reader)` method |
-| Per-field | `pakt:"field,converter=name"` tag | `[PaktConverter(typeof(...))]` attribute |
+| Per-field | `[PaktConverter(typeof(...))]` attribute (Go: use parent converter with ReadAs) |
 | Per-type | `RegisterConverter[T](c)` option | `options.Converters.Add(c)` |
 
 ---
 
 ## 12. Open Questions (Updated)
 
-### Q1. Go: Should StatementReader be an interface?
+### Q1. Go: Should UnitReader be an interface?
 
-An interface would allow mock implementations for testing. But concrete types are idiomatic Go and enable inlining. **Recommendation:** Concrete type. Provide a test helper that creates a `StatementReader` from a string.
+An interface would allow mock implementations for testing. But concrete types are idiomatic Go and enable inlining. **Recommendation:** Concrete type. Provide a test helper that creates a `UnitReader` from a string.
 
 ### Q2. .NET: Streaming invariant for async paths
 
-The `PaktReader` is a `ref struct` (stack-only, zero-alloc). The `PaktStatementReader` needs to support `IAsyncEnumerable` for pack iteration, which requires heap state. The current design has `PaktStatementReader` as a class that internally manages the reader lifecycle.
+The `PaktReader` is a `ref struct` (stack-only, zero-alloc). The `PaktUnitReader` needs to support `IAsyncEnumerable` for pack iteration, which requires heap state. The current design has `PaktUnitReader` as a class that internally manages the reader lifecycle.
 
-**Concern:** Async state machines can't hold `ref struct` fields. The `PaktStatementReader` must buffer at least one token's worth of state to bridge between its internal `PaktReader` and the async enumeration pattern.
+**Concern:** Async state machines can't hold `ref struct` fields. The `PaktUnitReader` must buffer at least one token's worth of state to bridge between its internal `PaktReader` and the async enumeration pattern.
 
 **Recommendation:** Accept this single-token bridge buffer as an implementation detail. The streaming invariant holds at the semantic level: callers still see one value at a time, and memory is O(nesting depth). The `ref struct PaktReader` remains available as the Tier 0 escape hatch for true zero-alloc synchronous scenarios.
 
@@ -1576,11 +1560,11 @@ This enables a converter for `Config` to delegate its `Server` field to the fram
 
 ### Q7. Map Pack Streaming
 
-Top-level map packs (`data:<str;int> << 'a';1\n'b';2`) should be consumable through the same Tier 1 API. The pack iterator yields `MapEntry[K,V]` for map packs and `T` for list packs. The `Statement.Type` tells the caller which kind of pack it is.
+Top-level map packs (`data:<str;int> << 'a';1\n'b';2`) should be consumable through the same Tier 1 API. The pack iterator yields `MapEntry[K,V]` for map packs and `T` for list packs. The `Property.Type` tells the caller which kind of pack it is.
 
 **Go:**
 ```go
-for stmt := range sr.Statements() {
+for stmt := range sr.Properties() {
     if stmt.IsPack && stmt.Type.Kind() == TypeMap {
         for entry := range PackItems[MapEntry[string, int]](sr) {
             fmt.Printf("%s = %d\n", entry.Key, entry.Value)

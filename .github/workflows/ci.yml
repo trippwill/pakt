@@ -11,6 +11,7 @@ permissions:
 jobs:
   go:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -42,6 +43,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Coverage summary
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/github-script@v7
         with:
           script: |
@@ -56,6 +58,7 @@ jobs:
 
   dotnet:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}

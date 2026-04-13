@@ -28,9 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - uses: jdx/mise-action@v2
         with:
-          go-version-file: go.mod
+          install_args: go
 
       - name: Restore fuzz corpus
         uses: actions/cache@v4
@@ -38,8 +38,9 @@ jobs:
           path: |
             ~/.cache/go-test-fuzz
             encoding/testdata/fuzz
-          key: fuzz-corpus-${{ matrix.target }}-${{ github.sha }}
+          key: fuzz-corpus-${{ matrix.target }}-week-${{ github.run_number }}
           restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-week-
             fuzz-corpus-${{ matrix.target }}-
 
       - name: Fuzz ${{ matrix.target }}

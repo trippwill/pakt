@@ -1067,7 +1067,7 @@ func benchGenerateFin(n int) (benchFinDataset, []byte, []byte) {
 	// Build PAKT
 	var pb strings.Builder
 	pb.WriteString("account:str = 'ACCT-7734-PRIME'\n")
-	pb.WriteString(fmt.Sprintf("as_of:ts = %s\n", val.AsOf))
+	fmt.Fprintf(&pb, "as_of:ts = %s\n", val.AsOf)
 
 	// Trades as list pack
 	pb.WriteString("trades:[{timestamp:ts, ticker:str, side:|buy, sell|, quantity:int, price:dec, fees:dec, filled:bool, venue:str, order_id:uuid, tags:[str]}] <<\n")

@@ -118,7 +118,7 @@ func parseIntLiteral(raw string) (int64, error) {
 		if val > math.MaxInt64+1 {
 			return 0, fmt.Errorf("int literal %q overflows int64", raw)
 		}
-		return -int64(val), nil
+		return -int64(val), nil //nolint:gosec // overflow checked: val <= MaxInt64+1
 	}
 	if val > math.MaxInt64 {
 		return 0, fmt.Errorf("int literal %q overflows int64", raw)

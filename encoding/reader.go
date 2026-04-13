@@ -49,7 +49,7 @@ func (a valBufAdapter) WriteByte(c byte) error {
 
 func (a valBufAdapter) WriteRune(ch rune) (int, error) {
 	if ch < utf8.RuneSelf {
-		a.r.valBuf = append(a.r.valBuf, byte(ch))
+		a.r.valBuf = append(a.r.valBuf, byte(ch)) //nolint:gosec // ch < utf8.RuneSelf (128), fits in byte
 		return 1, nil
 	}
 	var buf [4]byte
@@ -409,7 +409,7 @@ func (r *reader) readUnicodeEscape(n int) (rune, error) {
 			return 0, r.errorf("invalid hex digit in %s escape: found %q", prefix, prefix+digits.String())
 		}
 		digits.WriteByte(b)
-		val = val*16 + rune(d)
+		val = val*16 + rune(d) //nolint:gosec // d is 0-15 from hexVal
 	}
 	if val == 0 {
 		return 0, r.errorf("null byte (U+0000) not permitted in strings")
@@ -612,7 +612,7 @@ func parseHexDigits(s string) (rune, bool) {
 		if d < 0 {
 			return 0, false
 		}
-		val = val*16 + rune(d)
+		val = val*16 + rune(d) //nolint:gosec // d is 0-15 from hexVal
 	}
 	return val, true
 }

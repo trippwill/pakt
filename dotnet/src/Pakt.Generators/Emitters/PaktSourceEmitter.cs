@@ -67,6 +67,9 @@ namespace Pakt.Generators.Emitters
             // Skip helper
             EmitSkipHelper(sb);
 
+            // GetTypeInfo(Type) override
+            EmitGetTypeInfoByType(sb, types);
+
             // GetTypeInfo<T> override
             EmitGetTypeInfo(sb, types);
 
@@ -80,6 +83,19 @@ namespace Pakt.Generators.Emitters
             foreach (var type in types)
             {
                 sb.AppendLine($"if (typeof(T) == typeof({type.FullyQualifiedName})) return (global::Pakt.Serialization.PaktTypeInfo<T>)(object){type.Name};");
+            }
+            sb.AppendLine("return null;");
+            sb.CloseBrace();
+            sb.AppendLine();
+        }
+
+        private static void EmitGetTypeInfoByType(SourceBuilder sb, IReadOnlyList<SerializableTypeModel> types)
+        {
+            sb.AppendLine("public override global::Pakt.Serialization.PaktTypeInfo? GetTypeInfo(global::System.Type type)");
+            sb.OpenBrace();
+            foreach (var type in types)
+            {
+                sb.AppendLine($"if (type == typeof({type.FullyQualifiedName})) return {type.Name};");
             }
             sb.AppendLine("return null;");
             sb.CloseBrace();
@@ -122,7 +138,10 @@ namespace Pakt.Generators.Emitters
             {
                 var p = activeProps[i];
                 var comma = i < activeProps.Count - 1 ? "," : "";
-                sb.AppendLine($"new global::Pakt.Serialization.PaktPropertyInfo(\"{p.ClrName}\", \"{p.PaktName}\", {EmitPaktTypeExpr(p, allTypes)}, {p.Order}){comma}");
+                var converterExpr = p.ConverterTypeFullName is null
+                    ? "null"
+                    : $"typeof({p.ConverterTypeFullName})";
+                sb.AppendLine($"new global::Pakt.Serialization.PaktPropertyInfo(\"{p.ClrName}\", \"{p.PaktName}\", typeof({p.TypeFullName}), {EmitPaktTypeExpr(p, allTypes)}, {p.Order}, {converterExpr}){comma}");
             }
             sb.CloseBrace();
 
@@ -145,9 +164,14 @@ namespace Pakt.Generators.Emitters
             var name = type.Name;
             var activeProps = type.Properties.Where(p => !p.IsIgnored).ToList();
 
-            sb.AppendLine($"public static {fqn} Deserialize{name}(ref global::Pakt.PaktReader reader)");
+            sb.AppendLine($"public static {fqn} Deserialize{name}(ref global::Pakt.PaktReader reader, global::Pakt.Serialization.PaktConvertContext context)");
             sb.OpenBrace();
             sb.AppendLine($"var result = new {fqn}();");
+            foreach (var p in activeProps)
+            {
+                sb.AppendLine($"var _seen_{p.ClrName} = false;");
+            }
+            sb.AppendLine();
 
             sb.AppendLine("while (reader.Read())");
             sb.OpenBrace();
@@ -161,7 +185,15 @@ namespace Pakt.Generators.Emitters
             {
                 sb.AppendLine($"case \"{p.PaktName}\":");
                 sb.Indent();
-                EmitDeserializeProperty(sb, p, allTypes);
+                sb.AppendLine($"_seen_{p.ClrName} = true;");
+                if (p.ConverterTypeFullName is null)
+                {
+                    sb.AppendLine($"result.{p.ClrName} = context.ReadAs<{p.TypeFullName}>(ref reader);");
+                }
+                else
+                {
+                    sb.AppendLine($"result.{p.ClrName} = context.ReadAs<{p.TypeFullName}, {p.ConverterTypeFullName}>(ref reader);");
+                }
                 sb.AppendLine("break;");
                 sb.Dedent();
             }
@@ -169,12 +201,27 @@ namespace Pakt.Generators.Emitters
             // Default: skip unknown
             sb.AppendLine("default:");
             sb.Indent();
-            sb.AppendLine("SkipCurrentValue(ref reader);");
+            sb.AppendLine("if (context.Options.UnknownFields == global::Pakt.Serialization.UnknownFieldPolicy.Error)");
+            sb.OpenBrace();
+            sb.AppendLine("throw context.CreateError($\"Unknown field '{reader.CurrentName}'\", reader.Position, reader.CurrentName, global::Pakt.PaktErrorCode.TypeMismatch);");
+            sb.CloseBrace();
+            sb.AppendLine("context.Skip(ref reader);");
             sb.AppendLine("break;");
             sb.Dedent();
 
             sb.CloseBrace(); // switch
             sb.CloseBrace(); // while
+
+            sb.AppendLine("if (context.Options.MissingFields == global::Pakt.Serialization.MissingFieldPolicy.Error)");
+            sb.OpenBrace();
+            foreach (var p in activeProps)
+            {
+                sb.AppendLine($"if (!_seen_{p.ClrName})");
+                sb.OpenBrace();
+                sb.AppendLine($"throw context.CreateError(\"Missing field '{p.PaktName}'\", reader.Position, \"{p.PaktName}\", global::Pakt.PaktErrorCode.TypeMismatch);");
+                sb.CloseBrace();
+            }
+            sb.CloseBrace();
 
             sb.AppendLine("return result;");
             sb.CloseBrace(); // method
@@ -430,6 +477,12 @@ namespace Pakt.Generators.Emitters
             IReadOnlyList<SerializableTypeModel> allTypes,
             string expr)
         {
+            if (prop.ConverterTypeFullName is not null)
+            {
+                sb.AppendLine($"new {prop.ConverterTypeFullName}().Write(writer, {expr});");
+                return;
+            }
+
             switch (prop.PaktKind)
             {
                 case PaktTypeKind.Str:

@@ -856,11 +856,12 @@ func BenchmarkJSONEncodeFS10K(b *testing.B) {
 }
 
 // ---------------------------------------------------------------------------
-// Streaming Benchmarks — element-by-element pack via More()+UnmarshalNext
+// Streaming Benchmarks — statement reader + PackItems iteration
 // vs NDJSON streaming via json.Decoder
 //
-// Uses the FS dataset entries as the pack elements. PAKT reads from a pack
-// statement (<<); JSON reads from newline-delimited JSON (one object per line).
+// Uses the FS dataset entries as the pack elements. PAKT reads the top-level
+// entries pack from the unit and then iterates one element at a time with
+// PackItems; JSON reads newline-delimited JSON (one object per line).
 // Both decode one element per iteration, measuring the true streaming path.
 // ---------------------------------------------------------------------------
 
@@ -885,16 +886,23 @@ func benchStreamPAKT(b *testing.B, data []byte) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		type header struct {
-			Root    string         `pakt:"root"`
-			Scanned string         `pakt:"scanned"`
-			Entries []benchFSEntry `pakt:"entries"`
+		sr := NewUnitReader(bytes.NewReader(data))
+		count := 0
+		for prop := range sr.Properties() {
+			if prop.Name != "entries" {
+				continue
+			}
+			for range PackItems[benchFSEntry](sr) {
+				count++
+			}
 		}
-		h, err := UnmarshalNew[header](data)
-		if err != nil {
+		if err := sr.Err(); err != nil {
 			b.Fatal(err)
 		}
-		_ = h
+		if count == 0 {
+			b.Fatal("expected streamed entries")
+		}
+		sr.Close()
 	}
 }
 

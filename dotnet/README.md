@@ -25,41 +25,51 @@ using Pakt.Serialization;
 public partial class AppPaktContext : PaktSerializerContext { }
 ```
 
-### 3. Read a Unit with PaktStreamReader
+### 3. Read a Unit with PaktMemoryReader
 
-`PaktStreamReader` is the primary consumption API — it iterates top-level statements one at a time:
+`PaktMemoryReader` is the statement-level API — it iterates top-level statements one at a time:
 
 ```csharp
 using Pakt;
 
-await using var reader = PaktStreamReader.Create(paktBytes, AppPaktContext.Default);
+using var reader = PaktMemoryReader.Create(paktBytes, AppPaktContext.Default);
 
-while (await reader.ReadStatementAsync())
+while (reader.ReadStatement())
 {
     Console.WriteLine($"{reader.StatementName}: {reader.StatementType}");
 
-    if (reader.StatementName == "server")
+    if (!reader.IsPack && reader.StatementName == "server")
     {
-        var server = reader.Deserialize<Server>();
+        var server = reader.ReadValue<Server>();
         Console.WriteLine($"  {server.Host}:{server.Port}");
+    }
+    else if (reader.IsPack && reader.StatementType.IsList)
+    {
+        foreach (var server in reader.ReadPack<Server>())
+            Console.WriteLine($"  {server.Host}:{server.Port}");
+    }
+    else if (reader.IsPack && reader.StatementType.IsMap)
+    {
+        foreach (var entry in reader.ReadMapPack<string, Server>())
+            Console.WriteLine($"  {entry.Key}: {entry.Value.Host}:{entry.Value.Port}");
     }
     else
     {
-        await reader.SkipAsync();
+        reader.Skip();
     }
 }
 ```
 
-### 4. Convenience: Single-Statement Serialize/Deserialize
+### 4. Convenience: Whole-Unit Serialize/Deserialize
 
-For units with a single assign statement, use the `PaktSerializer` static API:
+For whole-unit materialization and whole-unit serialization, use the `PaktSerializer` static API:
 
 ```csharp
-// Deserialize
+// Deserialize a unit with top-level statements that match CLR properties
 var server = PaktSerializer.Deserialize<Server>(paktBytes, AppPaktContext.Default);
 
-// Serialize
-byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default, "server");
+// Serialize the CLR object back to a PAKT unit
+byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default);
 ```
 
 ## API Overview
@@ -67,12 +77,12 @@ byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default, "server"
 ### Layered Architecture
 
 ```
-  PaktSerializer          High-level convenience (single assign)
-       ↓
-  PaktStreamReader        Statement-level iteration (multi-statement units, packs)
-       ↓
+  PaktSerializer          High-level convenience (whole-unit materialization / serialization)
+        ↓
+  PaktMemoryReader          Statement-level iteration (assigns, packs)
+        ↓
   PaktReader / PaktWriter Low-level token-by-token I/O
-       ↓
+        ↓
   Source Generator         Compile-time (de)serialization code via [PaktSerializable]
 ```
 
@@ -82,8 +92,8 @@ byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default, "server"
 |---|---|
 | `PaktReader` | Forward-only, zero-copy tokenizer over `ReadOnlySpan<byte>`. Ref struct — stack-only, pooled allocations. |
 | `PaktWriter` | Forward-only PAKT output writer to `IBufferWriter<byte>`. |
-| `PaktStreamReader` | Async statement-level reader. Iterates top-level assigns and packs. Supports `Deserialize<T>()` and `ReadPackElements<T>()`. |
-| `PaktSerializer` | Static convenience API for single-statement units. |
+| `PaktMemoryReader` | Statement-level reader. Iterates top-level assigns and packs. Supports `ReadValue<T>()`, `ReadPack<T>()`, and `ReadMapPack<TKey, TValue>()`. |
+| `PaktSerializer` | Static convenience API for whole-unit deserialize/serialize over generated metadata. |
 | `PaktSerializerContext` | Base class for source-generated serialization contexts. Provides `GetTypeInfo<T>()` for type resolution. |
 | `PaktType` | Immutable PAKT type descriptor (scalars, structs, tuples, lists, maps, atom sets). |
 | `PaktException` | Parse/validation error with `PaktPosition` and `PaktErrorCode`. |
@@ -98,7 +108,7 @@ byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default, "server"
 | `[PaktIgnore]` | Property | Exclude a property from serialization. |
 | `[PaktAtom("a", "b", "c")]` | Property | Declare valid atom set members. |
 | `[PaktScalar(PaktScalarType.X)]` | Property | Override the inferred scalar type mapping. |
-| `[PaktConverter(typeof(C))]` | Property | Use a custom converter (planned). |
+| `[PaktConverter(typeof(C))]` | Property | Use a custom converter for that property. |
 
 ### Supported Type Mappings
 
@@ -125,7 +135,7 @@ byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default, "server"
 # Build all projects
 dotnet build
 
-# Run tests (218 tests)
+# Run tests
 dotnet test
 
 # Build benchmarks (does not run them)
@@ -140,10 +150,10 @@ dotnet run --project benchmarks/Pakt.Benchmarks -- --filter '*'
 ```
 dotnet/
 ├── src/
-│   ├── Pakt/                  # Core library (net8.0 + net10.0)
+│   ├── Pakt/                  # Core library (net10.0)
 │   └── Pakt.Generators/       # Source generator (netstandard2.0)
 ├── tests/
-│   ├── Pakt.Tests/             # Reader, writer, stream reader, serializer tests
+│   ├── Pakt.Tests/             # Reader, writer, unit reader, serializer tests
 │   └── Pakt.Generators.Tests/  # Generator snapshot tests
 ├── benchmarks/
 │   └── Pakt.Benchmarks/       # BenchmarkDotNet throughput & allocation benchmarks
@@ -168,15 +178,14 @@ Consumer projects must reference the generator as an analyzer — not a regular 
 
 - ✅ Streaming tokenizer (`PaktReader`) — all PAKT scalar and composite types
 - ✅ Forward-only writer (`PaktWriter`)
-- ✅ Statement-level reader (`PaktStreamReader`) — assigns and packs
+- ✅ Statement-level reader (`PaktMemoryReader`) — assigns and packs
 - ✅ Source-generated (de)serialization — structs, lists, maps, nullable types, nested types
-- ✅ Convenience API (`PaktSerializer`) — single-statement round-trip
-- ✅ 218 tests passing
+- ✅ Convenience API (`PaktSerializer`) — whole-unit deserialize/serialize
 
 **Deferred:**
 
 - Tuple deserialization (tuples are tokenized but not mapped to C# types)
-- Custom converters (`PaktConverter<T>` — attribute wired, base class stubbed)
+- Source-generated tuple serialization/deserialization coverage
 - Spec projection (`.spec.pakt` filtering)
 - NuGet packaging
-- True chunked streaming (currently buffers full unit for `PaktStreamReader`)
+- A dedicated stream-native `PaktStreamReader` with real async I/O (planned)

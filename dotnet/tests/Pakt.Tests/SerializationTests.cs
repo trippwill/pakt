@@ -55,8 +55,8 @@ public class SerializationMetadataTests
         var type = PaktType.Scalar(PaktScalarType.Str);
         var props = new List<PaktPropertyInfo>
         {
-            new("Host", "host", PaktType.Scalar(PaktScalarType.Str), 0),
-            new("Port", "port", PaktType.Scalar(PaktScalarType.Int), 1),
+            new("Host", "host", typeof(string), PaktType.Scalar(PaktScalarType.Str), 0),
+            new("Port", "port", typeof(int), PaktType.Scalar(PaktScalarType.Int), 1),
         };
 
         var info = new PaktTypeInfo<object>(type, props);
@@ -69,10 +69,11 @@ public class SerializationMetadataTests
     public void PaktPropertyInfo_StoresAllFields()
     {
         var propType = PaktType.Scalar(PaktScalarType.Bool);
-        var info = new PaktPropertyInfo("IsActive", "is_active", propType, 2, isIgnored: false);
+        var info = new PaktPropertyInfo("IsActive", "is_active", typeof(bool), propType, 2, isIgnored: false);
 
         Assert.Equal("IsActive", info.ClrName);
         Assert.Equal("is_active", info.PaktName);
+        Assert.Equal(typeof(bool), info.ClrType);
         Assert.Equal(propType, info.PaktType);
         Assert.Equal(2, info.Order);
         Assert.False(info.IsIgnored);
@@ -81,14 +82,14 @@ public class SerializationMetadataTests
     [Fact]
     public void PaktPropertyInfo_Ignored()
     {
-        var info = new PaktPropertyInfo("Skip", "skip", PaktType.Scalar(PaktScalarType.Str), 0, isIgnored: true);
+        var info = new PaktPropertyInfo("Skip", "skip", typeof(string), PaktType.Scalar(PaktScalarType.Str), 0, isIgnored: true);
         Assert.True(info.IsIgnored);
     }
 
     [Fact]
-    public void PaktSerializerOptions_Default_NotNull()
+    public void DeserializeOptions_Default_NotNull()
     {
-        Assert.NotNull(PaktSerializerOptions.Default);
-        Assert.Empty(PaktSerializerOptions.Default.Converters);
+        Assert.NotNull(DeserializeOptions.Default);
+        Assert.Empty(DeserializeOptions.Default.Converters);
     }
 }

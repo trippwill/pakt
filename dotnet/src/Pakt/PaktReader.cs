@@ -29,6 +29,7 @@ public ref partial struct PaktReader
     private string? _currentName;
     private string? _statementName;
     private PaktType? _statementType;
+    private PaktPosition _statementPosition;
     private bool _isPackStatement;
     private bool _isNullValue;
 
@@ -44,11 +45,19 @@ public ref partial struct PaktReader
     /// Initializes a new <see cref="PaktReader"/> over the provided UTF-8 PAKT data.
     /// </summary>
     public PaktReader(ReadOnlySpan<byte> data, PaktReaderOptions options = default)
+        : this(data, options, PaktPosition.None)
+    {
+    }
+
+    internal PaktReader(
+        ReadOnlySpan<byte> data,
+        PaktReaderOptions options,
+        PaktPosition initialPosition)
     {
         _buffer = data;
         _consumed = 0;
-        _line = 1;
-        _bytePositionInLine = 0;
+        _line = initialPosition == PaktPosition.None ? 1 : initialPosition.Line;
+        _bytePositionInLine = initialPosition == PaktPosition.None ? 0 : initialPosition.Column - 1;
         _tokenType = PaktTokenType.None;
         _scalarType = PaktScalarType.None;
         _valueStart = 0;
@@ -60,11 +69,30 @@ public ref partial struct PaktReader
         _currentName = null;
         _statementName = null;
         _statementType = null;
+        _statementPosition = initialPosition;
         _isPackStatement = false;
         _isNullValue = false;
         _options = options.MaxDepth > 0 ? options : PaktReaderOptions.Default;
         _disposed = false;
         SkipBOM();
+    }
+
+    internal static PaktReader CreateValueReader(
+        ReadOnlySpan<byte> data,
+        PaktType declaredType,
+        string? name = null,
+        PaktReaderOptions options = default,
+        PaktPosition initialPosition = default)
+    {
+        var reader = new PaktReader(data, options, initialPosition);
+        reader._state = ParserState.Value;
+        reader._valType = declaredType;
+        reader._valName = name;
+        reader._statementName = name;
+        reader._statementType = declaredType;
+        reader._statementPosition = initialPosition == PaktPosition.None ? reader.Position : initialPosition;
+        reader._isPackStatement = false;
+        return reader;
     }
 
     /// <summary>The type of the last token read.</summary>
@@ -87,6 +115,9 @@ public ref partial struct PaktReader
 
     /// <summary>The type of the current top-level statement.</summary>
     public readonly PaktType? StatementType => _statementType;
+
+    /// <summary>The source position of the current top-level statement.</summary>
+    public readonly PaktPosition StatementPosition => _statementPosition;
 
     /// <summary>Whether the current statement uses pack syntax (<c>&lt;&lt;</c>).</summary>
     public readonly bool IsPackStatement => _isPackStatement;
@@ -204,6 +235,7 @@ public ref partial struct PaktReader
         public ParserState ChildResume;
         public string? Name;
         public PaktPosition Pos;
+        public PaktType? ValueType;
 
         // Struct
         public ImmutableArray<PaktField> StructFields;
@@ -367,6 +399,7 @@ public ref partial struct PaktReader
 
         _statementName = name;
         _statementType = type;
+        _statementPosition = identPos;
         _isPackStatement = isPack;
 
         if (isPack)
@@ -506,6 +539,7 @@ public ref partial struct PaktReader
                 Kind = FrameKind.Struct,
                 Resume = CurrentChildResume(),
                 Name = name,
+                ValueType = typ,
                 StructFields = typ.StructFields,
             });
             _state = ParserState.StructOpen;
@@ -519,6 +553,7 @@ public ref partial struct PaktReader
                 Kind = FrameKind.Tuple,
                 Resume = CurrentChildResume(),
                 Name = name,
+                ValueType = typ,
                 TupleElements = typ.TupleElements,
             });
             _state = ParserState.TupleOpen;
@@ -532,6 +567,7 @@ public ref partial struct PaktReader
                 Kind = FrameKind.List,
                 Resume = CurrentChildResume(),
                 Name = name,
+                ValueType = typ,
                 ListElement = typ.ListElement,
             });
             _state = ParserState.ListOpen;
@@ -545,6 +581,7 @@ public ref partial struct PaktReader
                 Kind = FrameKind.Map,
                 Resume = CurrentChildResume(),
                 Name = name,
+                ValueType = typ,
                 MapKey = typ.MapKey,
                 MapValue = typ.MapValue,
             });
@@ -574,7 +611,7 @@ public ref partial struct PaktReader
         _tokenType = PaktTokenType.StructStart;
         _scalarType = PaktScalarType.None;
         _currentName = fr.Name;
-        _currentType = null;
+        _currentType = fr.ValueType;
         _valueStart = 0;
         _valueLength = 0;
         _isNullValue = false;
@@ -668,7 +705,7 @@ public ref partial struct PaktReader
         _tokenType = PaktTokenType.TupleStart;
         _scalarType = PaktScalarType.None;
         _currentName = fr.Name;
-        _currentType = null;
+        _currentType = fr.ValueType;
         _valueStart = 0;
         _valueLength = 0;
         _isNullValue = false;
@@ -755,7 +792,7 @@ public ref partial struct PaktReader
         _tokenType = PaktTokenType.ListStart;
         _scalarType = PaktScalarType.None;
         _currentName = fr.Name;
-        _currentType = null;
+        _currentType = fr.ValueType;
         _valueStart = 0;
         _valueLength = 0;
         _isNullValue = false;
@@ -831,7 +868,7 @@ public ref partial struct PaktReader
         _tokenType = PaktTokenType.MapStart;
         _scalarType = PaktScalarType.None;
         _currentName = fr.Name;
-        _currentType = null;
+        _currentType = fr.ValueType;
         _valueStart = 0;
         _valueLength = 0;
         _isNullValue = false;

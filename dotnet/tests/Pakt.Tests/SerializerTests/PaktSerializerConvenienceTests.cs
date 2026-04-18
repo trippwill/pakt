@@ -10,7 +10,7 @@ public class PaktSerializerConvenienceTests
     [Fact]
     public void Deserialize_SingleAssignment()
     {
-        var pakt = "server:{host:str, port:int} = {'localhost', 8080}\n"u8;
+        var pakt = "host:str = 'localhost'\nport:int = 8080\n"u8.ToArray();
         var server = PaktSerializer.Deserialize<SimpleServer>(pakt, TestPaktContext.Default);
 
         Assert.Equal("localhost", server.Host);
@@ -20,7 +20,7 @@ public class PaktSerializerConvenienceTests
     [Fact]
     public void Deserialize_WithNullable()
     {
-        var pakt = "n:{label:str?, count:int?} = {'hello', nil}\n"u8;
+        var pakt = "label:str? = 'hello'\ncount:int? = nil\n"u8.ToArray();
         var result = PaktSerializer.Deserialize<WithNullable>(pakt, TestPaktContext.Default);
 
         Assert.Equal("hello", result.Label);
@@ -30,7 +30,7 @@ public class PaktSerializerConvenienceTests
     [Fact]
     public void Deserialize_Nested()
     {
-        var pakt = "p:{name:str, home:{city:str, zip:int}} = {'Alice', {'NYC', 10001}}\n"u8;
+        var pakt = "name:str = 'Alice'\nhome:{city:str, zip:int} = {'NYC', 10001}\n"u8.ToArray();
         var person = PaktSerializer.Deserialize<PersonWithAddress>(pakt, TestPaktContext.Default);
 
         Assert.Equal("Alice", person.Name);
@@ -41,7 +41,7 @@ public class PaktSerializerConvenienceTests
     [Fact]
     public void Deserialize_WithList()
     {
-        var pakt = "t:{tags:[str]} = {['a', 'b', 'c']}\n"u8;
+        var pakt = "tags:[str] << 'a', 'b', 'c'\n"u8.ToArray();
         var result = PaktSerializer.Deserialize<WithList>(pakt, TestPaktContext.Default);
 
         Assert.Equal(new[] { "a", "b", "c" }, result.Tags);
@@ -50,7 +50,7 @@ public class PaktSerializerConvenienceTests
     [Fact]
     public void Deserialize_WithMap()
     {
-        var pakt = "m:{scores:<str ; int>} = {< 'alice' ; 10, 'bob' ; 20 >}\n"u8;
+        var pakt = "scores:<str ; int> << 'alice' ; 10, 'bob' ; 20\n"u8.ToArray();
         var result = PaktSerializer.Deserialize<WithMap>(pakt, TestPaktContext.Default);
 
         Assert.Equal(10, result.Scores["alice"]);
@@ -64,8 +64,8 @@ public class PaktSerializerConvenienceTests
         var bytes = PaktSerializer.Serialize(server, TestPaktContext.Default, "s");
 
         var text = Encoding.UTF8.GetString(bytes);
-        Assert.Contains("'example.com'", text);
-        Assert.Contains("443", text);
+        Assert.Contains("host:str = 'example.com'", text);
+        Assert.Contains("port:int = 443", text);
     }
 
     [Fact]
@@ -75,7 +75,8 @@ public class PaktSerializerConvenienceTests
         var bytes = PaktSerializer.Serialize(obj, TestPaktContext.Default, "n");
 
         var text = Encoding.UTF8.GetString(bytes);
-        Assert.Contains("nil", text);
+        Assert.Contains("label:str? = nil", text);
+        Assert.Contains("count:int? = nil", text);
     }
 
     [Fact]
@@ -85,6 +86,7 @@ public class PaktSerializerConvenienceTests
         var bytes = PaktSerializer.Serialize(obj, TestPaktContext.Default, "t");
 
         var text = Encoding.UTF8.GetString(bytes);
+        Assert.Contains("tags:[str] = [", text);
         Assert.Contains("'x'", text);
         Assert.Contains("'y'", text);
     }
@@ -156,20 +158,35 @@ public class PaktSerializerConvenienceTests
     }
 
     [Fact]
-    public void Deserialize_EmptyUnit_Throws()
+    public void Deserialize_EmptyUnit_ReturnsDefaultObject()
     {
-        Assert.Throws<PaktException>(() =>
-            PaktSerializer.Deserialize<SimpleServer>(ReadOnlySpan<byte>.Empty, TestPaktContext.Default));
+        var result = PaktSerializer.Deserialize<SimpleServer>(Array.Empty<byte>(), TestPaktContext.Default);
+
+        Assert.Equal(string.Empty, result.Host);
+        Assert.Equal(0, result.Port);
     }
 
     [Fact]
-    public void Serialize_DefaultStatementName()
+    public void Deserialize_UnknownStatementError_PreservesStatementPosition()
+    {
+        var pakt = "unknown:int = 1\n"u8.ToArray();
+        var options = new DeserializeOptions { UnknownFields = UnknownFieldPolicy.Error };
+
+        var ex = Assert.Throws<PaktDeserializeException>(
+            () => PaktSerializer.Deserialize<SimpleServer>(pakt, TestPaktContext.Default, options));
+
+        Assert.Equal(new PaktPosition(1, 1), ex!.Position);
+        Assert.Equal("unknown", ex.StatementName);
+    }
+
+    [Fact]
+    public void Serialize_UsesPropertyNames()
     {
         var server = new SimpleServer { Host = "test", Port = 1 };
         var bytes = PaktSerializer.Serialize(server, TestPaktContext.Default);
 
         var text = Encoding.UTF8.GetString(bytes);
-        Assert.StartsWith("value:", text);
+        Assert.StartsWith("host:str = ", text);
     }
 
     [Fact]

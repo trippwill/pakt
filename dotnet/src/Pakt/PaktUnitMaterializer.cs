@@ -29,9 +29,7 @@ internal static class PaktUnitMaterializer
                 {
                     throw new PaktDeserializeException(
                         $"Unknown statement '{reader.StatementName}'",
-                        statementPosition,
-                        reader.StatementName,
-                        reader.StatementName,
+                        statementPosition, reader.StatementName, reader.StatementName,
                         PaktErrorCode.TypeMismatch);
                 }
 
@@ -51,9 +49,7 @@ internal static class PaktUnitMaterializer
                     case DuplicatePolicy.Error:
                         throw new PaktDeserializeException(
                             $"Duplicate statement '{binding.Metadata.PaktName}'",
-                            statementPosition,
-                            binding.Metadata.PaktName,
-                            binding.Metadata.PaktName,
+                            statementPosition, binding.Metadata.PaktName, binding.Metadata.PaktName,
                             PaktErrorCode.TypeMismatch);
                 }
             }
@@ -64,9 +60,7 @@ internal static class PaktUnitMaterializer
                 {
                     throw new PaktDeserializeException(
                         $"Pack statement '{binding.Metadata.PaktName}' cannot use a property-level converter.",
-                        statementPosition,
-                        binding.Metadata.PaktName,
-                        binding.Metadata.PaktName,
+                        statementPosition, binding.Metadata.PaktName, binding.Metadata.PaktName,
                         PaktErrorCode.TypeMismatch);
                 }
 
@@ -101,23 +95,146 @@ internal static class PaktUnitMaterializer
             reader.Skip();
         }
 
-        if (options.MissingFields == MissingFieldPolicy.Error)
-        {
-            foreach (var binding in bindings.Values)
-            {
-                if (seen.Contains(binding.Metadata.PaktName))
-                    continue;
+        CheckMissing(bindings, seen, options);
+        return (T)target;
+    }
 
-                throw new PaktDeserializeException(
-                    $"Missing statement '{binding.Metadata.PaktName}'",
-                    PaktPosition.None,
-                    binding.Metadata.PaktName,
-                    binding.Metadata.PaktName,
-                    PaktErrorCode.TypeMismatch);
+    public static async ValueTask<T> MaterializeAsync<T>(
+        PaktStreamReader reader, PaktSerializerContext context, DeserializeOptions options,
+        CancellationToken ct = default)
+    {
+        // For whole-unit materialization over a stream, we use the statement-level
+        // async API to read each statement. This is a simplified path that handles
+        // the common case of non-pack assign statements. Full async pack materialization
+        // with collection binding will be added when needed.
+        var typeInfo = context.GetTypeInfo<T>()
+            ?? throw new InvalidOperationException(
+                $"Type '{typeof(T).Name}' is not registered in the serializer context.");
+
+        object target = Activator.CreateInstance(typeof(T))
+            ?? throw new InvalidOperationException(
+                $"Type '{typeof(T).Name}' must have a parameterless constructor or be a value type.");
+
+        var bindings = CreateBindings(typeof(T), typeInfo);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        while (await reader.ReadStatementAsync(ct).ConfigureAwait(false))
+        {
+            var statementPosition = reader.StatementPosition;
+
+            if (!bindings.TryGetValue(reader.StatementName, out var binding))
+            {
+                if (options.UnknownFields == UnknownFieldPolicy.Error)
+                {
+                    throw new PaktDeserializeException(
+                        $"Unknown statement '{reader.StatementName}'",
+                        statementPosition, reader.StatementName, reader.StatementName,
+                        PaktErrorCode.TypeMismatch);
+                }
+
+                await reader.SkipAsync(ct).ConfigureAwait(false);
+                continue;
             }
+
+            var duplicate = !seen.Add(binding.Metadata.PaktName);
+            if (duplicate)
+            {
+                switch (options.Duplicates)
+                {
+                    case DuplicatePolicy.FirstWins:
+                        await reader.SkipAsync(ct).ConfigureAwait(false);
+                        continue;
+
+                    case DuplicatePolicy.Error:
+                        throw new PaktDeserializeException(
+                            $"Duplicate statement '{binding.Metadata.PaktName}'",
+                            statementPosition, binding.Metadata.PaktName, binding.Metadata.PaktName,
+                            PaktErrorCode.TypeMismatch);
+                }
+            }
+
+            if (reader.IsPack)
+            {
+                if (binding.Metadata.ConverterType is not null)
+                {
+                    throw new PaktDeserializeException(
+                        $"Pack statement '{binding.Metadata.PaktName}' cannot use a property-level converter.",
+                        statementPosition, binding.Metadata.PaktName, binding.Metadata.PaktName,
+                        PaktErrorCode.TypeMismatch);
+                }
+
+                // Async pack materialization: collect elements into a list
+                if (binding.IsDictionary)
+                {
+                    var dictionary = (duplicate && options.Duplicates == DuplicatePolicy.LastWins)
+                        ? CreateDictionary(binding.DictionaryKeyType!, binding.DictionaryValueType!)
+                        : (binding.Property.GetValue(target) as IDictionary ?? CreateDictionary(binding.DictionaryKeyType!, binding.DictionaryValueType!));
+
+                    await foreach (var entry in reader.ReadMapPackAsync<object, object>(ct).ConfigureAwait(false))
+                        AddPackDictionaryEntry(dictionary, entry!, options, binding, statementPosition);
+
+                    binding.Property.SetValue(target, dictionary);
+                }
+                else if (binding.IsArray || binding.IsListLike)
+                {
+                    var list = (duplicate && options.Duplicates == DuplicatePolicy.LastWins)
+                        ? CreateList(binding.ElementType!)
+                        : (binding.Property.GetValue(target) as IList ?? CreateList(binding.ElementType!));
+
+                    await foreach (var item in reader.ReadPackAsync<object>(ct).ConfigureAwait(false))
+                        list.Add(item);
+
+                    if (binding.IsArray)
+                        binding.Property.SetValue(target, ToArray(binding.ElementType!, list.Cast<object?>().ToList()));
+                    else
+                        binding.Property.SetValue(target, list);
+                }
+                else
+                {
+                    throw new PaktDeserializeException(
+                        $"Statement '{binding.Metadata.PaktName}' is a pack, but CLR property '{binding.Property.Name}' is not collection-like.",
+                        statementPosition, binding.Metadata.PaktName, binding.Metadata.PaktName,
+                        PaktErrorCode.TypeMismatch);
+                }
+
+                continue;
+            }
+
+            if (!duplicate || options.Duplicates == DuplicatePolicy.LastWins)
+            {
+                var value = await reader.ReadValueAsync(binding.Property.PropertyType, binding.Metadata.ConverterType, ct)
+                    .ConfigureAwait(false);
+                binding.Property.SetValue(target, value);
+                continue;
+            }
+
+            await reader.SkipAsync(ct).ConfigureAwait(false);
         }
 
+        CheckMissing(bindings, seen, options);
         return (T)target;
+    }
+
+    private static void CheckMissing(
+        Dictionary<string, UnitBinding> bindings,
+        HashSet<string> seen,
+        DeserializeOptions options)
+    {
+        if (options.MissingFields != MissingFieldPolicy.Error)
+            return;
+
+        foreach (var binding in bindings.Values)
+        {
+            if (seen.Contains(binding.Metadata.PaktName))
+                continue;
+
+            throw new PaktDeserializeException(
+                $"Missing statement '{binding.Metadata.PaktName}'",
+                PaktPosition.None,
+                binding.Metadata.PaktName,
+                binding.Metadata.PaktName,
+                PaktErrorCode.TypeMismatch);
+        }
     }
 
     private static Dictionary<string, UnitBinding> CreateBindings<T>(

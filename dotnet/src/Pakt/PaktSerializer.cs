@@ -37,6 +37,23 @@ public static class PaktSerializer
     }
 
     /// <summary>
+    /// Deserializes a complete PAKT unit from a stream into <typeparamref name="T"/>.
+    /// </summary>
+    public static async ValueTask<T> DeserializeAsync<T>(
+        Stream stream,
+        PaktSerializerContext context,
+        DeserializeOptions? options = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(context);
+
+        await using var reader = PaktStreamReader.Create(stream, context, options);
+        return await PaktUnitMaterializer.MaterializeAsync<T>(reader, context, options ?? context.Options, ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
      /// Serialize a CLR object to a PAKT unit using its registered property metadata.
       /// </summary>
       /// <typeparam name="T">The type to serialize.</typeparam>

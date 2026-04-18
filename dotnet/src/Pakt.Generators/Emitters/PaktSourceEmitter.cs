@@ -186,13 +186,13 @@ namespace Pakt.Generators.Emitters
                 sb.AppendLine($"case \"{p.PaktName}\":");
                 sb.Indent();
                 sb.AppendLine($"_seen_{p.ClrName} = true;");
-                if (p.ConverterTypeFullName is null)
+                if (p.ConverterTypeFullName is not null)
                 {
-                    sb.AppendLine($"result.{p.ClrName} = context.ReadAs<{p.TypeFullName}>(ref reader);");
+                    sb.AppendLine($"result.{p.ClrName} = context.ReadAs<{p.TypeFullName}, {p.ConverterTypeFullName}>(ref reader);");
                 }
                 else
                 {
-                    sb.AppendLine($"result.{p.ClrName} = context.ReadAs<{p.TypeFullName}, {p.ConverterTypeFullName}>(ref reader);");
+                    EmitDeserializeProperty(sb, p, allTypes);
                 }
                 sb.AppendLine("break;");
                 sb.Dedent();
@@ -313,7 +313,7 @@ namespace Pakt.Generators.Emitters
 
             if (nestedType is not null)
             {
-                sb.AppendLine($"{target} = Deserialize{nestedType.Name}(ref reader);");
+                sb.AppendLine($"{target} = Deserialize{nestedType.Name}(ref reader, context);");
             }
             else
             {

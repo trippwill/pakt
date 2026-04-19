@@ -77,11 +77,12 @@ byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default);
 ### Layered Architecture
 
 ```
-  PaktSerializer          High-level convenience (whole-unit materialization / serialization)
+  PaktSerializer           High-level convenience (Deserialize / DeserializeAsync / Serialize)
         ↓
-  PaktMemoryReader          Statement-level iteration (assigns, packs)
+  PaktMemoryReader         Sync statement-level iteration (memory-backed)
+  PaktStreamReader         Async statement-level iteration (stream-backed)
         ↓
-  PaktReader / PaktWriter Low-level token-by-token I/O
+  PaktReader / PaktWriter  Low-level token-by-token I/O
         ↓
   Source Generator         Compile-time (de)serialization code via [PaktSerializable]
 ```
@@ -92,8 +93,9 @@ byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default);
 |---|---|
 | `PaktReader` | Forward-only, zero-copy tokenizer over `ReadOnlySpan<byte>`. Ref struct — stack-only, pooled allocations. |
 | `PaktWriter` | Forward-only PAKT output writer to `IBufferWriter<byte>`. |
-| `PaktMemoryReader` | Statement-level reader. Iterates top-level assigns and packs. Supports `ReadValue<T>()`, `ReadPack<T>()`, and `ReadMapPack<TKey, TValue>()`. |
-| `PaktSerializer` | Static convenience API for whole-unit deserialize/serialize over generated metadata. |
+| `PaktMemoryReader` | Sync statement-level reader for `ReadOnlyMemory<byte>` / `IMemoryOwner<byte>`. `ReadValue<T>()`, `ReadPack<T>()`, `ReadMapPack<TKey, TValue>()`. |
+| `PaktStreamReader` | Async statement-level reader for `Stream`. Real `Stream.ReadAsync` at I/O boundaries. `ReadValueAsync<T>()`, `ReadPackAsync<T>()` (`IAsyncEnumerable`). |
+| `PaktSerializer` | Static convenience API. `Deserialize<T>` (sync memory), `DeserializeAsync<T>` (async stream), `Serialize<T>`. |
 | `PaktSerializerContext` | Base class for source-generated serialization contexts. Provides `GetTypeInfo<T>()` for type resolution. |
 | `PaktType` | Immutable PAKT type descriptor (scalars, structs, tuples, lists, maps, atom sets). |
 | `PaktException` | Parse/validation error with `PaktPosition` and `PaktErrorCode`. |
@@ -178,9 +180,10 @@ Consumer projects must reference the generator as an analyzer — not a regular 
 
 - ✅ Streaming tokenizer (`PaktReader`) — all PAKT scalar and composite types
 - ✅ Forward-only writer (`PaktWriter`)
-- ✅ Statement-level reader (`PaktMemoryReader`) — assigns and packs
+- ✅ Statement-level reader (`PaktMemoryReader`) — sync, memory-backed
+- ✅ Async stream reader (`PaktStreamReader`) — real `Stream.ReadAsync` at I/O boundaries
 - ✅ Source-generated (de)serialization — structs, lists, maps, nullable types, nested types
-- ✅ Convenience API (`PaktSerializer`) — whole-unit deserialize/serialize
+- ✅ Convenience API (`PaktSerializer`) — `Deserialize<T>` (sync) + `DeserializeAsync<T>` (stream)
 
 **Deferred:**
 
@@ -188,4 +191,3 @@ Consumer projects must reference the generator as an analyzer — not a regular 
 - Source-generated tuple serialization/deserialization coverage
 - Spec projection (`.spec.pakt` filtering)
 - NuGet packaging
-- A dedicated stream-native `PaktStreamReader` with real async I/O (planned)

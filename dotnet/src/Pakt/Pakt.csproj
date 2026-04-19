@@ -6,4 +6,8 @@
     <Description>High-performance PAKT serialization library for .NET</Description>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pakt.Tests" />
+  </ItemGroup>
+
 </Project>

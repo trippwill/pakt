@@ -1,74 +1,97 @@
+using System.Reflection;
 using System.Buffers;
 using Pakt.Serialization;
 
 namespace Pakt;
 
 /// <summary>
-/// Convenience API for serializing and deserializing single PAKT assign values.
-/// For multi-statement units, use <see cref="PaktStreamReader"/>.
+/// Convenience API for whole-unit materialization and whole-unit serialization.
 /// </summary>
 public static class PaktSerializer
 {
     /// <summary>
-    /// Deserialize a PAKT unit containing a single assign statement.
+    /// Deserializes a complete PAKT unit from borrowed memory into <typeparamref name="T"/>.
     /// </summary>
-    /// <typeparam name="T">The type to deserialize into.</typeparam>
-    /// <param name="data">UTF-8 encoded PAKT unit bytes.</param>
-    /// <param name="context">Serializer context with registered types.</param>
-    /// <returns>The deserialized value.</returns>
-    public static T Deserialize<T>(ReadOnlySpan<byte> data, PaktSerializerContext context)
+    public static T Deserialize<T>(
+        ReadOnlyMemory<byte> data,
+        PaktSerializerContext context,
+        DeserializeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var typeInfo = context.GetTypeInfo<T>()
-            ?? throw new InvalidOperationException($"Type '{typeof(T).Name}' is not registered in the serializer context.");
-
-        var reader = new PaktReader(data);
-        try
-        {
-            if (!reader.Read())
-                throw new PaktException("Empty unit", PaktPosition.None, PaktErrorCode.UnexpectedEof);
-
-            if (reader.TokenType == PaktTokenType.AssignStart)
-            {
-                reader.Read(); // Value start (StructStart, etc.)
-                var result = typeInfo.Deserialize!(ref reader);
-
-                while (reader.Read())
-                {
-                    if (reader.TokenType == PaktTokenType.AssignEnd)
-                        break;
-                }
-
-                return result;
-            }
-
-            throw new PaktException($"Expected AssignStart, got {reader.TokenType}", reader.Position, PaktErrorCode.Syntax);
-        }
-        finally
-        {
-            reader.Dispose();
-        }
+        using var reader = PaktMemoryReader.Create(data, context, options);
+        return PaktUnitMaterializer.Materialize<T>(reader, context, options ?? context.Options);
     }
 
     /// <summary>
-    /// Serialize a value to PAKT bytes as a single assign statement.
+    /// Deserializes a complete PAKT unit from owned memory into <typeparamref name="T"/>.
     /// </summary>
-    /// <typeparam name="T">The type to serialize.</typeparam>
-    /// <param name="value">The value to serialize.</param>
-    /// <param name="context">Serializer context with registered types.</param>
-    /// <param name="statementName">The name for the top-level statement.</param>
-    /// <returns>UTF-8 encoded PAKT unit bytes.</returns>
-    public static byte[] Serialize<T>(T value, PaktSerializerContext context, string statementName = "value")
+    public static T Deserialize<T>(
+        IMemoryOwner<byte> owner,
+        int length,
+        PaktSerializerContext context,
+        DeserializeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(context);
+        using var reader = PaktMemoryReader.Create(owner, length, context, options);
+        return PaktUnitMaterializer.Materialize<T>(reader, context, options ?? context.Options);
+    }
+
+    /// <summary>
+    /// Deserializes a complete PAKT unit from a stream into <typeparamref name="T"/>.
+    /// </summary>
+    public static async ValueTask<T> DeserializeAsync<T>(
+        Stream stream,
+        PaktSerializerContext context,
+        DeserializeOptions? options = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(context);
+
+        await using var reader = PaktStreamReader.Create(stream, context, options);
+        return await PaktUnitMaterializer.MaterializeAsync<T>(reader, context, options ?? context.Options, ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+     /// Serialize a CLR object to a PAKT unit using its registered property metadata.
+      /// </summary>
+      /// <typeparam name="T">The type to serialize.</typeparam>
+      /// <param name="value">The value to serialize.</param>
+      /// <param name="context">Serializer context with registered types.</param>
+     /// <param name="statementName">Unused legacy parameter.</param>
+      /// <returns>UTF-8 encoded PAKT unit bytes.</returns>
+    public static byte[] Serialize<T>(T value, PaktSerializerContext context, string statementName = "value")
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(context);
+        _ = statementName;
+
         var typeInfo = context.GetTypeInfo<T>()
             ?? throw new InvalidOperationException($"Type '{typeof(T).Name}' is not registered in the serializer context.");
 
+        var properties = typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .ToDictionary(static property => property.Name, StringComparer.Ordinal);
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new PaktWriter(buffer);
-        writer.WriteAssignmentStart(statementName, typeInfo.PaktType);
-        typeInfo.Serialize!(writer, value);
-        writer.WriteAssignmentEnd();
+
+        foreach (var property in typeInfo.Properties.Where(static property => !property.IsIgnored))
+        {
+            if (!properties.TryGetValue(property.ClrName, out var clrProperty))
+                continue;
+
+            writer.WriteAssignmentStart(property.PaktName, property.PaktType);
+            PaktSerializationRuntime.WriteObject(
+                writer,
+                clrProperty.GetValue(value),
+                clrProperty.PropertyType,
+                property.PaktType,
+                context,
+                context.Options,
+                property.ConverterType);
+            writer.WriteAssignmentEnd();
+        }
+
         return buffer.WrittenSpan.ToArray();
     }
 }

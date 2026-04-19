@@ -157,25 +157,35 @@ public partial class AppPaktContext : PaktSerializerContext { }
 ```csharp
 using Pakt;
 
-await using var reader = PaktStreamReader.Create(paktBytes, AppPaktContext.Default);
+using var reader = PaktMemoryReader.Create(paktBytes, AppPaktContext.Default);
 
-while (await reader.ReadStatementAsync())
+while (reader.ReadStatement())
 {
-    if (reader.IsPack)
-        await foreach (var s in reader.ReadPackElements<Server>())
+    if (reader.IsPack && reader.StatementType.IsList)
+    {
+        foreach (var s in reader.ReadPack<Server>())
             Console.WriteLine($"{s.Host}:{s.Port}");
+    }
+    else if (reader.IsPack && reader.StatementType.IsMap)
+    {
+        foreach (var entry in reader.ReadMapPack<string, Server>())
+            Console.WriteLine($"{entry.Key}: {entry.Value.Host}:{entry.Value.Port}");
+    }
     else
-        var s = reader.Deserialize<Server>();
+    {
+        var s = reader.ReadValue<Server>();
+        Console.WriteLine($"{s.Host}:{s.Port}");
+    }
 }
 ```
 
-### Single-statement convenience
+### Whole-unit convenience
 
 ```csharp
 var server = PaktSerializer.Deserialize<Server>(paktBytes, AppPaktContext.Default);
-byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default, "server");
+byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default);
 ```
 
 ### Requirements
 
-- .NET 8.0 or later (net8.0, net10.0)
+- .NET 10

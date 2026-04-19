@@ -60,11 +60,11 @@ public class FSBenchmarks
     }
 
     // ---------------------------------------------------------------------------
-    // Deserialize (PAKT PaktStreamReader vs JSON JsonSerializer)
+    // Deserialize (PAKT PaktMemoryReader vs JSON JsonSerializer)
     //
-    // Note: PAKT uses PaktStreamReader to read multi-statement pack format.
-    // Root and scanned are skipped; entries are deserialized via source-gen.
-    // JSON deserializes the entire document in one call.
+    // PAKT reads the unit statement-by-statement and only materializes the
+    // entries pack when it is encountered. JSON deserializes the whole document
+    // in one call.
     // ---------------------------------------------------------------------------
 
     [BenchmarkCategory("Deserialize"), Benchmark(Baseline = true)]
@@ -76,25 +76,17 @@ public class FSBenchmarks
             Scanned = "2026-06-01T14:30:00Z",
         };
 
-        var stream = PaktStreamReader.Create(_paktData, BenchmarkPaktContext.Default);
-        try
+        using var reader = PaktMemoryReader.Create(_paktData, BenchmarkPaktContext.Default);
+        while (reader.ReadStatement())
         {
-            while (stream.ReadStatementAsync().GetAwaiter().GetResult())
+            if (reader.IsPack && reader.StatementName == "entries")
             {
-                if (stream.IsPack && stream.StatementName == "entries")
-                {
-                    dataset.Entries = AsyncHelper.ToListSync(
-                        stream.ReadPackElements<FSEntry>());
-                }
-                else
-                {
-                    stream.SkipAsync().GetAwaiter().GetResult();
-                }
+                dataset.Entries = new List<FSEntry>(reader.ReadPack<FSEntry>());
             }
-        }
-        finally
-        {
-            stream.DisposeAsync().GetAwaiter().GetResult();
+            else
+            {
+                reader.Skip();
+            }
         }
 
         return dataset;
@@ -144,46 +136,38 @@ public class FSBenchmarks
     }
 
     // ---------------------------------------------------------------------------
-    // Pack (PAKT statement-level iteration vs JSON full-document load)
+    // Stream (PAKT statement-level iteration vs JSON full-document load)
     //
-    // Demonstrates the pack API pattern: PAKT can iterate pack elements
-    // statement-by-statement, while JSON must deserialize the entire document
-    // to access nested arrays.
-    //
-    // Note: The current PaktStreamReader implementation materializes pack
-    // elements internally; the API shape is designed for future true streaming.
+    // Demonstrates the stream API pattern: PAKT can iterate pack elements once
+    // the pack statement is reached, while JSON must deserialize the entire
+    // document to access nested arrays.
     // ---------------------------------------------------------------------------
 
-    [BenchmarkCategory("Pack"), Benchmark(Baseline = true)]
-    public int PAKT_Pack()
+    [BenchmarkCategory("Stream"), Benchmark(Baseline = true)]
+    public int PAKT_Stream()
     {
-        var stream = PaktStreamReader.Create(_paktData, BenchmarkPaktContext.Default);
+        using var reader = PaktMemoryReader.Create(_paktData, BenchmarkPaktContext.Default);
         int count = 0;
-        try
+        while (reader.ReadStatement())
         {
-            while (stream.ReadStatementAsync().GetAwaiter().GetResult())
+            if (reader.IsPack)
             {
-                if (stream.IsPack)
+                foreach (var _ in reader.ReadPack<FSEntry>())
                 {
-                    count = AsyncHelper.CountSync(
-                        stream.ReadPackElements<FSEntry>());
-                }
-                else
-                {
-                    stream.SkipAsync().GetAwaiter().GetResult();
+                    count++;
                 }
             }
-        }
-        finally
-        {
-            stream.DisposeAsync().GetAwaiter().GetResult();
+            else
+            {
+                reader.Skip();
+            }
         }
 
         return count;
     }
 
-    [BenchmarkCategory("Pack"), Benchmark]
-    public int JSON_FullLoad()
+    [BenchmarkCategory("Stream"), Benchmark]
+    public int JSON_Stream()
     {
         var dataset = JsonSerializer.Deserialize(_jsonData, BenchmarkJsonContext.Default.FSDataset)!;
         return dataset.Entries.Count;

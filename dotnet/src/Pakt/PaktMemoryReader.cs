@@ -754,6 +754,9 @@ public sealed class PaktMemoryReader : IDisposable
             throw new InvalidOperationException("Current statement is not a map pack. Use ReadValue or ReadPack instead.");
     }
 
+    internal static bool TryGetMapEntryTypesStatic(Type type, out Type keyType, out Type valueType)
+        => TryGetMapEntryTypes(type, out keyType, out valueType);
+
     private static bool TryGetMapEntryTypes(Type type, out Type keyType, out Type valueType)
     {
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(PaktMapEntry<,>))

@@ -170,7 +170,7 @@ internal static class PaktUnitMaterializer
                         ? CreateDictionary(binding.DictionaryKeyType!, binding.DictionaryValueType!)
                         : (binding.Property.GetValue(target) as IDictionary ?? CreateDictionary(binding.DictionaryKeyType!, binding.DictionaryValueType!));
 
-                    await foreach (var entry in reader.ReadMapPackAsync<object, object>(ct).ConfigureAwait(false))
+                    await foreach (var entry in reader.ReadMapPackEntriesAsync(binding.PackElementType!, ct).ConfigureAwait(false))
                         AddPackDictionaryEntry(dictionary, entry!, options, binding, statementPosition);
 
                     binding.Property.SetValue(target, dictionary);
@@ -181,7 +181,7 @@ internal static class PaktUnitMaterializer
                         ? CreateList(binding.ElementType!)
                         : (binding.Property.GetValue(target) as IList ?? CreateList(binding.ElementType!));
 
-                    await foreach (var item in reader.ReadPackAsync<object>(ct).ConfigureAwait(false))
+                    await foreach (var item in reader.ReadPackValuesAsync(binding.ElementType!, ct).ConfigureAwait(false))
                         list.Add(item);
 
                     if (binding.IsArray)

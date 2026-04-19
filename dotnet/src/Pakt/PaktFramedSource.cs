@@ -78,23 +78,18 @@ internal sealed class PaktFramedSource : IAsyncDisposable
             // Only expose bytes up to (not including) the NUL.
             // The NUL itself is consumed as the delimiter.
             // Bytes after the NUL are leftover for the next unit.
+            var readStart = _filled;
             _filled += nulIndex;
             _unitEnded = true;
-            // Shift leftover bytes (after NUL) to the front of the post-filled area.
-            // We keep them in the buffer for BeginNextUnit.
-            var leftoverStart = nulIndex + 1;
-            var leftoverCount = read - leftoverStart;
+
+            var leftoverStart = readStart + nulIndex + 1;
+            var leftoverCount = read - (nulIndex + 1);
             if (leftoverCount > 0)
             {
-                var src = _owner.Memory.Span.Slice(_filled + leftoverStart, leftoverCount);
+                var src = _owner.Memory.Span.Slice(leftoverStart, leftoverCount);
                 var dst = _owner.Memory.Span.Slice(_filled, leftoverCount);
                 src.CopyTo(dst);
             }
-            // Store leftover count in _filled temporarily: _filled points to end of current unit data,
-            // and we track leftover count separately.
-            // Actually, let's use a cleaner approach: store the leftover after _filled.
-            // _filled = end of current unit data
-            // _leftoverCount = bytes after _filled that belong to the next unit
             _leftoverCount = leftoverCount;
         }
         else

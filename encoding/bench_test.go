@@ -397,7 +397,11 @@ func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
 			path = strings.Join(parts, "/")
 			size = int64(rng.Intn(100*1024*1024-1024) + 1024)
 			mode = fileModes[rng.Intn(len(fileModes))]
-			hash = []byte(fmt.Sprintf("%08x", i))
+			hash = make([]byte, 4)
+			hash[0] = byte(i >> 24)
+			hash[1] = byte(i >> 16)
+			hash[2] = byte(i >> 8)
+			hash[3] = byte(i)
 		}
 
 		offset := time.Duration(rng.Intn(dayRange)*24+rng.Intn(24)) * time.Hour

@@ -242,6 +242,72 @@ public sealed class PaktStreamReader : IAsyncDisposable
         _hasStatement = false;
     }
 
+    internal async IAsyncEnumerable<object?> ReadPackValuesAsync(
+        Type elementType, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ThrowIfDisposed();
+        EnsureActiveListPack();
+
+        try
+        {
+            while (true)
+            {
+                if (await IsPackTerminatedAsync(ct).ConfigureAwait(false))
+                    break;
+
+                var value = await ReadValueCoreAsync(
+                    elementType, _statementType!.ListElement!, null, null, ct).ConfigureAwait(false);
+
+                await ConsumePackSeparatorAsync(ct).ConfigureAwait(false);
+                _packIndex++;
+
+                yield return value;
+            }
+        }
+        finally
+        {
+            if (_hasStatement && _isPack)
+                await SkipAsync(ct).ConfigureAwait(false);
+        }
+    }
+
+    internal async IAsyncEnumerable<object?> ReadMapPackEntriesAsync(
+        Type entryType, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ThrowIfDisposed();
+        EnsureActiveMapPack();
+
+        if (!PaktMemoryReader.TryGetMapEntryTypesStatic(entryType, out var keyType, out var valueType))
+            throw new InvalidOperationException($"Map packs must be read as PaktMapEntry<TKey, TValue>; got '{entryType.Name}'.");
+
+        try
+        {
+            while (true)
+            {
+                if (await IsPackTerminatedAsync(ct).ConfigureAwait(false))
+                    break;
+
+                var key = await ReadValueCoreAsync(
+                    keyType, _statementType!.MapKey!, null, null, ct).ConfigureAwait(false);
+
+                await ConsumeMapSeparatorAsync(ct).ConfigureAwait(false);
+
+                var value = await ReadValueCoreAsync(
+                    valueType, _statementType.MapValue!, null, null, ct).ConfigureAwait(false);
+
+                await ConsumePackSeparatorAsync(ct).ConfigureAwait(false);
+                _packIndex++;
+
+                yield return Activator.CreateInstance(entryType, key, value);
+            }
+        }
+        finally
+        {
+            if (_hasStatement && _isPack)
+                await SkipAsync(ct).ConfigureAwait(false);
+        }
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {

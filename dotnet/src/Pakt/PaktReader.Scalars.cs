@@ -795,19 +795,50 @@ public ref partial struct PaktReader
         var text = chars[..len];
 
         if (text.Length >= 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
-            return Convert.ToInt64(new string(text[2..]), 16);
+            return ParseInt64Base(text, 2, 16, negative: false);
         if (text.Length >= 3 && text[0] == '-' && text[1] == '0' && (text[2] == 'x' || text[2] == 'X'))
-            return -Convert.ToInt64(new string(text[3..]), 16);
+            return ParseInt64Base(text, 3, 16, negative: true);
         if (text.Length >= 2 && text[0] == '0' && (text[1] == 'b' || text[1] == 'B'))
-            return Convert.ToInt64(new string(text[2..]), 2);
+            return ParseInt64Base(text, 2, 2, negative: false);
         if (text.Length >= 3 && text[0] == '-' && text[1] == '0' && (text[2] == 'b' || text[2] == 'B'))
-            return -Convert.ToInt64(new string(text[3..]), 2);
+            return ParseInt64Base(text, 3, 2, negative: true);
         if (text.Length >= 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O'))
-            return Convert.ToInt64(new string(text[2..]), 8);
+            return ParseInt64Base(text, 2, 8, negative: false);
         if (text.Length >= 3 && text[0] == '-' && text[1] == '0' && (text[2] == 'o' || text[2] == 'O'))
-            return -Convert.ToInt64(new string(text[3..]), 8);
+            return ParseInt64Base(text, 3, 8, negative: true);
 
         return long.Parse(text, CultureInfo.InvariantCulture);
+    }
+
+    private static long ParseInt64Base(ReadOnlySpan<char> text, int start, int numberBase, bool negative)
+    {
+        if (start >= text.Length)
+            throw new FormatException("Input string was not in a correct format.");
+
+        ulong limit = negative ? 0x8000000000000000UL : (ulong)long.MaxValue;
+        ulong value = 0;
+
+        for (int i = start; i < text.Length; i++)
+        {
+            int digit = text[i] switch
+            {
+                >= '0' and <= '9' => text[i] - '0',
+                >= 'a' and <= 'f' => text[i] - 'a' + 10,
+                >= 'A' and <= 'F' => text[i] - 'A' + 10,
+                _ => -1,
+            };
+            if (digit < 0 || digit >= numberBase)
+                throw new FormatException("Input string was not in a correct format.");
+            if (value > (limit - (ulong)digit) / (ulong)numberBase)
+                throw new OverflowException("Value was either too large or too small for an Int64.");
+            value = (value * (ulong)numberBase) + (ulong)digit;
+        }
+
+        if (!negative)
+            return (long)value;
+        if (value == 0x8000000000000000UL)
+            return long.MinValue;
+        return -(long)value;
     }
 
     private static int CopyStrippingUnderscores(ReadOnlySpan<byte> span, Span<char> dest)

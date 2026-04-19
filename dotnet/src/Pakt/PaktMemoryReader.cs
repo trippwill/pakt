@@ -175,7 +175,44 @@ public sealed class PaktMemoryReader : IDisposable
     /// <summary>
     /// Reads the current statement's value as <typeparamref name="T"/>.
     /// </summary>
-    public T ReadValue<T>() => (T)ReadValue(typeof(T))!;
+    public T ReadValue<T>()
+    {
+        ThrowIfDisposed();
+        if (!_hasStatement)
+            throw new InvalidOperationException("No current statement. Call ReadStatement first.");
+        if (_isPack)
+        {
+            throw new InvalidOperationException(
+                _statementType!.IsMap
+                    ? "Current statement is a map pack. Use ReadMapPack instead."
+                    : "Current statement is a list pack. Use ReadPack instead.");
+        }
+
+        var typeInfo = _context.GetTypeInfo<T>();
+        if (typeInfo?.Deserialize is not null)
+        {
+            var reader = PaktReader.CreateValueReader(
+                BufferSpan(_valueOffset), _statementType!, _statementName, _readerOptions, _valuePosition);
+            try
+            {
+                if (!reader.Read())
+                    throw new PaktException("Expected value, got end of input", _valuePosition, PaktErrorCode.UnexpectedEof);
+
+                var context = new PaktConvertContext(_context, _options, _statementName, null);
+                var value = typeInfo.Deserialize(ref reader, context);
+                _offset = _valueOffset + reader.BytesConsumed;
+                _offsetPosition = reader.Position;
+                _hasStatement = false;
+                return value;
+            }
+            finally
+            {
+                reader.Dispose();
+            }
+        }
+
+        return (T)ReadValue(typeof(T))!;
+    }
 
     internal object? ReadValue(Type targetType, Type? converterType = null)
     {
@@ -228,6 +265,66 @@ public sealed class PaktMemoryReader : IDisposable
         ThrowIfDisposed();
         EnsureActiveListPack();
 
+        var typeInfo = _context.GetTypeInfo<T>();
+        if (typeInfo?.Deserialize is not null)
+            return ReadPackGeneric(typeInfo);
+
+        return ReadPackViaRuntime<T>();
+    }
+
+    private IEnumerable<T> ReadPackGeneric<T>(PaktTypeInfo<T> typeInfo)
+    {
+        try
+        {
+            var elementType = _statementType!.ListElement!;
+            while (true)
+            {
+                var cursor = _packCursor;
+                var position = _packPosition;
+
+                if (IsPackTerminated(ref cursor, ref position))
+                {
+                    _offset = cursor;
+                    _offsetPosition = position;
+                    _hasStatement = false;
+                    yield break;
+                }
+
+                var reader = PaktReader.CreateValueReader(
+                    BufferSpan(cursor), elementType, null, _readerOptions, position);
+                T value;
+                try
+                {
+                    if (!reader.Read())
+                        throw new PaktException("Expected value, got EOF", position, PaktErrorCode.UnexpectedEof);
+
+                    var context = new PaktConvertContext(_context, _options, _statementName, null);
+                    value = typeInfo.Deserialize!(ref reader, context);
+                    cursor += reader.BytesConsumed;
+                    position = reader.Position;
+                }
+                finally
+                {
+                    reader.Dispose();
+                }
+
+                FinishPackElement(ref cursor, ref position);
+                _packCursor = cursor;
+                _packPosition = position;
+                _packIndex++;
+
+                yield return value;
+            }
+        }
+        finally
+        {
+            if (_hasStatement && _isPack)
+                Skip();
+        }
+    }
+
+    private IEnumerable<T> ReadPackViaRuntime<T>()
+    {
         try
         {
             while (TryReadNextListPackValue(typeof(T), null, out var value))

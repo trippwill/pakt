@@ -51,14 +51,18 @@ public ref partial struct PaktReader
     public readonly decimal GetDecimal()
     {
         AssertTokenIs(PaktTokenType.ScalarValue);
-        return decimal.Parse(StripUnderscores(ValueSpan), NumberStyles.Number, CultureInfo.InvariantCulture);
+        Span<char> chars = stackalloc char[ValueSpan.Length];
+        int len = CopyStrippingUnderscores(ValueSpan, chars);
+        return decimal.Parse(chars[..len], NumberStyles.Number, CultureInfo.InvariantCulture);
     }
 
     /// <summary>Gets the current scalar value as a double.</summary>
     public readonly double GetDouble()
     {
         AssertTokenIs(PaktTokenType.ScalarValue);
-        return double.Parse(StripUnderscores(ValueSpan), NumberStyles.Float, CultureInfo.InvariantCulture);
+        Span<char> chars = stackalloc char[ValueSpan.Length];
+        int len = CopyStrippingUnderscores(ValueSpan, chars);
+        return double.Parse(chars[..len], NumberStyles.Float, CultureInfo.InvariantCulture);
     }
 
     /// <summary>Gets the current scalar value as a boolean.</summary>
@@ -75,21 +79,27 @@ public ref partial struct PaktReader
     public readonly Guid GetGuid()
     {
         AssertTokenIs(PaktTokenType.ScalarValue);
-        return Guid.Parse(Encoding.UTF8.GetString(ValueSpan));
+        Span<char> chars = stackalloc char[ValueSpan.Length];
+        Encoding.UTF8.GetChars(ValueSpan, chars);
+        return Guid.Parse(chars);
     }
 
     /// <summary>Gets the current scalar value as a DateOnly.</summary>
     public readonly DateOnly GetDate()
     {
         AssertTokenIs(PaktTokenType.ScalarValue);
-        return DateOnly.Parse(Encoding.UTF8.GetString(ValueSpan), CultureInfo.InvariantCulture);
+        Span<char> chars = stackalloc char[ValueSpan.Length];
+        Encoding.UTF8.GetChars(ValueSpan, chars);
+        return DateOnly.Parse(chars, CultureInfo.InvariantCulture);
     }
 
     /// <summary>Gets the current scalar value as a DateTimeOffset (for timestamp values).</summary>
     public readonly DateTimeOffset GetTimestamp()
     {
         AssertTokenIs(PaktTokenType.ScalarValue);
-        return DateTimeOffset.Parse(Encoding.UTF8.GetString(ValueSpan), CultureInfo.InvariantCulture, DateTimeStyles.None);
+        Span<char> chars = stackalloc char[ValueSpan.Length];
+        Encoding.UTF8.GetChars(ValueSpan, chars);
+        return DateTimeOffset.Parse(chars, CultureInfo.InvariantCulture, DateTimeStyles.None);
     }
 
     /// <summary>
@@ -780,32 +790,35 @@ public ref partial struct PaktReader
 
     private static long ParseInt64(ReadOnlySpan<byte> span)
     {
-        var text = StripUnderscores(span);
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-            return Convert.ToInt64(text[2..], 16);
-        if (text.StartsWith("-0x", StringComparison.OrdinalIgnoreCase))
-            return -Convert.ToInt64(text[3..], 16);
-        if (text.StartsWith("0b", StringComparison.OrdinalIgnoreCase))
-            return Convert.ToInt64(text[2..], 2);
-        if (text.StartsWith("-0b", StringComparison.OrdinalIgnoreCase))
-            return -Convert.ToInt64(text[3..], 2);
-        if (text.StartsWith("0o", StringComparison.OrdinalIgnoreCase))
-            return Convert.ToInt64(text[2..], 8);
-        if (text.StartsWith("-0o", StringComparison.OrdinalIgnoreCase))
-            return -Convert.ToInt64(text[3..], 8);
+        Span<char> chars = stackalloc char[span.Length];
+        int len = CopyStrippingUnderscores(span, chars);
+        var text = chars[..len];
+
+        if (text.Length >= 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
+            return Convert.ToInt64(new string(text[2..]), 16);
+        if (text.Length >= 3 && text[0] == '-' && text[1] == '0' && (text[2] == 'x' || text[2] == 'X'))
+            return -Convert.ToInt64(new string(text[3..]), 16);
+        if (text.Length >= 2 && text[0] == '0' && (text[1] == 'b' || text[1] == 'B'))
+            return Convert.ToInt64(new string(text[2..]), 2);
+        if (text.Length >= 3 && text[0] == '-' && text[1] == '0' && (text[2] == 'b' || text[2] == 'B'))
+            return -Convert.ToInt64(new string(text[3..]), 2);
+        if (text.Length >= 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O'))
+            return Convert.ToInt64(new string(text[2..]), 8);
+        if (text.Length >= 3 && text[0] == '-' && text[1] == '0' && (text[2] == 'o' || text[2] == 'O'))
+            return -Convert.ToInt64(new string(text[3..]), 8);
+
         return long.Parse(text, CultureInfo.InvariantCulture);
     }
 
-    private static string StripUnderscores(ReadOnlySpan<byte> span)
+    private static int CopyStrippingUnderscores(ReadOnlySpan<byte> span, Span<char> dest)
     {
-        Span<char> chars = stackalloc char[span.Length];
         int count = 0;
         for (int i = 0; i < span.Length; i++)
         {
             if (span[i] != '_')
-                chars[count++] = (char)span[i];
+                dest[count++] = (char)span[i];
         }
-        return new string(chars[..count]);
+        return count;
     }
 
     private readonly void AssertTokenIs(PaktTokenType expected)

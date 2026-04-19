@@ -8,6 +8,7 @@ namespace Pakt.Generators.Model
             string clrName,
             string paktName,
             string typeFullName,
+            string? converterTypeFullName,
             PaktTypeKind paktKind,
             bool isNullable,
             bool isIgnored,
@@ -25,6 +26,7 @@ namespace Pakt.Generators.Model
             ClrName = clrName;
             PaktName = paktName;
             TypeFullName = typeFullName;
+            ConverterTypeFullName = converterTypeFullName;
             PaktKind = paktKind;
             IsNullable = isNullable;
             IsIgnored = isIgnored;
@@ -43,6 +45,7 @@ namespace Pakt.Generators.Model
         public string ClrName { get; }
         public string PaktName { get; }
         public string TypeFullName { get; }
+        public string? ConverterTypeFullName { get; }
         public PaktTypeKind PaktKind { get; }
         public bool IsNullable { get; }
         public bool IsIgnored { get; }
@@ -64,6 +67,7 @@ namespace Pakt.Generators.Model
             return ClrName == other.ClrName
                 && PaktName == other.PaktName
                 && TypeFullName == other.TypeFullName
+                && ConverterTypeFullName == other.ConverterTypeFullName
                 && PaktKind == other.PaktKind
                 && IsNullable == other.IsNullable
                 && IsIgnored == other.IsIgnored
@@ -88,6 +92,7 @@ namespace Pakt.Generators.Model
                 int hash = 17;
                 hash = hash * 31 + ClrName.GetHashCode();
                 hash = hash * 31 + PaktName.GetHashCode();
+                hash = hash * 31 + (ConverterTypeFullName?.GetHashCode() ?? 0);
                 hash = hash * 31 + (int)PaktKind;
                 hash = hash * 31 + IsNullable.GetHashCode();
                 hash = hash * 31 + Order;

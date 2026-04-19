@@ -618,10 +618,9 @@ When `reader.ReadValue<Config>()` is called, when does the type check happen?
 | Feature | Relevance to PAKT |
 |---------|-------------------|
 | **Partial constructors** | Source generator can emit constructor logic for deserialization targets. Generated partial ctors initialize type metadata without user boilerplate. |
-| **Extension members** | `ReadOnlySpan<byte>.DeserializePakt<T>()` as an extension method/property block. Cleaner API surface without polluting the type. |
-| **Implicit `Span<T>` conversions** | `byte[]`, `Memory<byte>`, and `ReadOnlySpan<byte>` all flow into deserializer APIs seamlessly. |
+| **Extension members** | `ReadOnlyMemory<byte>.DeserializePakt<T>()` or `IMemoryOwner<byte>.DeserializePakt<T>()` as extension methods. Cleaner API surface without polluting the type. |
+| **`ReadOnlyMemory<T>` / `IMemoryOwner<T>`** | Borrowed-memory and owned-memory APIs can share buffers without copying while still making ownership explicit. |
 | **`ref struct`** | Reader type lives on the stack. Zero heap allocation for the reader itself. |
-| **`IAsyncEnumerable<T>`** | Async pack iteration: `await foreach (var item in reader.ReadPack<T>())`. |
 | **Source generators (incremental)** | Compile-time codegen for per-type deserialization delegates. No reflection at runtime. |
 | **`field` keyword** | Simplifies generated property accessors in deserialized types. |
 
@@ -1057,7 +1056,7 @@ func (e *DeserializeError) Unwrap() error { return e.Err }
 ```
 Pakt/
     PaktReader.cs              # Tier 0: token-level reader (exists, ref struct)
-    PaktUnitReader.cs     # Tier 1: statement-level streaming
+    PaktMemoryReader.cs   # Tier 1: memory-backed statement reader
     PaktSerializer.cs          # Tier 2: whole-unit materialization
     Serialization/
         PaktSerializerContext.cs    # source-gen context base
@@ -1085,25 +1084,31 @@ public ref struct PaktReader
 }
 ```
 
-### 10.3 Tier 1: PaktUnitReader — The Primary API
+### 10.3 Tier 1: PaktMemoryReader — Memory-Backed Statement Reader
 
-A higher-level reader that operates at the statement level. Unlike the raw `PaktReader`, this type is not a `ref struct` — it can be stored, passed, and used with `IAsyncEnumerable`.
+A higher-level reader that operates at the statement level. Unlike the raw `PaktReader`, this type is not a `ref struct` — it can be stored, passed, and used as the primary whole-unit cursor.
 
 ```csharp
 /// <summary>
 /// Reads PAKT statements one at a time from a stream.
 /// This is the primary deserialization interface.
 /// </summary>
-public sealed class PaktUnitReader : IDisposable, IAsyncDisposable
+public sealed class PaktMemoryReader : IDisposable
 {
     // --- Construction ---
 
-    public static PaktUnitReader Create(
-        ReadOnlySpan<byte> data,
+    public static PaktMemoryReader Create(
+        ReadOnlyMemory<byte> data,
         PaktSerializerContext context,
         DeserializeOptions? options = null);
 
-    public static PaktUnitReader Create(
+    public static PaktMemoryReader Create(
+        IMemoryOwner<byte> owner,
+        int length,
+        PaktSerializerContext context,
+        DeserializeOptions? options = null);
+
+    public static PaktMemoryReader Create(
         Stream stream,
         PaktSerializerContext context,
         DeserializeOptions? options = null);
@@ -1114,11 +1119,6 @@ public sealed class PaktUnitReader : IDisposable, IAsyncDisposable
     /// Advances to the next statement. Returns false when the unit is exhausted.
     /// </summary>
     public bool ReadStatement();
-
-    /// <summary>
-    /// Async variant for stream-backed readers.
-    /// </summary>
-    public ValueTask<bool> ReadStatementAsync(CancellationToken ct = default);
 
     /// <summary>Current statement name (e.g., "server", "events").</summary>
     public string StatementName { get; }
@@ -1132,7 +1132,7 @@ public sealed class PaktUnitReader : IDisposable, IAsyncDisposable
     // --- Value Reading ---
 
     /// <summary>
-    /// Deserialize the current statement's value (or current pack element) as T.
+    /// Deserialize the current assignment statement's value as T.
     /// </summary>
     public T ReadValue<T>();
 
@@ -1144,27 +1144,26 @@ public sealed class PaktUnitReader : IDisposable, IAsyncDisposable
     // --- Pack Iteration ---
 
     /// <summary>
-    /// Returns an enumerable of pack elements, deserialized as T.
+    /// Returns an enumerable of list-pack elements, deserialized as T.
     /// </summary>
     public IEnumerable<T> ReadPack<T>();
 
     /// <summary>
-    /// Returns an async enumerable of pack elements for stream-backed readers.
+    /// Returns an enumerable of map-pack entries.
     /// </summary>
-    public IAsyncEnumerable<T> ReadPackAsync<T>(CancellationToken ct = default);
+    public IEnumerable<PaktMapEntry<TKey, TValue>> ReadMapPack<TKey, TValue>();
 
     // --- Resource Management ---
     public void Dispose();
-    public ValueTask DisposeAsync();
 }
 ```
 
 #### Complete Tier 1 Example
 
 ```csharp
-await using var reader = PaktUnitReader.Create(stream, AppContext.Default);
+using var reader = PaktMemoryReader.Create(stream, AppContext.Default);
 
-while (await reader.ReadStatementAsync())
+while (reader.ReadStatement())
 {
     switch (reader.StatementName)
     {
@@ -1179,7 +1178,7 @@ while (await reader.ReadStatementAsync())
             break;
 
         case "events":
-            await foreach (var evt in reader.ReadPackAsync<LogEvent>())
+            foreach (var evt in reader.ReadPack<LogEvent>())
             {
                 Ingest(evt);
             }
@@ -1203,18 +1202,27 @@ public static class PaktSerializer
     /// Deserialize a complete PAKT unit into T.
     /// </summary>
     public static T Deserialize<T>(
-        ReadOnlySpan<byte> data,
+        ReadOnlyMemory<byte> data,
+        PaktSerializerContext context,
+        DeserializeOptions? options = null);
+
+    /// <summary>
+    /// Deserialize a complete PAKT unit from owned memory into T.
+    /// The serializer takes ownership of the memory owner.
+    /// </summary>
+    public static T Deserialize<T>(
+        IMemoryOwner<byte> owner,
+        int length,
         PaktSerializerContext context,
         DeserializeOptions? options = null);
 
     /// <summary>
     /// Deserialize from a stream.
     /// </summary>
-    public static ValueTask<T> DeserializeAsync<T>(
+    public static T Deserialize<T>(
         Stream stream,
         PaktSerializerContext context,
-        DeserializeOptions? options = null,
-        CancellationToken ct = default);
+        DeserializeOptions? options = null);
 
     /// <summary>
     /// Serialize T into a PAKT unit.
@@ -1398,39 +1406,37 @@ public class EndpointConverter : PaktConverter<Endpoint>
 
 #### Composite Navigation Helpers
 
-Extension methods (using C# 14 extension members) for use in custom converters:
+Because `PaktReader` is a `ref struct`, the .NET API uses callback-based traversal helpers rather than `IEnumerable`-based iterators that would force heap state around the hot parsing path.
 
 ```csharp
 public static class PaktReaderExtensions
 {
-    extension(ref PaktReader reader)
-    {
-        /// <summary>
-        /// Enumerate struct fields. Yields (name, type) pairs.
-        /// Caller reads each field's value via reader methods or Skip.
-        /// </summary>
-        public IEnumerable<PaktFieldEntry> StructFields()
-        {
-            while (reader.Read() && reader.TokenType != PaktTokenType.StructEnd)
-                yield return new(reader.CurrentName!, reader.CurrentType!);
-        }
+    public static void StructFields(this ref PaktReader reader, PaktStructFieldHandler handler);
+    public static void TupleElements(this ref PaktReader reader, PaktTupleElementHandler handler);
+    public static void ListElements<T>(this ref PaktReader reader, PaktConvertContext context, PaktValueHandler<T> handler);
+    public static void MapEntries<TKey, TValue>(this ref PaktReader reader, PaktConvertContext context, PaktMapEntryHandler<TKey, TValue> handler);
+    public static void SkipValue(this ref PaktReader reader);
+}
 
-        /// <summary>
-        /// Enumerate list elements as T.
-        /// </summary>
-        public IEnumerable<T> ListElements<T>(PaktSerializerContext ctx)
-        {
-            while (reader.Read() && reader.TokenType != PaktTokenType.ListEnd)
-                yield return ctx.GetTypeInfo<T>()!.Deserialize!(ref reader);
-        }
+public delegate bool PaktStructFieldHandler(ref PaktReader reader, PaktFieldEntry field);
+public delegate bool PaktTupleElementHandler(ref PaktReader reader, PaktTupleEntry element);
+public delegate bool PaktValueHandler<T>(T value);
+public delegate bool PaktMapEntryHandler<TKey, TValue>(PaktMapEntry<TKey, TValue> entry);
 
-        /// <summary>
-        /// Skip the current value (scalar or composite) entirely.
-        /// </summary>
-        public void SkipValue() { /* depth-aware skip */ }
-    }
+public readonly struct PaktFieldEntry
+{
+    public string Name { get; }
+    public PaktType Type { get; }
+}
+
+public readonly struct PaktTupleEntry
+{
+    public int Index { get; }
+    public PaktType Type { get; }
 }
 ```
+
+Returning `false` from a handler stops traversal early and drains the remaining composite values automatically. For struct and tuple traversal, handlers see the reader positioned at the current child value token and can consume that child via `context.ReadAs<T>(ref reader)`, `reader.SkipValue()`, or nested traversal helpers.
 
 ### 10.6 Options & Policies
 
@@ -1490,7 +1496,7 @@ Both APIs enforce the same invariant:
 
 > **Every tier reads from the same stream, in order, without buffering.** Materialization loops the streaming primitives. Custom converters read from the stream themselves.
 
-In Go, this is achieved by having `Unmarshal` internally create a `UnitReader` and iterate it. In .NET, `PaktSerializer.Deserialize` internally creates a `PaktUnitReader`.
+In Go, this is achieved by having `Unmarshal` internally create a `UnitReader` and iterate it. In .NET, `PaktSerializer.Deserialize` internally creates a `PaktMemoryReader`.
 
 ### 11.2 Type Metadata Caching
 
@@ -1506,7 +1512,7 @@ In Go, this is achieved by having `Unmarshal` internally create a `UnitReader` a
 | Pattern | Go | .NET |
 |---------|-----|------|
 | Iterate | `for item, err := range PackItems[T](sr)` | `foreach (var item in reader.ReadPack<T>())` |
-| Async iterate | N/A (use goroutine + channel if needed) | `await foreach (var item in reader.ReadPackAsync<T>())` |
+| Map-pack iterate | `for entry := range MapEntries[K, V](sr)` | `foreach (var entry in reader.ReadMapPack<K, V>())` |
 | Buffer reuse | `PackItemsInto[T](sr, &buf)` | Not needed (struct value types are stack-allocated) |
 | Early exit | `break` in range loop (yield returns false) | `break` in foreach (IEnumerable disposes) |
 
@@ -1528,13 +1534,13 @@ In Go, this is achieved by having `Unmarshal` internally create a `UnitReader` a
 
 An interface would allow mock implementations for testing. But concrete types are idiomatic Go and enable inlining. **Recommendation:** Concrete type. Provide a test helper that creates a `UnitReader` from a string.
 
-### Q2. .NET: Streaming invariant for async paths
+### Q2. .NET: Should Tier 1 expose async APIs?
 
-The `PaktReader` is a `ref struct` (stack-only, zero-alloc). The `PaktUnitReader` needs to support `IAsyncEnumerable` for pack iteration, which requires heap state. The current design has `PaktUnitReader` as a class that internally manages the reader lifecycle.
+The `PaktReader` is a `ref struct` (stack-only, zero-alloc). The `PaktMemoryReader` is a class because it owns buffer lifetime and whole-unit cursor state across calls.
 
-**Concern:** Async state machines can't hold `ref struct` fields. The `PaktUnitReader` must buffer at least one token's worth of state to bridge between its internal `PaktReader` and the async enumeration pattern.
+**Concern:** Async state machines can't hold `ref struct` fields, so an async Tier 1 surface tends to force extra heap state, buffering, or adapter layers around the hot parsing path.
 
-**Recommendation:** Accept this single-token bridge buffer as an implementation detail. The streaming invariant holds at the semantic level: callers still see one value at a time, and memory is O(nesting depth). The `ref struct PaktReader` remains available as the Tier 0 escape hatch for true zero-alloc synchronous scenarios.
+**Recommendation:** No, unless the parser architecture is itself stream-native and genuinely async-driven. Keep Tier 1 synchronous and streaming-first; add async only when it removes real blocking I/O rather than wrapping synchronous parsing in extra machinery.
 
 ### Q3. Go: Scanner pattern — RESOLVED
 
@@ -1556,7 +1562,7 @@ This enables a converter for `Config` to delegate its `Server` field to the fram
 
 `IEnumerable<T>` is universal but boxes value types. A custom `PaktPackEnumerable<T>` struct could avoid allocation.
 
-**Recommendation:** Return `IEnumerable<T>` for simplicity. The per-element deserialization cost dwarfs enumerator allocation. For the async path, `IAsyncEnumerable<T>` is required.
+**Recommendation:** Return `IEnumerable<T>` for simplicity. The per-element deserialization cost dwarfs enumerator allocation, and adding a second async surface without a distinct stream-native engine only adds overhead and architectural complexity.
 
 ### Q7. Map Pack Streaming
 
@@ -1587,6 +1593,3 @@ if (reader.IsPack && reader.StatementType.IsMap)
 Since there is no dynamic document model, attempting to deserialize into `any` (Go) or `object` (.NET) should be an error. The caller must always provide a concrete target type.
 
 **Recommendation:** Return a clear error: "cannot deserialize into interface type; provide a concrete target type."
-
-
-

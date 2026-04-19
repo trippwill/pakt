@@ -1,16 +1,41 @@
+using System;
+
 namespace Pakt.Serialization;
 
 /// <summary>
-/// Abstract base class for custom PAKT type converters.
-/// Implement this to handle types not covered by built-in conventions.
+/// Non-generic base class for custom PAKT converters.
 /// </summary>
-/// <typeparam name="T">The type to convert.</typeparam>
-public abstract class PaktConverter<T>
+public abstract class PaktConverter
 {
-    // TODO: Uncomment when PaktReader and PaktWriter are implemented.
-    // /// <summary>Reads a value of type <typeparamref name="T"/> from the reader.</summary>
-    // public abstract T Read(ref PaktReader reader);
+    internal abstract Type TargetType { get; }
 
-    // /// <summary>Writes a value of type <typeparamref name="T"/> to the writer.</summary>
-    // public abstract void Write(PaktWriter writer, T value);
+    internal abstract object? ReadAsObject(ref PaktReader reader, PaktType declaredType, PaktConvertContext context);
+
+    internal abstract void WriteAsObject(PaktWriter writer, object? value);
+}
+
+/// <summary>
+/// Base class for custom PAKT value converters.
+/// Converters participate in the stream and read directly from the reader.
+/// </summary>
+/// <typeparam name="T">The CLR type handled by this converter.</typeparam>
+public abstract class PaktConverter<T> : PaktConverter
+{
+    /// <summary>
+    /// Reads a PAKT value from the reader and returns a CLR value.
+    /// </summary>
+    public abstract T Read(ref PaktReader reader, PaktType declaredType, PaktConvertContext context);
+
+    /// <summary>
+    /// Writes a CLR value to the writer.
+    /// </summary>
+    public abstract void Write(PaktWriter writer, T value);
+
+    internal override Type TargetType => typeof(T);
+
+    internal override object? ReadAsObject(ref PaktReader reader, PaktType declaredType, PaktConvertContext context)
+        => Read(ref reader, declaredType, context);
+
+    internal override void WriteAsObject(PaktWriter writer, object? value)
+        => Write(writer, (T)value!);
 }

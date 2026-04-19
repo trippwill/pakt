@@ -103,18 +103,28 @@ using Pakt.Serialization;
 [PaktSerializable(typeof(Server))]
 public partial class AppPaktContext : PaktSerializerContext { }
 
-// Deserialize
+// Deserialize a unit with top-level statements matching CLR properties
 var server = PaktSerializer.Deserialize<Server>(paktBytes, AppPaktContext.Default);
 
 // Iterate pack statements
-await using var reader = PaktStreamReader.Create(paktBytes, AppPaktContext.Default);
-while (await reader.ReadStatementAsync())
+using var reader = PaktMemoryReader.Create(paktBytes, AppPaktContext.Default);
+while (reader.ReadStatement())
 {
-    if (reader.IsPack)
-        await foreach (var item in reader.ReadPackElements<Server>())
+    if (reader.IsPack && reader.StatementType.IsList)
+    {
+        foreach (var item in reader.ReadPack<Server>())
             Process(item);
+    }
+    else if (reader.IsPack && reader.StatementType.IsMap)
+    {
+        foreach (var item in reader.ReadMapPack<string, Server>())
+            Console.WriteLine($"{item.Key}: {item.Value.Host}:{item.Value.Port}");
+    }
     else
-        var value = reader.Deserialize<Server>();
+    {
+        var value = reader.ReadValue<Server>();
+        Console.WriteLine($"{value.Host}:{value.Port}");
+    }
 }
 ```
 

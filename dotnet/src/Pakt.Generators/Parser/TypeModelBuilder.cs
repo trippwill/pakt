@@ -34,16 +34,7 @@ namespace Pakt.Generators.Parser
                 totalProps++;
 
                 bool isIgnored = HasAttribute(prop, "Pakt.Serialization.PaktIgnoreAttribute");
-                bool hasConverter = HasAttribute(prop, "Pakt.Serialization.PaktConverterAttribute");
-
-                if (hasConverter)
-                {
-                    diagnostics.Add(Diagnostic.Create(
-                        DiagnosticDescriptors.ConverterNotSupported,
-                        prop.Locations.FirstOrDefault(),
-                        prop.Name));
-                    isIgnored = true;
-                }
+                string? converterTypeFullName = GetConverterType(prop);
 
                 bool hasSetter = prop.SetMethod is not null &&
                     prop.SetMethod.DeclaredAccessibility >= Accessibility.Internal;
@@ -70,6 +61,7 @@ namespace Pakt.Generators.Parser
                     clrName: prop.Name,
                     paktName: paktName,
                     typeFullName: analyzed.TypeFullName,
+                    converterTypeFullName: converterTypeFullName,
                     paktKind: analyzed.Kind,
                     isNullable: analyzed.IsNullable,
                     isIgnored: isIgnored,
@@ -175,6 +167,7 @@ namespace Pakt.Generators.Parser
         private static AnalyzedProperty AnalyzePropertyType(IPropertySymbol prop)
         {
             var type = prop.Type;
+            var propertyTypeFullName = prop.Type.ToDisplayString(FullyQualifiedFormat);
             bool nullable = false;
 
             // Unwrap Nullable<T>
@@ -195,7 +188,7 @@ namespace Pakt.Generators.Parser
                 }
             }
 
-            string typeFullName = type.ToDisplayString(FullyQualifiedFormat);
+            string typeFullName = propertyTypeFullName;
 
             // Check [PaktScalar] override
             var scalarAttr = GetAttribute(prop, "Pakt.Serialization.PaktScalarAttribute");
@@ -411,6 +404,17 @@ namespace Pakt.Generators.Parser
         {
             return symbol.GetAttributes().FirstOrDefault(a =>
                 a.AttributeClass?.ToDisplayString() == attributeFqn);
+        }
+
+        private static string? GetConverterType(IPropertySymbol prop)
+        {
+            var attr = GetAttribute(prop, "Pakt.Serialization.PaktConverterAttribute");
+            if (attr is null || attr.ConstructorArguments.Length == 0)
+                return null;
+
+            return attr.ConstructorArguments[0].Value is INamedTypeSymbol converterType
+                ? converterType.ToDisplayString(FullyQualifiedFormat)
+                : null;
         }
     }
 }

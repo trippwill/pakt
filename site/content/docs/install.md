@@ -186,6 +186,26 @@ var server = PaktSerializer.Deserialize<Server>(paktBytes, AppPaktContext.Defaul
 byte[] bytes = PaktSerializer.Serialize(server, AppPaktContext.Default);
 ```
 
+### Read from a stream (async)
+
+```csharp
+await using var reader = PaktStreamReader.Create(networkStream, AppPaktContext.Default);
+
+while (await reader.ReadStatementAsync(ct))
+{
+    if (reader.IsPack && reader.StatementType.IsList)
+    {
+        await foreach (var s in reader.ReadPackAsync<Server>(ct))
+            Console.WriteLine($"{s.Host}:{s.Port}");
+    }
+    else
+    {
+        var s = await reader.ReadValueAsync<Server>(ct);
+        Console.WriteLine($"{s.Host}:{s.Port}");
+    }
+}
+```
+
 ### Requirements
 
 - .NET 10

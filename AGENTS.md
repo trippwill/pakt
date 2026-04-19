@@ -19,10 +19,25 @@ pakt/
 │   ├── unmarshal.go     # PAKT text → Go struct
 │   ├── tags.go          # Struct tag parsing (pakt:"name")
 │   └── *_test.go        # Tests for each component
+├── dotnet/              # .NET library (net10.0)
+│   ├── src/Pakt/        # Core library
+│   │   ├── PaktReader.cs           # Tier 0: ref struct token reader (state machine)
+│   │   ├── PaktMemoryReader.cs     # Tier 1: sync statement reader (memory-backed)
+│   │   ├── PaktStreamReader.cs     # Tier 1: async statement reader (stream-backed)
+│   │   ├── PaktFramedSource.cs     # Internal: NUL-aware async buffer for stream reader
+│   │   ├── PaktSerializer.cs       # Tier 2: convenience Deserialize/DeserializeAsync/Serialize
+│   │   ├── PaktUnitMaterializer.cs # Whole-unit binding (sync + async)
+│   │   ├── PaktReaderExtensions.cs # Callback-based composite navigation helpers
+│   │   ├── PaktWriter.cs           # Forward-only PAKT output writer
+│   │   └── Serialization/          # Runtime: converters, options, type info, deserialization
+│   ├── src/Pakt.Generators/        # Source generator (netstandard2.0)
+│   ├── tests/                      # xUnit tests
+│   └── benchmarks/                 # BenchmarkDotNet suites (FS, Fin, Small, Wide, Deep, Collections)
 ├── main.go              # CLI entry point (Kong)
 ├── cli.go               # CLI commands: parse, validate, version
 ├── cli_test.go          # CLI integration tests (build binary, run against testdata)
 ├── spec/pakt-v0.md      # Formal PAKT v0 specification
+├── spec/benchmarks-v0.md # Cross-platform benchmark specification
 ├── docs/guide.md        # Human-friendly PAKT guide
 ├── design/              # Architecture documents
 │   └── state-machine-rewrite.md  # Decoder state machine design
@@ -68,6 +83,32 @@ The decoder in `encoding/` uses an explicit-stack state machine rather than recu
 - `reader.go` — Helper actions called within state transitions (byte I/O, scalar reads, whitespace)
 - `reader_type.go` — Type annotation parser (recursive descent, bounded depth — stays separate from state machine)
 - `design/state-machine-rewrite.md` — Full design doc with state transition narrative, frame payloads, risky areas, and observable behavior contract
+
+## Architecture: .NET Two-Reader Model
+
+The .NET library uses a layered architecture with two distinct Tier 1 readers:
+
+### Tier 0: `PaktReader` (ref struct)
+
+Stack-only, zero-copy tokenizer over `ReadOnlySpan<byte>`. Same state-machine design as the Go decoder but adapted for .NET's ref struct constraints. Source-generated deserializers operate at this level for maximum performance.
+
+### Tier 1: Two readers
+
+- **`PaktMemoryReader`** — Sync-only, `IDisposable`. For `ReadOnlyMemory<byte>` or `IMemoryOwner<byte>` input. No artificial async. The memory-backed fast path.
+- **`PaktStreamReader`** — Async-only, `IAsyncDisposable`. Real `Stream.ReadAsync` at I/O refill boundaries. Uses `PaktFramedSource` internally for NUL-delimited unit framing with correct leftover handling. No sync wrappers.
+
+The two readers share no interface or base class. This is intentional — async exists only where the underlying code path is genuinely async.
+
+### Tier 2: `PaktSerializer`
+
+Static convenience API: `Deserialize<T>(ReadOnlyMemory<byte>)` (sync, uses `PaktMemoryReader`), `DeserializeAsync<T>(Stream)` (async, uses `PaktStreamReader`), `Serialize<T>`. Sugar over Tier 1.
+
+### Key design rules
+
+- No fake async adapters. Async only on `PaktStreamReader` where `Stream.ReadAsync` is real.
+- `IMemoryOwner<byte>` is the canonical ownership transfer mechanism.
+- Source-generated code targets `PaktReader` directly for zero-alloc scalar reads.
+- `PaktConvertContext` is a `readonly ref struct` — no heap allocation for converter context.
 
 ## Spec Compliance
 

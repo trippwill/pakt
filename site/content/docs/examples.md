@@ -292,9 +292,9 @@ rollback-version:(int, int, int)? = nil    # not set
 
 # Service metadata map
 meta:<str ; str> = <
-    'owner'  = 'platform-team'
+    'owner'  ; 'platform-team'
     'region' ; 'us-east-1'
-    'tier'   = 'critical'
+    'tier'   ; 'critical'
 >
 
 # Health check configuration

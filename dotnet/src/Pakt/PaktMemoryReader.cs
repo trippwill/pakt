@@ -5,7 +5,7 @@ namespace Pakt;
 
 /// <summary>
 /// Reads PAKT statements one at a time from borrowed or owned memory.
-/// This is the sync-only, memory-backed reader. For stream input, use PaktStreamReader (future).
+/// This is the sync-only, memory-backed reader. For stream input, use PaktStreamReader.
 /// </summary>
 public sealed class PaktMemoryReader : IDisposable
 {

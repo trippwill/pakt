@@ -71,7 +71,7 @@ type benchFSEntry struct {
 	IsDir   bool   `pakt:"is_dir" json:"is_dir"`
 	Owner   string `pakt:"owner" json:"owner"`
 	Group   string `pakt:"group" json:"group"`
-	Hash    string `pakt:"hash" json:"hash"`
+	Hash    []byte `pakt:"hash" json:"hash"`
 }
 
 type benchFSDataset struct {
@@ -330,7 +330,7 @@ func benchFSBuildEntriesType() Type {
 		{Name: "is_dir", Type: scalar(TypeBool)},
 		{Name: "owner", Type: scalar(TypeStr)},
 		{Name: "group", Type: scalar(TypeStr)},
-		{Name: "hash", Type: scalar(TypeStr)},
+		{Name: "hash", Type: scalar(TypeBin)},
 	}}}}}
 }
 
@@ -385,7 +385,7 @@ func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
 		var path string
 		var size int64
 		var mode int64
-		var hash string
+		var hash []byte
 
 		if isDir {
 			parts = append(parts, subdirs[rng.Intn(len(subdirs))])
@@ -397,7 +397,7 @@ func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
 			path = strings.Join(parts, "/")
 			size = int64(rng.Intn(100*1024*1024-1024) + 1024)
 			mode = fileModes[rng.Intn(len(fileModes))]
-			hash = fmt.Sprintf("%08x", i)
+			hash = []byte(fmt.Sprintf("%08x", i))
 		}
 
 		offset := time.Duration(rng.Intn(dayRange)*24+rng.Intn(24)) * time.Hour
@@ -425,7 +425,7 @@ func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
 	var pb strings.Builder
 	pb.WriteString("root:str = '/data/warehouse'\n")
 	pb.WriteString("scanned:ts = 2026-06-01T14:30:00Z\n")
-	pb.WriteString("entries:[{path:str, size:int, mode:int, mod_time:ts, is_dir:bool, owner:str, group:str, hash:str}] <<\n")
+	pb.WriteString("entries:[{path:str, size:int, mode:int, mod_time:ts, is_dir:bool, owner:str, group:str, hash:bin}] <<\n")
 	for i, e := range entries {
 		if i > 0 {
 			pb.WriteByte('\n')
@@ -434,7 +434,7 @@ func benchGenerateFS(n int) (benchFSDataset, []byte, []byte) {
 		if e.IsDir {
 			boolStr = "true"
 		}
-		fmt.Fprintf(&pb, "    { '%s', %d, %d, %s, %s, '%s', '%s', '%s' }",
+		fmt.Fprintf(&pb, "    { '%s', %d, %d, %s, %s, '%s', '%s', x'%x' }",
 			e.Path, e.Size, e.Mode, e.ModTime, boolStr, e.Owner, e.Group, e.Hash)
 	}
 	pb.WriteByte('\n')

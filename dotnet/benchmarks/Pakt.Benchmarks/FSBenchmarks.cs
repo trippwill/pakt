@@ -136,15 +136,15 @@ public class FSBenchmarks
     }
 
     // ---------------------------------------------------------------------------
-    // Pack (PAKT statement-level iteration vs JSON full-document load)
+    // Stream (PAKT statement-level iteration vs JSON full-document load)
     //
-    // Demonstrates the pack API pattern: PAKT can iterate pack elements once
+    // Demonstrates the stream API pattern: PAKT can iterate pack elements once
     // the pack statement is reached, while JSON must deserialize the entire
     // document to access nested arrays.
     // ---------------------------------------------------------------------------
 
-    [BenchmarkCategory("Pack"), Benchmark(Baseline = true)]
-    public int PAKT_Pack()
+    [BenchmarkCategory("Stream"), Benchmark(Baseline = true)]
+    public int PAKT_Stream()
     {
         using var reader = PaktMemoryReader.Create(_paktData, BenchmarkPaktContext.Default);
         int count = 0;
@@ -166,8 +166,8 @@ public class FSBenchmarks
         return count;
     }
 
-    [BenchmarkCategory("Pack"), Benchmark]
-    public int JSON_FullLoad()
+    [BenchmarkCategory("Stream"), Benchmark]
+    public int JSON_Stream()
     {
         var dataset = JsonSerializer.Deserialize(_jsonData, BenchmarkJsonContext.Default.FSDataset)!;
         return dataset.Entries.Count;

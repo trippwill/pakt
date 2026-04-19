@@ -185,7 +185,8 @@ public sealed class PaktWriter : IDisposable
 
         PrependSeparator();
         Span<char> charBuf = stackalloc char[64];
-        value.TryFormat(charBuf, out int charWritten, "G17", CultureInfo.InvariantCulture);
+        // Use "E17" to always include an exponent, as PAKT float grammar requires it.
+        value.TryFormat(charBuf, out int charWritten, "E17", CultureInfo.InvariantCulture);
         var formatted = charBuf[..charWritten];
 
         // Normalize 'E' to 'e' for PAKT convention

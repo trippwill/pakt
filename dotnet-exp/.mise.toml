@@ -1,0 +1,71 @@
+[tools]
+dotnet = "10"
+
+[tasks.build]
+description = "Build all projects"
+run = "dotnet build"
+
+[tasks.test]
+description = "Run tests after build"
+depends = ["build"]
+run = "dotnet test --no-build"
+
+[tasks."test:coverage"]
+description = "Run tests with Cobertura coverage output"
+depends = ["build"]
+run = "dotnet test --no-build --results-directory artifacts/TestResults --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura"
+
+[tasks.format]
+description = "Auto-fix formatting per .editorconfig"
+run = "dotnet format"
+
+[tasks."format:check"]
+description = "Verify formatting per .editorconfig"
+run = "dotnet format --verify-no-changes"
+
+[tasks."aot:smoke"]
+description = "Release AOT smoke build for linux-x64"
+run = "dotnet build Pakt.Cli -c Release -r linux-x64"
+
+[tasks."stage:update"]
+description = "Stage tracked file updates"
+run = "git add -u"
+
+[tasks.bench]
+description = "Run the benchmark project"
+run = "dotnet run --project Pakt.Benchmarks --"
+
+[tasks.ci]
+description = "Run full CI pipeline: build, test, format check, AOT smoke"
+run = [
+  { task = "test" },
+  { tasks = ["format:check", "aot:smoke"] },
+]
+
+[tasks.pre-commit]
+description = "Format, build, test, and stage tracked changes before committing"
+run = [
+  { task = "format" },
+  { task = "test" },
+  { task = "stage:update" },
+]
+
+[tasks."publish:linux-x64"]
+description = "Native AOT publish for linux-x64"
+run = "dotnet publish Pakt.Cli -c Release -r linux-x64"
+
+[tasks."publish:linux-arm64"]
+description = "Native AOT publish for linux-arm64"
+run = "dotnet publish Pakt.Cli -c Release -r linux-arm64"
+
+[tasks."publish:osx-arm64"]
+description = "Native AOT publish for osx-arm64 (macOS host only)"
+run = """
+test "$(uname -s)" = "Darwin" || { echo "publish:osx-arm64 requires a macOS host"; exit 1; }
+dotnet publish Pakt.Cli -c Release -r osx-arm64
+"""
+
+[tasks."publish:win-x64"]
+description = "Native AOT publish for win-x64 (Windows host only)"
+run = "echo publish:win-x64 requires a Windows host && exit 1"
+run_windows = "dotnet publish Pakt.Cli -c Release -r win-x64"

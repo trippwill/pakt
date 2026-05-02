@@ -1,4 +1,5 @@
 [tools]
+dotnet = "10"
 go = "1.25"
 golangci-lint = "2.11.4"
 hugo = "latest"

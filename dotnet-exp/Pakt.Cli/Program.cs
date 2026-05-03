@@ -10,7 +10,7 @@ var parseCommand = new Command("parse", "Parse a .pakt file and print the event 
     fileArgument,
 };
 
-parseCommand.SetAction((ParseResult parseResult) =>
+parseCommand.SetAction(parseResult =>
 {
     var file = parseResult.GetValue(fileArgument)!;
     if (!file.Exists)
@@ -28,7 +28,7 @@ var validateCommand = new Command("validate", "Validate a .pakt file against its
     fileArgument,
 };
 
-validateCommand.SetAction((ParseResult parseResult) =>
+validateCommand.SetAction(parseResult =>
 {
     var file = parseResult.GetValue(fileArgument)!;
     if (!file.Exists)
@@ -47,4 +47,4 @@ var rootCommand = new RootCommand("PAKT CLI — typed data interchange format")
     validateCommand,
 };
 
-return rootCommand.Parse(args).Invoke();
+return await rootCommand.Parse(args).InvokeAsync();

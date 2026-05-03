@@ -199,6 +199,13 @@ csharp_preserve_single_line_blocks = true
 csharp_preserve_single_line_statements = true
 
 #### Naming styles ####
+
+# MA0025: Implement the functionality instead of throwing NotImplementedException
+dotnet_diagnostic.MA0025.severity = suggestion
+
+# MA0048: File name must match type name
+dotnet_diagnostic.MA0048.severity = silent
+
 [*.{cs,vb}]
 
 # Naming rules

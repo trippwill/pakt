@@ -122,15 +122,15 @@ sealed class Parser
 
     private StepResult StepUnitStart(ref SequenceReader<byte> reader, bool isFinal)
     {
-        // TODO: Skip UTF-8 BOM if present
-        // TODO: Layout/whitespace/comments before first statement
+        SkipBom(ref reader);
+        SkipLayout(ref reader);
         _phase = ParserPhase.BetweenStatements;
         return StepResult.Event(PaktEvent.UnitStart(_cursor.Offset));
     }
 
     private StepResult StepBetweenStatements(ref SequenceReader<byte> reader, bool isFinal)
     {
-        // TODO: Layout/whitespace/comments
+        SkipLayout(ref reader);
 
         if (reader.End)
         {
@@ -233,8 +233,15 @@ sealed class Parser
 
     private StepResult StepStatementOperator(ref SequenceReader<byte> reader, bool isFinal)
     {
+        // §7: Layout is required around '=' and '<<'
+        if (!TryRequireLayout(ref reader, isFinal, out StepResult layoutResult))
+            return layoutResult;
+
         if (!TryReadStatementOperator(ref reader, isFinal, out StepResult opResult))
             return opResult;
+
+        if (!TryRequireLayout(ref reader, isFinal, out StepResult postResult))
+            return postResult;
 
         if (!_valueStack.TryPush(new ValueFrame { TypeRef = _statementType, Index = 0, Flags = FrameFlags.None }))
             return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
@@ -383,6 +390,8 @@ sealed class Parser
         _pendingTypeEvents.Add(PendingTypeEvent.Simple(
             PaktEvent.Kind.StructTypeStart, _cursor.Offset));
 
+        // §5.6: struct_type = LBRACE layout_opt (field (LAYOUT field)*)? layout_opt RBRACE
+        SkipLayout(ref reader);
         var memberTypes = new List<PaktTypeRef>(4);
         if (TryReadEmptyComposite(ref reader, (byte)'}'))
         {
@@ -402,22 +411,17 @@ sealed class Parser
                 return false;
             }
 
-            if (!TryReadSeparatorOrTerminator(ref reader, isFinal, (byte)',', (byte)'}', out bool hasMore, out result))
-            {
-                typeRef = default;
-                return false;
-            }
-
-            if (hasMore)
-                continue;
-
-            _pendingTypeEvents.Add(PendingTypeEvent.Simple(
-                PaktEvent.Kind.StructTypeEnd, _cursor.Offset));
-
-            typeRef = _types.AddStruct(CollectionsMarshal.AsSpan(memberTypes));
-            result = default;
-            return true;
+            SkipLayout(ref reader);
+            if (TryReadEmptyComposite(ref reader, (byte)'}'))
+                break;
         }
+
+        _pendingTypeEvents.Add(PendingTypeEvent.Simple(
+            PaktEvent.Kind.StructTypeEnd, _cursor.Offset));
+
+        typeRef = _types.AddStruct(CollectionsMarshal.AsSpan(memberTypes));
+        result = default;
+        return true;
     }
 
     private bool TryParseStructField(
@@ -463,6 +467,8 @@ sealed class Parser
         _pendingTypeEvents.Add(PendingTypeEvent.Simple(
             PaktEvent.Kind.TupleTypeStart, _cursor.Offset));
 
+        // §5.6: tuple_type = LPAREN layout_opt (type (LAYOUT type)*)? layout_opt RPAREN
+        SkipLayout(ref reader);
         var memberTypes = new List<PaktTypeRef>(4);
         if (TryReadEmptyComposite(ref reader, (byte)')'))
         {
@@ -488,22 +494,17 @@ sealed class Parser
 
             memberTypes.Add(itemType);
 
-            if (!TryReadSeparatorOrTerminator(ref reader, isFinal, (byte)',', (byte)')', out bool hasMore, out result))
-            {
-                typeRef = default;
-                return false;
-            }
-
-            if (hasMore)
-                continue;
-
-            _pendingTypeEvents.Add(PendingTypeEvent.Simple(
-                PaktEvent.Kind.TupleTypeEnd, _cursor.Offset));
-
-            typeRef = _types.AddTuple(CollectionsMarshal.AsSpan(memberTypes));
-            result = default;
-            return true;
+            SkipLayout(ref reader);
+            if (TryReadEmptyComposite(ref reader, (byte)')'))
+                break;
         }
+
+        _pendingTypeEvents.Add(PendingTypeEvent.Simple(
+            PaktEvent.Kind.TupleTypeEnd, _cursor.Offset));
+
+        typeRef = _types.AddTuple(CollectionsMarshal.AsSpan(memberTypes));
+        result = default;
+        return true;
     }
 
     private bool TryParseListType(
@@ -522,11 +523,16 @@ sealed class Parser
         _pendingTypeEvents.Add(PendingTypeEvent.Simple(
             PaktEvent.Kind.ListTypeStart, _cursor.Offset));
 
+        // §5.6: list_type = LBRACK layout_opt type layout_opt RBRACK
+        SkipLayout(ref reader);
+
         if (!TryParseTypeReference(ref reader, isFinal, depth + 1, out PaktTypeRef elementType, out result))
         {
             typeRef = default;
             return false;
         }
+
+        SkipLayout(ref reader);
 
         if (!TryReadExpected(ref reader, (byte)']', isFinal, out result))
         {
@@ -562,14 +568,16 @@ sealed class Parser
         _pendingTypeEvents.Add(PendingTypeEvent.Simple(
             PaktEvent.Kind.MapTypeStart, _cursor.Offset));
 
+        // §5.6: map_type = LANGLE layout_opt type LAYOUT BIND LAYOUT type layout_opt RANGLE
+        SkipLayout(ref reader);
+
         if (!TryParseTypeReference(ref reader, isFinal, depth + 1, out PaktTypeRef keyType, out result))
         {
             typeRef = default;
             return false;
         }
 
-        // Map binding: currently ';', spec 0.1a uses '=>'
-        if (!TryReadExpected(ref reader, (byte)';', isFinal, out result))
+        if (!TryReadLayoutBindLayout(ref reader, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -580,6 +588,8 @@ sealed class Parser
             typeRef = default;
             return false;
         }
+
+        SkipLayout(ref reader);
 
         if (!TryReadExpected(ref reader, (byte)'>', isFinal, out result))
         {
@@ -600,6 +610,21 @@ sealed class Parser
         return true;
     }
 
+    /// <summary>
+    /// Reads LAYOUT '=>' LAYOUT (§7: layout required around '=>').
+    /// </summary>
+    private bool TryReadLayoutBindLayout(
+        ref SequenceReader<byte> reader, bool isFinal, out StepResult result)
+    {
+        if (!TryRequireLayout(ref reader, isFinal, out result))
+            return false;
+        if (!TryReadBind(ref reader, isFinal, out result))
+            return false;
+        if (!TryRequireLayout(ref reader, isFinal, out result))
+            return false;
+        return true;
+    }
+
     private bool TryParseAtomSetType(
         ref SequenceReader<byte> reader,
         bool isFinal,
@@ -614,6 +639,9 @@ sealed class Parser
 
         _pendingTypeEvents.Add(PendingTypeEvent.Simple(
             PaktEvent.Kind.AtomSetStart, _cursor.Offset));
+
+        // §5.6: atom_set = PIPE layout_opt IDENT (LAYOUT IDENT)* layout_opt PIPE
+        SkipLayout(ref reader);
 
         if (TryReadEmptyComposite(ref reader, (byte)'|'))
         {
@@ -637,22 +665,17 @@ sealed class Parser
                 nameStart, (int)atomName.Length));
             atomCount++;
 
-            if (!TryReadSeparatorOrTerminator(ref reader, isFinal, (byte)',', (byte)'|', out bool hasMore, out result))
-            {
-                typeRef = default;
-                return false;
-            }
-
-            if (hasMore)
-                continue;
-
-            _pendingTypeEvents.Add(PendingTypeEvent.Simple(
-                PaktEvent.Kind.AtomSetEnd, _cursor.Offset));
-
-            typeRef = _types.AddAtomSet(atomCount);
-            result = default;
-            return true;
+            SkipLayout(ref reader);
+            if (TryReadEmptyComposite(ref reader, (byte)'|'))
+                break;
         }
+
+        _pendingTypeEvents.Add(PendingTypeEvent.Simple(
+            PaktEvent.Kind.AtomSetEnd, _cursor.Offset));
+
+        typeRef = _types.AddAtomSet(atomCount);
+        result = default;
+        return true;
     }
 
     private bool TryReadIdentifier(
@@ -808,46 +831,127 @@ sealed class Parser
         return true;
     }
 
-    private bool TryReadSeparatorOrTerminator(
-        ref SequenceReader<byte> reader,
-        bool isFinal,
-        byte separator,
-        byte terminator,
-        out bool hasMore,
-        out StepResult result)
+    /// <summary>
+    /// Skips layout: whitespace, newlines, and comments.
+    /// LAYOUT = (LAYOUT_CHAR | COMMENT)+
+    /// </summary>
+    private void SkipLayout(ref SequenceReader<byte> reader)
+    {
+        while (reader.TryPeek(out byte b))
+        {
+            if (Lexical.IsLayoutChar(b))
+            {
+                reader.Advance(1);
+                _cursor.Advance(b);
+                continue;
+            }
+
+            if (b == Lexical.CommentStart)
+            {
+                SkipComment(ref reader);
+                continue;
+            }
+
+            break;
+        }
+    }
+
+    private void SkipComment(ref SequenceReader<byte> reader)
+    {
+        // §3.2: COMMENT = '#' (any char except NL)*
+        // Comment does not consume the newline.
+        while (reader.TryRead(out byte b))
+        {
+            _cursor.Advance(b);
+            if (b == Lexical.Newline)
+                break;
+            if (b == Lexical.CarriageReturn)
+            {
+                if (reader.TryPeek(out byte next) && next == Lexical.Newline)
+                {
+                    reader.Advance(1);
+                    _cursor.Advance(Lexical.Newline);
+                }
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Requires at least one layout character. Returns false with error if no layout found.
+    /// </summary>
+    private bool TryRequireLayout(ref SequenceReader<byte> reader, bool isFinal, out StepResult result)
     {
         if (!reader.TryPeek(out byte b))
         {
-            hasMore = false;
+            result = isFinal
+                ? StepResult.Error(PaktParseError.Syntax(CurrentPosition, "expected layout"))
+                : StepResult.MoreData();
+            return false;
+        }
+
+        if (!Lexical.IsLayoutChar(b) && b != Lexical.CommentStart)
+        {
+            result = StepResult.Error(PaktParseError.Syntax(CurrentPosition, "expected layout"));
+            return false;
+        }
+
+        SkipLayout(ref reader);
+        result = default;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads the '=>' bind operator (§3.7).
+    /// </summary>
+    private bool TryReadBind(ref SequenceReader<byte> reader, bool isFinal, out StepResult result)
+    {
+        if (!reader.TryPeek(out byte b0))
+        {
             result = isFinal
                 ? StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition))
                 : StepResult.MoreData();
             return false;
         }
 
-        if (b == separator)
+        if (b0 != (byte)'=')
         {
-            reader.Advance(1);
-            _cursor.Offset++;
-            _cursor.Column++;
-            hasMore = true;
-            result = default;
-            return true;
+            result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition, "expected '=>'"));
+            return false;
         }
 
-        if (b == terminator)
+        if (!reader.TryPeek(1, out byte b1))
         {
-            reader.Advance(1);
-            _cursor.Offset++;
-            _cursor.Column++;
-            hasMore = false;
-            result = default;
-            return true;
+            result = isFinal
+                ? StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition))
+                : StepResult.MoreData();
+            return false;
         }
 
-        hasMore = false;
-        result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition));
-        return false;
+        if (b1 != (byte)'>')
+        {
+            result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition, "expected '=>'"));
+            return false;
+        }
+
+        reader.Advance(2);
+        _cursor.Offset += 2;
+        _cursor.Column += 2;
+        result = default;
+        return true;
+    }
+
+    private void SkipBom(ref SequenceReader<byte> reader)
+    {
+        // §2: UTF-8 BOM (EF BB BF) accepted and ignored
+        if (reader.Remaining >= 3
+            && reader.TryPeek(out byte b0) && b0 == 0xEF
+            && reader.TryPeek(1, out byte b1) && b1 == 0xBB
+            && reader.TryPeek(2, out byte b2) && b2 == 0xBF)
+        {
+            reader.Advance(3);
+            _cursor.Offset += 3;
+        }
     }
 
 }

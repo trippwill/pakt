@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.IO.Pipelines;
 
 namespace Pakt;
@@ -13,7 +14,7 @@ public sealed class PaktReader : IAsyncDisposable
     /// <summary>
     /// Specifies the action to be taken by a read handler after processing an event.
     /// </summary>
-    public enum HandlerAction
+    public enum HandlerResult
     {
         /// <summary>
         /// Continue reading the next event.
@@ -31,7 +32,7 @@ public sealed class PaktReader : IAsyncDisposable
     /// </summary>
     /// <param name="evt">The Pakt event to process.</param>
     /// <returns>The action to take after processing the event.</returns>
-    public delegate HandlerAction ReadHandler(scoped in PaktEvent evt);
+    public delegate HandlerResult ReadHandler(scoped in PaktEvent evt);
 
     private PaktReader(PipeReader reader, PaktReaderOptions options)
     {
@@ -59,9 +60,22 @@ public sealed class PaktReader : IAsyncDisposable
     /// <param name="handler">The handler to process the event.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that returns true if an event was read, false otherwise.</returns>
-    public ValueTask<bool> ReadAsync(ReadHandler handler, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> ReadAsync(ReadHandler handler, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        ReadResult readResult = await _reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        return HandleRead(readResult.Buffer);
+
+        bool HandleRead(scoped in ReadOnlySequence<byte> buffer)
+        {
+            HandlerResult handlerResult = handler(new PaktEvent(
+                PaktEvent.Kind.UnitStart,
+                offset: 0,
+                default,
+                payload: buffer
+            ));
+
+            return handlerResult == HandlerResult.Stop;
+        }
     }
 
     /// <summary>
@@ -70,17 +84,19 @@ public sealed class PaktReader : IAsyncDisposable
     /// <param name="handler">The handler to process each event.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    public ValueTask DrainAsync(ReadHandler handler, CancellationToken cancellationToken = default)
+    public async ValueTask DrainAsync(ReadHandler handler, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        while (await ReadAsync(handler, cancellationToken).ConfigureAwait(false))
+        {
+            // Continue reading until the handler signals to stop.
+        }
     }
 
     /// <summary>
     /// Releases resources used by the reader.
     /// </summary>
     /// <returns>A task representing the asynchronous disposal operation.</returns>
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        throw new NotImplementedException();
     }
 }

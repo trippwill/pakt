@@ -130,7 +130,7 @@ csharp_prefer_braces = true:silent
 csharp_prefer_simple_using_statement = true:suggestion
 csharp_style_namespace_declarations = file_scoped:suggestion
 csharp_style_prefer_method_group_conversion = true:silent
-csharp_style_prefer_primary_constructors = true:suggestion
+csharp_style_prefer_primary_constructors = true:silent
 csharp_style_prefer_top_level_statements = true:silent
 
 # Expression-level preferences
@@ -205,6 +205,12 @@ dotnet_diagnostic.MA0025.severity = suggestion
 
 # MA0048: File name must match type name
 dotnet_diagnostic.MA0048.severity = silent
+
+# IDE0290: Use primary constructor
+dotnet_diagnostic.IDE0290.severity = silent
+
+# MA0026: Fix TODO comment
+dotnet_diagnostic.MA0026.severity = warning
 
 [*.{cs,vb}]
 

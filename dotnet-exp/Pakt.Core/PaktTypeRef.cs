@@ -1,14 +1,17 @@
-
-
 namespace Pakt;
 
 /// <summary>
 /// Reference to a parsed Pakt type.
 /// </summary>
-public readonly struct PaktTypeRef
+/// <param name="Id"> Gets the Id of the type. </param>
+public readonly record struct PaktTypeRef
 {
-    /// <summary>
-    /// Gets the identifier of the type.
-    /// </summary>
-    public int Id { get; }
+    internal PaktTypeRef(int id)
+    {
+        Id = id;
+    }
+
+    public readonly int Id;
+
+    public bool IsDefault => Id == 0;
 }

@@ -79,14 +79,14 @@ sealed partial class Parser
 
     private StepResult StepStatementOperator(ref SequenceReader<byte> reader, bool isFinal)
     {
-        // §7: Layout is required around '=' and '<<'
-        if (!TryRequireLayout(ref reader, isFinal, out StepResult layoutResult))
+        // §5.2: No newline permitted inside a statement header
+        if (!TryRequireHeaderLayout(ref reader, isFinal, out StepResult layoutResult))
             return layoutResult;
 
         if (!TryReadStatementOperator(ref reader, isFinal, out StepResult opResult))
             return opResult;
 
-        if (!TryRequireLayout(ref reader, isFinal, out StepResult postResult))
+        if (!TryRequireHeaderLayout(ref reader, isFinal, out StepResult postResult))
             return postResult;
 
         if (!_valueStack.TryPush(new ValueFrame { TypeRef = _statementType, Index = 0, Flags = FrameFlags.None }))
@@ -102,7 +102,7 @@ sealed partial class Parser
         if (!reader.TryPeek(out byte op))
         {
             result = isFinal
-                ? StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition))
+                ? StepResult.Error(PaktParseError.UnexpectedEndOfInput(CurrentPosition))
                 : StepResult.MoreData();
             return false;
         }

@@ -48,6 +48,8 @@ internal struct TypeFrame
     public byte SubState;
     public int MemberScratchStart;
     public int MemberCount;
+    public int FieldNameStart;
+    public int FieldNameLength;
 }
 
 /// <summary>
@@ -147,7 +149,15 @@ internal sealed class TypeParser
         if (_checkNullable)
         {
             _checkNullable = false;
-            if (reader.TryPeek(out byte q) && q == Syntax.NullableModifier)
+            if (!reader.TryPeek(out byte q))
+            {
+                if (!isFinal)
+                    return TypeStepResult.MoreData();
+                // isFinal: no '?' coming, fall through to post-type
+                return PostTypeComplete(ref reader, isFinal);
+            }
+
+            if (q == Syntax.NullableModifier)
             {
                 reader.Advance(1);
                 _cursor.Offset++;
@@ -156,7 +166,7 @@ internal sealed class TypeParser
                 return TypeStepResult.Event(new PaktEvent(
                     PaktEvent.Kind.NullableModifier, _cursor.Offset, PaktTypeKind.None, default));
             }
-            // No '?' — fall through to post-type handling
+            // Not '?' — fall through to post-type handling
             return PostTypeComplete(ref reader, isFinal);
         }
 
@@ -185,7 +195,7 @@ internal sealed class TypeParser
         if (!reader.TryPeek(out byte b))
         {
             return isFinal
-                ? TypeStepResult.Error(PaktParseError.InvalidHeader(_cursor.ToPosition()))
+                ? TypeStepResult.Error(PaktParseError.UnexpectedEndOfInput(_cursor.ToPosition()))
                 : TypeStepResult.MoreData();
         }
 
@@ -230,9 +240,11 @@ internal sealed class TypeParser
         SequencePosition startPos = reader.Position;
         if (!TryReadIdent(ref reader, isFinal, out ReadOnlySequence<byte> token))
         {
-            return reader.End && !isFinal
-                ? TypeStepResult.MoreData()
-                : TypeStepResult.Error(PaktParseError.InvalidHeader(_cursor.ToPosition()));
+            if (reader.End && !isFinal)
+                return TypeStepResult.MoreData();
+            return TypeStepResult.Error(reader.End
+                ? PaktParseError.UnexpectedEndOfInput(_cursor.ToPosition())
+                : PaktParseError.InvalidHeader(_cursor.ToPosition()));
         }
 
         if (!TryMapScalarType(token, out PaktTypeKind kind))
@@ -292,7 +304,7 @@ internal sealed class TypeParser
                 return BeginType(ref reader, isFinal);
 
             case SubState.StructPostField:
-                return StepStructPostField(ref reader, ref frame);
+                return StepStructPostField(ref reader, ref frame, isFinal);
 
             case SubState.StructClose:
                 return FinishComposite(ref frame, PaktEvent.Kind.StructTypeEnd, PaktTypeKind.Struct);
@@ -309,13 +321,15 @@ internal sealed class TypeParser
     {
         if (!TryReadIdent(ref reader, isFinal, out ReadOnlySequence<byte> fieldName))
         {
-            return reader.End && !isFinal
-                ? TypeStepResult.MoreData()
-                : TypeStepResult.Error(PaktParseError.InvalidHeader(_cursor.ToPosition()));
+            if (reader.End && !isFinal)
+                return TypeStepResult.MoreData();
+            return TypeStepResult.Error(reader.End
+                ? PaktParseError.UnexpectedEndOfInput(_cursor.ToPosition())
+                : PaktParseError.InvalidHeader(_cursor.ToPosition()));
         }
 
-        _pendingFieldNameStart = _types.AppendName(in fieldName);
-        _pendingFieldNameLength = (int)fieldName.Length;
+        frame.FieldNameStart = _types.AppendName(in fieldName);
+        frame.FieldNameLength = (int)fieldName.Length;
         frame.SubState = SubState.StructFieldColon;
         return TypeStepResult.Continue();
     }
@@ -326,9 +340,11 @@ internal sealed class TypeParser
     {
         if (!TryReadByte(ref reader, Syntax.TypeAscription, isFinal))
         {
-            return reader.End && !isFinal
-                ? TypeStepResult.MoreData()
-                : TypeStepResult.Error(PaktParseError.InvalidHeader(_cursor.ToPosition()));
+            if (reader.End && !isFinal)
+                return TypeStepResult.MoreData();
+            return TypeStepResult.Error(reader.End
+                ? PaktParseError.UnexpectedEndOfInput(_cursor.ToPosition())
+                : PaktParseError.InvalidHeader(_cursor.ToPosition()));
         }
 
         frame.SubState = SubState.StructFieldType;
@@ -336,16 +352,27 @@ internal sealed class TypeParser
     }
 
     private TypeStepResult StepStructPostField(
-        scoped ref SequenceReader<byte> reader, ref TypeFrame frame)
+        scoped ref SequenceReader<byte> reader, ref TypeFrame frame, bool isFinal)
     {
         PaktEvent evt = new(
             PaktEvent.Kind.FieldDecl,
             _cursor.Offset,
             _lastCompletedTypeKind,
-            new ReadOnlySequence<byte>(_types.NameBuffer, _pendingFieldNameStart, _pendingFieldNameLength));
+            new ReadOnlySequence<byte>(_types.NameBuffer, frame.FieldNameStart, frame.FieldNameLength));
         frame.MemberCount++;
-        SkipLayout(ref reader);
-        frame.SubState = TryReadClose(ref reader, Syntax.StructClose) ? SubState.StructClose : SubState.StructFieldName;
+        bool hadLayout = SkipLayout(ref reader);
+        if (reader.End && !isFinal)
+            return TypeStepResult.MoreData();
+        if (TryReadClose(ref reader, Syntax.StructClose))
+        {
+            frame.SubState = SubState.StructClose;
+        }
+        else
+        {
+            if (!hadLayout)
+                return TypeStepResult.Error(PaktParseError.MissingLayout(_cursor.ToPosition(), "expected layout between struct fields"));
+            frame.SubState = SubState.StructFieldName;
+        }
         return TypeStepResult.Event(evt);
     }
 
@@ -375,8 +402,19 @@ internal sealed class TypeParser
                     PaktEvent evt = new(
                         PaktEvent.Kind.ElementDecl, _cursor.Offset, childKind, default);
                     frame.MemberCount++;
-                    SkipLayout(ref reader);
-                    frame.SubState = TryReadClose(ref reader, Syntax.TupleClose) ? SubState.TupleClose : SubState.TupleElementType;
+                    bool hadLayout = SkipLayout(ref reader);
+                    if (reader.End && !isFinal)
+                        return TypeStepResult.MoreData();
+                    if (TryReadClose(ref reader, Syntax.TupleClose))
+                    {
+                        frame.SubState = SubState.TupleClose;
+                    }
+                    else
+                    {
+                        if (!hadLayout)
+                            return TypeStepResult.Error(PaktParseError.MissingLayout(_cursor.ToPosition(), "expected layout between tuple elements"));
+                        frame.SubState = SubState.TupleElementType;
+                    }
                     return TypeStepResult.Event(evt);
                 }
 
@@ -411,9 +449,11 @@ internal sealed class TypeParser
                 SkipLayout(ref reader);
                 if (!TryReadByte(ref reader, Syntax.ListClose, isFinal))
                 {
-                    return reader.End && !isFinal
-                        ? TypeStepResult.MoreData()
-                        : TypeStepResult.Error(PaktParseError.InvalidHeader(_cursor.ToPosition()));
+                    if (reader.End && !isFinal)
+                        return TypeStepResult.MoreData();
+                    return TypeStepResult.Error(reader.End
+                        ? PaktParseError.UnexpectedEndOfInput(_cursor.ToPosition())
+                        : PaktParseError.InvalidHeader(_cursor.ToPosition()));
                 }
                 return FinishList(ref frame);
 
@@ -442,6 +482,8 @@ internal sealed class TypeParser
                 return BeginType(ref reader, isFinal);
 
             case SubState.MapPreBind:
+                // Key type completed — advance scratch index so value writes to [start + 1]
+                frame.MemberCount++;
                 return StepMapBind(ref reader, ref frame, isFinal, 2);
 
             case SubState.MapBind:
@@ -470,9 +512,11 @@ internal sealed class TypeParser
         {
             if (!RequireLayout(ref reader, isFinal))
             {
-                return reader.End && !isFinal
-                    ? TypeStepResult.MoreData()
-                    : TypeStepResult.Error(PaktParseError.Syntax(_cursor.ToPosition(), "expected layout around '=>'"));
+                if (reader.End && !isFinal)
+                    return TypeStepResult.MoreData();
+                return TypeStepResult.Error(reader.End
+                    ? PaktParseError.UnexpectedEndOfInput(_cursor.ToPosition())
+                    : PaktParseError.MissingLayout(_cursor.ToPosition(), "expected layout around '=>'"));
             }
             frame.SubState = (byte)(subState + 1);
             return TypeStepResult.Continue();
@@ -481,9 +525,11 @@ internal sealed class TypeParser
         // subState == 3: read '=>'
         if (!TryReadDigraph(ref reader, Syntax.MapBind, isFinal))
         {
-            return reader.End && !isFinal
-                ? TypeStepResult.MoreData()
-                : TypeStepResult.Error(PaktParseError.InvalidHeader(_cursor.ToPosition(), "expected '=>'"));
+            if (reader.End && !isFinal)
+                return TypeStepResult.MoreData();
+            return TypeStepResult.Error(reader.End
+                ? PaktParseError.UnexpectedEndOfInput(_cursor.ToPosition())
+                : PaktParseError.InvalidHeader(_cursor.ToPosition(), "expected '=>'"));
         }
 
         frame.SubState = SubState.MapPostBind;
@@ -497,9 +543,11 @@ internal sealed class TypeParser
         SkipLayout(ref reader);
         if (!TryReadByte(ref reader, Syntax.MapClose, isFinal))
         {
-            return reader.End && !isFinal
-                ? TypeStepResult.MoreData()
-                : TypeStepResult.Error(PaktParseError.InvalidHeader(_cursor.ToPosition()));
+            if (reader.End && !isFinal)
+                return TypeStepResult.MoreData();
+            return TypeStepResult.Error(reader.End
+                ? PaktParseError.UnexpectedEndOfInput(_cursor.ToPosition())
+                : PaktParseError.InvalidHeader(_cursor.ToPosition()));
         }
         return FinishMap(ref frame);
     }
@@ -524,17 +572,35 @@ internal sealed class TypeParser
                 {
                     if (!TryReadIdent(ref reader, isFinal, out ReadOnlySequence<byte> atomName))
                     {
-                        return reader.End && !isFinal
-                            ? TypeStepResult.MoreData()
-                            : TypeStepResult.Error(PaktParseError.InvalidHeader(_cursor.ToPosition()));
+                        if (reader.End && !isFinal)
+                            return TypeStepResult.MoreData();
+                        return TypeStepResult.Error(reader.End
+                            ? PaktParseError.UnexpectedEndOfInput(_cursor.ToPosition())
+                            : PaktParseError.InvalidHeader(_cursor.ToPosition()));
                     }
+
+                    // Reject reserved atom names
+                    if (TokenEquals(atomName, "true"u8) || TokenEquals(atomName, "false"u8) || TokenEquals(atomName, "nil"u8))
+                        return TypeStepResult.Error(PaktParseError.ReservedToken(_cursor.ToPosition(), "reserved keyword cannot be an atom name"));
+
                     int nameStart = _types.AppendName(in atomName);
                     PaktEvent evt = new(
                         PaktEvent.Kind.AtomDecl, _cursor.Offset, PaktTypeKind.AtomSet,
                         new ReadOnlySequence<byte>(_types.NameBuffer, nameStart, (int)atomName.Length));
                     frame.MemberCount++;
-                    SkipLayout(ref reader);
-                    frame.SubState = TryReadClose(ref reader, Syntax.AtomSetClose) ? SubState.AtomSetClose : SubState.AtomName;
+                    bool hadLayout = SkipLayout(ref reader);
+                    if (reader.End && !isFinal)
+                        return TypeStepResult.MoreData();
+                    if (TryReadClose(ref reader, Syntax.AtomSetClose))
+                    {
+                        frame.SubState = SubState.AtomSetClose;
+                    }
+                    else
+                    {
+                        if (!hadLayout)
+                            return TypeStepResult.Error(PaktParseError.MissingLayout(_cursor.ToPosition(), "expected layout between atom names"));
+                        frame.SubState = SubState.AtomName;
+                    }
                     return TypeStepResult.Event(evt);
                 }
 
@@ -587,6 +653,7 @@ internal sealed class TypeParser
 
     private TypeStepResult FinishMap(ref TypeFrame frame)
     {
+        System.Diagnostics.Debug.Assert(frame.MemberCount == 2, $"Map must have exactly 2 members (key + value), got {frame.MemberCount}");
         // Members scratch has [keyTypeRef, valueTypeRef]
         PaktTypeRef keyType = _memberScratch[frame.MemberScratchStart];
         PaktTypeRef valueType = _memberScratch[frame.MemberScratchStart + 1];
@@ -624,8 +691,6 @@ internal sealed class TypeParser
 
     private PaktTypeRef _lastCompletedTypeRef;
     private PaktTypeKind _lastCompletedTypeKind;
-    private int _pendingFieldNameStart;
-    private int _pendingFieldNameLength;
 
     private void CompleteChildType(PaktTypeRef typeRef)
     {
@@ -678,6 +743,7 @@ internal sealed class TypeParser
         scoped ref SequenceReader<byte> reader, bool isFinal,
         out ReadOnlySequence<byte> token)
     {
+        long startConsumed = reader.Consumed;
         ReadOnlySpan<byte> span = reader.UnreadSpan;
         if (span.IsEmpty || !Lexical.IsIdentifierStart(span[0]))
         {
@@ -707,6 +773,8 @@ internal sealed class TypeParser
 
         if (reader.End && !isFinal)
         {
+            // Rewind so partial bytes are not reported as consumed
+            reader.Rewind(reader.Consumed - startConsumed);
             token = default;
             return false;
         }
@@ -753,43 +821,44 @@ internal sealed class TypeParser
         return true;
     }
 
-    private void SkipLayout(scoped ref SequenceReader<byte> reader)
+    private bool SkipLayout(scoped ref SequenceReader<byte> reader)
     {
+        bool consumed = false;
         while (reader.TryPeek(out byte b))
         {
             if (Lexical.IsLayoutChar(b))
             {
                 reader.Advance(1);
                 _cursor.Advance(b);
+                consumed = true;
                 continue;
             }
 
             if (b == Syntax.CommentStart)
             {
                 SkipComment(ref reader);
+                consumed = true;
                 continue;
             }
 
             break;
         }
+        return consumed;
     }
 
     private void SkipComment(scoped ref SequenceReader<byte> reader)
     {
-        while (reader.TryRead(out byte b))
+        // Consume the '#'
+        reader.Advance(1);
+        _cursor.Advance(Lexical.Hash);
+
+        // §3.2: consume everything until newline (but not the newline itself)
+        while (reader.TryPeek(out byte b))
         {
+            if (b == Lexical.Newline || b == Lexical.CarriageReturn)
+                break;
+            reader.Advance(1);
             _cursor.Advance(b);
-            if (b == Lexical.Newline)
-                break;
-            if (b == Lexical.CarriageReturn)
-            {
-                if (reader.TryPeek(out byte next) && next == Lexical.Newline)
-                {
-                    reader.Advance(1);
-                    _cursor.Advance(Lexical.Newline);
-                }
-                break;
-            }
         }
     }
 
@@ -839,5 +908,22 @@ internal sealed class TypeParser
         };
 
         return kind.IsScalar();
+    }
+
+    private static bool TokenEquals(ReadOnlySequence<byte> token, ReadOnlySpan<byte> expected)
+    {
+        if (token.Length != expected.Length)
+            return false;
+
+        int i = 0;
+        foreach (var segment in token)
+        {
+            for (int j = 0; j < segment.Length; j++, i++)
+            {
+                if (segment.Span[j] != expected[i])
+                    return false;
+            }
+        }
+        return true;
     }
 }

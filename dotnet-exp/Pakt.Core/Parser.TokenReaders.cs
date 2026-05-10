@@ -352,22 +352,17 @@ sealed partial class Parser
 
     private void SkipComment(ref SequenceReader<byte> reader)
     {
-        // §3.2: COMMENT = '#' (any char except NL)*
-        // Comment does not consume the newline.
-        while (reader.TryRead(out byte b))
+        // Consume the '#'
+        reader.Advance(1);
+        _cursor.Advance(Lexical.Hash);
+
+        // §3.2: consume everything until newline (but not the newline itself)
+        while (reader.TryPeek(out byte b))
         {
+            if (b == Lexical.Newline || b == Lexical.CarriageReturn)
+                break;
+            reader.Advance(1);
             _cursor.Advance(b);
-            if (b == Lexical.Newline)
-                break;
-            if (b == Lexical.CarriageReturn)
-            {
-                if (reader.TryPeek(out byte next) && next == Lexical.Newline)
-                {
-                    reader.Advance(1);
-                    _cursor.Advance(Lexical.Newline);
-                }
-                break;
-            }
         }
     }
 
@@ -393,6 +388,62 @@ sealed partial class Parser
         SkipLayout(ref reader);
         result = default;
         return true;
+    }
+
+    /// <summary>
+    /// §5.2: Requires whitespace (space/tab) or comments within a statement header.
+    /// Newlines are not permitted inside a statement header.
+    /// </summary>
+    private bool TryRequireHeaderLayout(ref SequenceReader<byte> reader, bool isFinal, out StepResult result)
+    {
+        if (!reader.TryPeek(out byte b))
+        {
+            result = isFinal
+                ? StepResult.Error(PaktParseError.UnexpectedEndOfInput(CurrentPosition))
+                : StepResult.MoreData();
+            return false;
+        }
+
+        if (!Lexical.IsWhitespace(b) && b != Syntax.CommentStart)
+        {
+            if (b == Lexical.Newline || b == Lexical.CarriageReturn)
+            {
+                result = StepResult.Error(PaktParseError.Syntax(CurrentPosition, "newline not permitted in statement header"));
+                return false;
+            }
+
+            result = StepResult.Error(PaktParseError.MissingLayout(CurrentPosition, "expected whitespace in statement header"));
+            return false;
+        }
+
+        SkipHeaderLayout(ref reader);
+        result = default;
+        return true;
+    }
+
+    /// <summary>
+    /// Skips whitespace (space/tab) and comments within a statement header.
+    /// Does not consume newlines.
+    /// </summary>
+    private void SkipHeaderLayout(ref SequenceReader<byte> reader)
+    {
+        while (reader.TryPeek(out byte b))
+        {
+            if (Lexical.IsWhitespace(b))
+            {
+                reader.Advance(1);
+                _cursor.Advance(b);
+                continue;
+            }
+
+            if (b == Syntax.CommentStart)
+            {
+                SkipComment(ref reader);
+                continue;
+            }
+
+            break;
+        }
     }
 
     private void SkipBom(ref SequenceReader<byte> reader)

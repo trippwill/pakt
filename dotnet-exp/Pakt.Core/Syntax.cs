@@ -11,16 +11,16 @@ internal static class Syntax
 {
     // Statement structure
     public const byte TypeAscription = Lexical.Colon;
-    public const byte AssignOp = Lexical.Assign;
-    public const byte NullableModifier = Lexical.NullableSuffix;
+    public const byte AssignOp = Lexical.EqualsSign;
+    public const byte NullableModifier = Lexical.Question;
 
     // Value prefixes
     public const byte AtomValuePrefix = Lexical.Pipe;
-    public const byte RawStringPrefix = Lexical.RawPrefix;
-    public const byte HexBinaryPrefix = Lexical.HexPrefix;
-    public const byte Base64BinaryPrefix = Lexical.Base64Prefix;
-    public const byte NilKeywordStart = Lexical.NilStart;
-    public const byte StringOpen = Lexical.Quote;
+    public const byte RawStringPrefix = Lexical.LowerR;
+    public const byte HexBinaryPrefix = Lexical.LowerX;
+    public const byte Base64BinaryPrefix = Lexical.LowerB;
+    public const byte NilKeywordStart = Lexical.LowerN;
+    public const byte StringOpen = Lexical.SingleQuote;
 
     // Composite type/value delimiters
     public const byte StructOpen = Lexical.LBrace;
@@ -34,9 +34,12 @@ internal static class Syntax
     public const byte AtomSetOpen = Lexical.Pipe;
     public const byte AtomSetClose = Lexical.Pipe;
 
+    // Layout
+    public const byte CommentStart = Lexical.Hash;
+
     // Digraphs
     public static readonly Digraph PackOp = new(Lexical.LAngle, Lexical.LAngle);
-    public static readonly Digraph MapBind = new(Lexical.Assign, Lexical.RAngle);
+    public static readonly Digraph MapBind = new(Lexical.EqualsSign, Lexical.RAngle);
 }
 
 /// <summary>

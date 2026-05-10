@@ -184,8 +184,41 @@ sealed class Parser
     private StepResult StepMapValue(ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
         => StepResult.Error(PaktParseError.Syntax(CurrentPosition, "map value parsing not yet implemented"));
 
-    private StepResult StepScalarValue(ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
-        => StepResult.Error(PaktParseError.Syntax(CurrentPosition, "scalar value parsing not yet implemented"));
+    private StepResult StepScalarValue(
+        ref SequenceReader<byte> reader,
+        ref ValueFrame frame,
+        PaktTypeNode node,
+        bool isFinal)
+    {
+        SkipLayout(ref reader);
+
+        if (!reader.TryPeek(out byte first))
+            return isFinal
+            ? StepResult.Error(PaktParseError.Syntax(CurrentPosition))
+            : StepResult.MoreData();
+
+        // Atom values: |ident
+        if (node.Kind == PaktTypeKind.AtomSet)
+            return StepAtomValue(ref reader, ref frame, isFinal);
+
+        // nil — any nullable type
+        if (first == Lexical.NilStart && node.IsNullable)
+            return ReadNilAndEmit(ref reader, ref frame, node, isFinal);
+
+        return node.Kind switch
+        {
+            PaktTypeKind.String => ReadStringValueAndEmit(ref reader, ref frame, isFinal, first),
+            PaktTypeKind.Int => ReadIntValueAndEmit(ref reader, ref frame, isFinal),
+            PaktTypeKind.Decimal => ReadDecValueAndEmit(ref reader, ref frame, isFinal),
+            PaktTypeKind.Float => ReadFloatValueAndEmit(ref reader, ref frame, isFinal),
+            PaktTypeKind.Bool => ReadBoolValueAndEmit(ref reader, ref frame, isFinal),
+            PaktTypeKind.Uuid => ReadUuidValueAndEmit(ref reader, ref frame, isFinal),
+            PaktTypeKind.Date => ReadDateValueAndEmit(ref reader, ref frame, isFinal),
+            PaktTypeKind.Timestamp => ReadTsValueAndEmit(ref reader, ref frame, isFinal),
+            PaktTypeKind.Binary => ReadBinaryValueAndEmit(ref reader, ref frame, isFinal),
+            _ => StepResult.Error(PaktParseError.Syntax(CurrentPosition, "unsupported scalar type")),
+        };
+    }
 
     private StepResult StepStatementName(ref SequenceReader<byte> reader, bool isFinal)
     {
@@ -199,7 +232,7 @@ sealed class Parser
 
     private StepResult StepTypeAnnotation(ref SequenceReader<byte> reader, bool isFinal)
     {
-        if (!TryReadExpected(ref reader, Lexical.TypeSeparator, isFinal, out StepResult separatorResult))
+        if (!TryReadExpected(ref reader, Lexical.TypeAscription, isFinal, out StepResult separatorResult))
             return separatorResult;
 
         _pendingTypeEvents.Clear();
@@ -261,7 +294,7 @@ sealed class Parser
             return false;
         }
 
-        if (op == (byte)'=')
+        if (op == Lexical.Assign)
         {
             reader.Advance(1);
             _cursor.Offset++;
@@ -271,9 +304,9 @@ sealed class Parser
             return true;
         }
 
-        if (op == (byte)'<')
+        if (op == Lexical.LAngle)
         {
-            if (!reader.TryPeek(1, out byte op2) || op2 != (byte)'<')
+            if (!reader.TryPeek(1, out byte op2) || op2 != Lexical.LAngle)
             {
                 if (reader.Remaining < 2 && !isFinal)
                 {
@@ -322,18 +355,18 @@ sealed class Parser
 
         bool parsed = b switch
         {
-            (byte)'{' => TryParseStructType(ref reader, isFinal, depth, out typeRef, out result),
-            (byte)'(' => TryParseTupleType(ref reader, isFinal, depth, out typeRef, out result),
-            (byte)'[' => TryParseListType(ref reader, isFinal, depth, out typeRef, out result),
-            (byte)'<' => TryParseMapType(ref reader, isFinal, depth, out typeRef, out result),
-            (byte)'|' => TryParseAtomSetType(ref reader, isFinal, out typeRef, out result),
+            Lexical.LBrace => TryParseStructType(ref reader, isFinal, depth, out typeRef, out result),
+            Lexical.LParen => TryParseTupleType(ref reader, isFinal, depth, out typeRef, out result),
+            Lexical.LBrack => TryParseListType(ref reader, isFinal, depth, out typeRef, out result),
+            Lexical.LAngle => TryParseMapType(ref reader, isFinal, depth, out typeRef, out result),
+            Lexical.Pipe => TryParseAtomSetType(ref reader, isFinal, out typeRef, out result),
             _ => TryParseScalarType(ref reader, isFinal, out typeRef, out result),
         };
 
         if (!parsed)
             return false;
 
-        if (reader.TryPeek(out b) && b == (byte)'?')
+        if (reader.TryPeek(out b) && b == Lexical.NullableSuffix)
         {
             reader.Advance(1);
             _cursor.Offset++;
@@ -381,7 +414,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, (byte)'{', isFinal, out result))
+        if (!TryReadExpected(ref reader, Lexical.LBrace, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -393,7 +426,7 @@ sealed class Parser
         // §5.6: struct_type = LBRACE layout_opt (field (LAYOUT field)*)? layout_opt RBRACE
         SkipLayout(ref reader);
         var memberTypes = new List<PaktTypeRef>(4);
-        if (TryReadEmptyComposite(ref reader, (byte)'}'))
+        if (TryReadEmptyComposite(ref reader, Lexical.RBrace))
         {
             _pendingTypeEvents.Add(PendingTypeEvent.Simple(
                 PaktEvent.Kind.StructTypeEnd, _cursor.Offset));
@@ -412,7 +445,7 @@ sealed class Parser
             }
 
             SkipLayout(ref reader);
-            if (TryReadEmptyComposite(ref reader, (byte)'}'))
+            if (TryReadEmptyComposite(ref reader, Lexical.RBrace))
                 break;
         }
 
@@ -434,7 +467,7 @@ sealed class Parser
         if (!TryReadIdentifier(ref reader, isFinal, out ReadOnlySequence<byte> fieldName, out result))
             return false;
 
-        if (!TryReadExpected(ref reader, Lexical.TypeSeparator, isFinal, out result))
+        if (!TryReadExpected(ref reader, Lexical.TypeAscription, isFinal, out result))
             return false;
 
         if (!TryParseTypeReference(ref reader, isFinal, depth + 1, out PaktTypeRef fieldType, out result))
@@ -458,7 +491,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, (byte)'(', isFinal, out result))
+        if (!TryReadExpected(ref reader, Lexical.LParen, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -470,7 +503,7 @@ sealed class Parser
         // §5.6: tuple_type = LPAREN layout_opt (type (LAYOUT type)*)? layout_opt RPAREN
         SkipLayout(ref reader);
         var memberTypes = new List<PaktTypeRef>(4);
-        if (TryReadEmptyComposite(ref reader, (byte)')'))
+        if (TryReadEmptyComposite(ref reader, Lexical.RParen))
         {
             _pendingTypeEvents.Add(PendingTypeEvent.Simple(
                 PaktEvent.Kind.TupleTypeEnd, _cursor.Offset));
@@ -495,7 +528,7 @@ sealed class Parser
             memberTypes.Add(itemType);
 
             SkipLayout(ref reader);
-            if (TryReadEmptyComposite(ref reader, (byte)')'))
+            if (TryReadEmptyComposite(ref reader, Lexical.RParen))
                 break;
         }
 
@@ -514,7 +547,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, (byte)'[', isFinal, out result))
+        if (!TryReadExpected(ref reader, Lexical.LBrack, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -534,7 +567,7 @@ sealed class Parser
 
         SkipLayout(ref reader);
 
-        if (!TryReadExpected(ref reader, (byte)']', isFinal, out result))
+        if (!TryReadExpected(ref reader, Lexical.RBrack, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -559,7 +592,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, (byte)'<', isFinal, out result))
+        if (!TryReadExpected(ref reader, Lexical.LAngle, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -591,7 +624,7 @@ sealed class Parser
 
         SkipLayout(ref reader);
 
-        if (!TryReadExpected(ref reader, (byte)'>', isFinal, out result))
+        if (!TryReadExpected(ref reader, Lexical.RAngle, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -631,7 +664,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, (byte)'|', isFinal, out result))
+        if (!TryReadExpected(ref reader, Lexical.Pipe, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -643,7 +676,7 @@ sealed class Parser
         // §5.6: atom_set = PIPE layout_opt IDENT (LAYOUT IDENT)* layout_opt PIPE
         SkipLayout(ref reader);
 
-        if (TryReadEmptyComposite(ref reader, (byte)'|'))
+        if (TryReadEmptyComposite(ref reader, Lexical.Pipe))
         {
             typeRef = default;
             result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition));
@@ -666,7 +699,7 @@ sealed class Parser
             atomCount++;
 
             SkipLayout(ref reader);
-            if (TryReadEmptyComposite(ref reader, (byte)'|'))
+            if (TryReadEmptyComposite(ref reader, Lexical.Pipe))
                 break;
         }
 
@@ -785,21 +818,19 @@ sealed class Parser
     {
         kind = span.Length switch
         {
-            2 when span[0] == (byte)'t' && span[1] == (byte)'s' => PaktTypeKind.Timestamp,
-            3 when span[0] == (byte)'s' && span[1] == (byte)'t' && span[2] == (byte)'r' => PaktTypeKind.String,
-            3 when span[0] == (byte)'i' && span[1] == (byte)'n' && span[2] == (byte)'t' => PaktTypeKind.Int,
-            3 when span[0] == (byte)'d' && span[1] == (byte)'e' && span[2] == (byte)'c' => PaktTypeKind.Decimal,
-            3 when span[0] == (byte)'b' && span[1] == (byte)'i' && span[2] == (byte)'n' => PaktTypeKind.Binary,
-            4 when span[0] == (byte)'b' && span[1] == (byte)'o' && span[2] == (byte)'o' && span[3] == (byte)'l' => PaktTypeKind.Bool,
-            4 when span[0] == (byte)'u' && span[1] == (byte)'u' && span[2] == (byte)'i' && span[3] == (byte)'d' => PaktTypeKind.Uuid,
-            4 when span[0] == (byte)'d' && span[1] == (byte)'a' && span[2] == (byte)'t' && span[3] == (byte)'e' => PaktTypeKind.Date,
-            5 when span[0] == (byte)'f' && span[1] == (byte)'l' && span[2] == (byte)'o' && span[3] == (byte)'a' && span[4] == (byte)'t' => PaktTypeKind.Float,
+            2 when span == "ts"u8 => PaktTypeKind.Timestamp,
+            3 when span == "str"u8 => PaktTypeKind.String,
+            3 when span == "int"u8 => PaktTypeKind.Int,
+            3 when span == "dec"u8 => PaktTypeKind.Decimal,
+            3 when span == "bin"u8 => PaktTypeKind.Binary,
+            4 when span == "bool"u8 => PaktTypeKind.Bool,
+            4 when span == "uuid"u8 => PaktTypeKind.Uuid,
+            4 when span == "date"u8 => PaktTypeKind.Date,
+            5 when span == "float"u8 => PaktTypeKind.Float,
             _ => default,
         };
 
-        return kind is PaktTypeKind.Timestamp or PaktTypeKind.String or PaktTypeKind.Int
-            or PaktTypeKind.Decimal or PaktTypeKind.Binary or PaktTypeKind.Bool
-            or PaktTypeKind.Uuid or PaktTypeKind.Date or PaktTypeKind.Float;
+        return kind.IsScalar();
     }
 
     private PaktTypeRef AddNullableType(PaktTypeRef typeRef)
@@ -914,7 +945,7 @@ sealed class Parser
             return false;
         }
 
-        if (b0 != (byte)'=')
+        if (b0 != Lexical.Assign)
         {
             result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition, "expected '=>'"));
             return false;
@@ -928,7 +959,7 @@ sealed class Parser
             return false;
         }
 
-        if (b1 != (byte)'>')
+        if (b1 != Lexical.RAngle)
         {
             result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition, "expected '=>'"));
             return false;
@@ -952,6 +983,402 @@ sealed class Parser
             reader.Advance(3);
             _cursor.Offset += 3;
         }
+    }
+
+    // ── Scalar value helpers ──────────────────────────────────────
+
+    private StepResult StepAtomValue(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+    {
+        if (!TryReadAtomValue(ref reader, isFinal, out ReadOnlySequence<byte> payload, out StepResult result))
+            return result;
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.AtomValue, _cursor.Offset, PaktTypeKind.AtomSet, payload));
+    }
+
+    private StepResult ReadNilAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame,
+        PaktTypeNode node, bool isFinal)
+    {
+        if (!TryReadIdentifier(ref reader, isFinal, out ReadOnlySequence<byte> token, out StepResult result))
+            return result;
+
+        if (!IsToken(token, "nil"u8))
+            return StepResult.Error(PaktParseError.Syntax(CurrentPosition, "expected 'nil'"));
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.NilValue, _cursor.Offset, node.Kind, default));
+    }
+
+    private StepResult ReadStringValueAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal, byte first)
+    {
+        // str accepts: '…', r'…', '''…''', r'''…'''
+        if (first == Lexical.RawPrefix)
+        {
+            SequencePosition startPos = reader.Position;
+            reader.Advance(1);
+            _cursor.Offset++;
+            _cursor.Column++;
+
+            if (!TryReadStringLiteral(ref reader, isFinal, out _, out StepResult innerResult))
+                return innerResult;
+
+            ReadOnlySequence<byte> payload = reader.Sequence.Slice(startPos, reader.Position);
+            _valueStack.Pop();
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.String, payload));
+        }
+
+        if (first != Lexical.Quote)
+            return StepResult.Error(PaktParseError.TypeMismatch(CurrentPosition, "str requires quoted string"));
+
+        if (!TryReadStringLiteral(ref reader, isFinal, out ReadOnlySequence<byte> strPayload, out StepResult strResult))
+            return strResult;
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.String, strPayload));
+    }
+
+    private StepResult ReadIntValueAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+    {
+        if (!TryReadTokenByCharSet(ref reader, isFinal, IsIntChar, out ReadOnlySequence<byte> payload, out StepResult result))
+            return result;
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.Int, payload));
+    }
+
+    private StepResult ReadDecValueAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+    {
+        if (!TryReadTokenByCharSet(ref reader, isFinal, IsDecChar, out ReadOnlySequence<byte> payload, out StepResult result))
+            return result;
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.Decimal, payload));
+    }
+
+    private StepResult ReadFloatValueAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+    {
+        if (!TryReadTokenByCharSet(ref reader, isFinal, IsFloatChar, out ReadOnlySequence<byte> payload, out StepResult result))
+            return result;
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.Float, payload));
+    }
+
+    private StepResult ReadBoolValueAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+    {
+        if (!TryReadIdentifier(ref reader, isFinal, out ReadOnlySequence<byte> token, out StepResult result))
+            return result;
+
+        if (!IsToken(token, "true"u8) && !IsToken(token, "false"u8))
+            return StepResult.Error(PaktParseError.TypeMismatch(CurrentPosition, "bool requires 'true' or 'false'"));
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.Bool, token));
+    }
+
+    private StepResult ReadUuidValueAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+    {
+        if (!TryReadTokenByCharSet(ref reader, isFinal, IsUuidChar, out ReadOnlySequence<byte> payload, out StepResult result))
+            return result;
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.Uuid, payload));
+    }
+
+    private StepResult ReadDateValueAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+    {
+        if (!TryReadTokenByCharSet(ref reader, isFinal, IsDateChar, out ReadOnlySequence<byte> payload, out StepResult result))
+            return result;
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.Date, payload));
+    }
+
+    private StepResult ReadTsValueAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+    {
+        if (!TryReadTokenByCharSet(ref reader, isFinal, IsTsChar, out ReadOnlySequence<byte> payload, out StepResult result))
+            return result;
+
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.Timestamp, payload));
+    }
+
+    private StepResult ReadBinaryValueAndEmit(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+    {
+        // bin requires x'…' or b'…'
+        if (!reader.TryPeek(out byte prefix) || (prefix != Lexical.HexPrefix && prefix != Lexical.Base64Prefix))
+            return StepResult.Error(PaktParseError.TypeMismatch(CurrentPosition, "bin requires x'…' or b'…'"));
+
+        if (!reader.TryPeek(1, out byte q) || q != Lexical.Quote)
+            return StepResult.Error(PaktParseError.TypeMismatch(CurrentPosition, "bin requires x'…' or b'…'"));
+
+        SequencePosition startPos = reader.Position;
+        reader.Advance(1);
+        _cursor.Offset++;
+        _cursor.Column++;
+
+        if (!TryReadStringLiteral(ref reader, isFinal, out _, out StepResult innerResult))
+            return innerResult;
+
+        ReadOnlySequence<byte> payload = reader.Sequence.Slice(startPos, reader.Position);
+        _valueStack.Pop();
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.Binary, payload));
+    }
+
+    // ── Token reading helpers ─────────────────────────────────────
+
+    /// <summary>
+    /// Reads a string literal: '…', '''…'''. Does not read prefix (r/x/b).
+    /// Handles escape sequences by skipping \X without interpretation.
+    /// </summary>
+    private bool TryReadStringLiteral(
+        ref SequenceReader<byte> reader, bool isFinal,
+        out ReadOnlySequence<byte> payload, out StepResult result)
+    {
+        SequencePosition startPos = reader.Position;
+
+        if (!reader.TryRead(out byte open) || open != Lexical.Quote)
+        {
+            payload = default;
+            result = StepResult.Error(PaktParseError.Syntax(CurrentPosition));
+            return false;
+        }
+
+        _cursor.Offset++;
+        _cursor.Column++;
+
+        // Check for triple-quote (multi-line)
+        bool isMultiLine = reader.TryPeek(out byte q1) && q1 == Lexical.Quote
+            && reader.TryPeek(1, out byte q2) && q2 == Lexical.Quote;
+
+        if (isMultiLine)
+            return TryReadMultiLineString(ref reader, startPos, isFinal, out payload, out result);
+
+        return TryReadSingleLineString(ref reader, startPos, isFinal, out payload, out result);
+    }
+
+    private bool TryReadSingleLineString(
+        ref SequenceReader<byte> reader, SequencePosition startPos, bool isFinal,
+        out ReadOnlySequence<byte> payload, out StepResult result)
+    {
+        while (reader.TryRead(out byte b))
+        {
+            _cursor.Advance(b);
+            if (b == Lexical.Quote)
+            {
+                payload = reader.Sequence.Slice(startPos, reader.Position);
+                result = default;
+                return true;
+            }
+
+            if (b == Lexical.Escape)
+            {
+                if (!reader.TryRead(out byte escaped))
+                {
+                    payload = default;
+                    result = isFinal
+                        ? StepResult.Error(PaktParseError.Syntax(CurrentPosition, "unterminated escape"))
+                        : StepResult.MoreData();
+                    return false;
+                }
+                _cursor.Advance(escaped);
+            }
+        }
+
+        payload = default;
+        result = isFinal
+            ? StepResult.Error(PaktParseError.Syntax(CurrentPosition, "unterminated string"))
+            : StepResult.MoreData();
+        return false;
+    }
+
+    private bool TryReadMultiLineString(
+        ref SequenceReader<byte> reader, SequencePosition startPos, bool isFinal,
+        out ReadOnlySequence<byte> payload, out StepResult result)
+    {
+        // Consume the two additional opening quotes
+        reader.Advance(2);
+        _cursor.Offset += 2;
+        _cursor.Column += 2;
+
+        int closeCount = 0;
+        while (reader.TryRead(out byte b))
+        {
+            _cursor.Advance(b);
+            if (b == Lexical.Quote)
+            {
+                closeCount++;
+                if (closeCount == 3)
+                {
+                    payload = reader.Sequence.Slice(startPos, reader.Position);
+                    result = default;
+                    return true;
+                }
+                continue;
+            }
+
+            closeCount = 0;
+            if (b == Lexical.Escape)
+            {
+                if (!reader.TryRead(out byte escaped))
+                {
+                    payload = default;
+                    result = isFinal
+                        ? StepResult.Error(PaktParseError.Syntax(CurrentPosition, "unterminated escape"))
+                        : StepResult.MoreData();
+                    return false;
+                }
+                _cursor.Advance(escaped);
+            }
+        }
+
+        payload = default;
+        result = isFinal
+            ? StepResult.Error(PaktParseError.Syntax(CurrentPosition, "unterminated multi-line string"))
+            : StepResult.MoreData();
+        return false;
+    }
+
+    /// <summary>
+    /// Reads a token from the input using the given character predicate.
+    /// Returns the raw bytes as payload.
+    /// </summary>
+    private bool TryReadTokenByCharSet(
+        ref SequenceReader<byte> reader, bool isFinal,
+        Func<byte, bool> isValidChar,
+        out ReadOnlySequence<byte> payload, out StepResult result)
+    {
+        SequencePosition startPos = reader.Position;
+        long count = 0;
+
+        while (reader.TryPeek(out byte b))
+        {
+            if (isValidChar(b))
+            {
+                reader.Advance(1);
+                _cursor.Advance(b);
+                count++;
+                continue;
+            }
+            break;
+        }
+
+        if (count == 0)
+        {
+            payload = default;
+            result = reader.End && !isFinal
+                ? StepResult.MoreData()
+                : StepResult.Error(PaktParseError.TypeMismatch(CurrentPosition));
+            return false;
+        }
+
+        if (reader.End && !isFinal)
+        {
+            payload = default;
+            result = StepResult.MoreData();
+            return false;
+        }
+
+        payload = reader.Sequence.Slice(startPos, reader.Position);
+        result = default;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads an atom value: '|' followed by IDENT.
+    /// </summary>
+    private bool TryReadAtomValue(
+        ref SequenceReader<byte> reader, bool isFinal,
+        out ReadOnlySequence<byte> payload, out StepResult result)
+    {
+        SequencePosition startPos = reader.Position;
+
+        if (!TryReadExpected(ref reader, Lexical.Pipe, isFinal, out result))
+        {
+            payload = default;
+            return false;
+        }
+
+        if (!TryReadIdentifier(ref reader, isFinal, out _, out result))
+        {
+            payload = default;
+            return false;
+        }
+
+        payload = reader.Sequence.Slice(startPos, reader.Position);
+        result = default;
+        return true;
+    }
+
+    // §3.3: INT = [-] DIGIT_SEP | [-] '0x' HEX+ | [-] '0b' BIN+ | [-] '0o' OCT+
+    private static bool IsIntChar(byte b) =>
+        Lexical.IsHexDigit(b)
+        || b == Lexical.Minus || b == Lexical.DigitSeparator
+        || b == Lexical.HexPrefix || b == Lexical.OctalMarker || b == Lexical.Base64Prefix;
+
+    // §3.3: DEC = [-] DIGIT_SEP? '.' DIGIT_SEP
+    private static bool IsDecChar(byte b) =>
+        Lexical.IsDigit(b)
+        || b == Lexical.Minus || b == Lexical.DigitSeparator || b == Lexical.DecimalPoint;
+
+    // §3.3: FLOAT = [-] DIGIT_SEP? ('.' DIGIT_SEP)? ('e'|'E') [+-]? DIGIT+
+    private static bool IsFloatChar(byte b) =>
+        Lexical.IsDigit(b)
+        || b == Lexical.Minus || b == Lexical.Plus || b == Lexical.DigitSeparator
+        || b == Lexical.DecimalPoint || b == Lexical.ExponentLower || b == Lexical.ExponentUpper;
+
+    // §3.3: DATE = DIGIT{4}-DIGIT{2}-DIGIT{2}
+    private static bool IsDateChar(byte b) =>
+        Lexical.IsDigit(b) || b == Lexical.Minus;
+
+    // §3.3: TS = DATE 'T' time TZ — digits, -, T, :, ., Z, +
+    private static bool IsTsChar(byte b) =>
+        Lexical.IsDigit(b)
+        || b == Lexical.Minus || b == Lexical.Plus || b == Lexical.Colon
+        || b == Lexical.DateTimeSep || b == Lexical.UtcMarker || b == Lexical.DecimalPoint;
+
+    // §3.3: UUID = HEX{8}-HEX{4}-HEX{4}-HEX{4}-HEX{12}
+    private static bool IsUuidChar(byte b) =>
+        Lexical.IsHexDigit(b)
+        || b == Lexical.Minus;
+
+    private static bool IsToken(ReadOnlySequence<byte> token, ReadOnlySpan<byte> expected)
+    {
+        if (token.Length != expected.Length)
+            return false;
+
+        if (token.IsSingleSegment)
+            return token.FirstSpan.SequenceEqual(expected);
+
+        Span<byte> scratch = stackalloc byte[8];
+        if (expected.Length > scratch.Length)
+            return false;
+
+        token.CopyTo(scratch[..(int)token.Length]);
+        return scratch[..(int)token.Length].SequenceEqual(expected);
     }
 
 }

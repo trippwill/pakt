@@ -202,7 +202,7 @@ sealed class Parser
             return StepAtomValue(ref reader, ref frame, isFinal);
 
         // nil — any nullable type
-        if (first == Lexical.NilStart && node.IsNullable)
+        if (first == Syntax.NilKeywordStart && node.IsNullable)
             return ReadNilAndEmit(ref reader, ref frame, node, isFinal);
 
         return node.Kind switch
@@ -232,7 +232,7 @@ sealed class Parser
 
     private StepResult StepTypeAnnotation(ref SequenceReader<byte> reader, bool isFinal)
     {
-        if (!TryReadExpected(ref reader, Lexical.TypeAscription, isFinal, out StepResult separatorResult))
+        if (!TryReadExpected(ref reader, Syntax.TypeAscription, isFinal, out StepResult separatorResult))
             return separatorResult;
 
         _pendingTypeEvents.Clear();
@@ -294,7 +294,7 @@ sealed class Parser
             return false;
         }
 
-        if (op == Lexical.Assign)
+        if (op == Syntax.AssignOp)
         {
             reader.Advance(1);
             _cursor.Offset++;
@@ -304,27 +304,14 @@ sealed class Parser
             return true;
         }
 
-        if (op == Lexical.LAngle)
+        if (TryReadDigraph(ref reader, Syntax.PackOp, isFinal, out result))
         {
-            if (!reader.TryPeek(1, out byte op2) || op2 != Lexical.LAngle)
-            {
-                if (reader.Remaining < 2 && !isFinal)
-                {
-                    result = StepResult.MoreData();
-                    return false;
-                }
-
-                result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition));
-                return false;
-            }
-
-            reader.Advance(2);
-            _cursor.Offset += 2;
-            _cursor.Column += 2;
             _isPack = true;
-            result = default;
             return true;
         }
+
+        if (result.Status == Parser.StepStatus.MoreData)
+            return false;
 
         result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition));
         return false;
@@ -355,18 +342,18 @@ sealed class Parser
 
         bool parsed = b switch
         {
-            Lexical.LBrace => TryParseStructType(ref reader, isFinal, depth, out typeRef, out result),
-            Lexical.LParen => TryParseTupleType(ref reader, isFinal, depth, out typeRef, out result),
-            Lexical.LBrack => TryParseListType(ref reader, isFinal, depth, out typeRef, out result),
-            Lexical.LAngle => TryParseMapType(ref reader, isFinal, depth, out typeRef, out result),
-            Lexical.Pipe => TryParseAtomSetType(ref reader, isFinal, out typeRef, out result),
+            Syntax.StructOpen => TryParseStructType(ref reader, isFinal, depth, out typeRef, out result),
+            Syntax.TupleOpen => TryParseTupleType(ref reader, isFinal, depth, out typeRef, out result),
+            Syntax.ListOpen => TryParseListType(ref reader, isFinal, depth, out typeRef, out result),
+            Syntax.MapOpen => TryParseMapType(ref reader, isFinal, depth, out typeRef, out result),
+            Syntax.AtomSetOpen => TryParseAtomSetType(ref reader, isFinal, out typeRef, out result),
             _ => TryParseScalarType(ref reader, isFinal, out typeRef, out result),
         };
 
         if (!parsed)
             return false;
 
-        if (reader.TryPeek(out b) && b == Lexical.NullableSuffix)
+        if (reader.TryPeek(out b) && b == Syntax.NullableModifier)
         {
             reader.Advance(1);
             _cursor.Offset++;
@@ -414,7 +401,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, Lexical.LBrace, isFinal, out result))
+        if (!TryReadExpected(ref reader, Syntax.StructOpen, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -426,7 +413,7 @@ sealed class Parser
         // §5.6: struct_type = LBRACE layout_opt (field (LAYOUT field)*)? layout_opt RBRACE
         SkipLayout(ref reader);
         var memberTypes = new List<PaktTypeRef>(4);
-        if (TryReadEmptyComposite(ref reader, Lexical.RBrace))
+        if (TryReadEmptyComposite(ref reader, Syntax.StructClose))
         {
             _pendingTypeEvents.Add(PendingTypeEvent.Simple(
                 PaktEvent.Kind.StructTypeEnd, _cursor.Offset));
@@ -445,7 +432,7 @@ sealed class Parser
             }
 
             SkipLayout(ref reader);
-            if (TryReadEmptyComposite(ref reader, Lexical.RBrace))
+            if (TryReadEmptyComposite(ref reader, Syntax.StructClose))
                 break;
         }
 
@@ -467,7 +454,7 @@ sealed class Parser
         if (!TryReadIdentifier(ref reader, isFinal, out ReadOnlySequence<byte> fieldName, out result))
             return false;
 
-        if (!TryReadExpected(ref reader, Lexical.TypeAscription, isFinal, out result))
+        if (!TryReadExpected(ref reader, Syntax.TypeAscription, isFinal, out result))
             return false;
 
         if (!TryParseTypeReference(ref reader, isFinal, depth + 1, out PaktTypeRef fieldType, out result))
@@ -491,7 +478,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, Lexical.LParen, isFinal, out result))
+        if (!TryReadExpected(ref reader, Syntax.TupleOpen, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -503,7 +490,7 @@ sealed class Parser
         // §5.6: tuple_type = LPAREN layout_opt (type (LAYOUT type)*)? layout_opt RPAREN
         SkipLayout(ref reader);
         var memberTypes = new List<PaktTypeRef>(4);
-        if (TryReadEmptyComposite(ref reader, Lexical.RParen))
+        if (TryReadEmptyComposite(ref reader, Syntax.TupleClose))
         {
             _pendingTypeEvents.Add(PendingTypeEvent.Simple(
                 PaktEvent.Kind.TupleTypeEnd, _cursor.Offset));
@@ -528,7 +515,7 @@ sealed class Parser
             memberTypes.Add(itemType);
 
             SkipLayout(ref reader);
-            if (TryReadEmptyComposite(ref reader, Lexical.RParen))
+            if (TryReadEmptyComposite(ref reader, Syntax.TupleClose))
                 break;
         }
 
@@ -547,7 +534,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, Lexical.LBrack, isFinal, out result))
+        if (!TryReadExpected(ref reader, Syntax.ListOpen, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -567,7 +554,7 @@ sealed class Parser
 
         SkipLayout(ref reader);
 
-        if (!TryReadExpected(ref reader, Lexical.RBrack, isFinal, out result))
+        if (!TryReadExpected(ref reader, Syntax.ListClose, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -592,7 +579,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, Lexical.LAngle, isFinal, out result))
+        if (!TryReadExpected(ref reader, Syntax.MapOpen, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -624,7 +611,7 @@ sealed class Parser
 
         SkipLayout(ref reader);
 
-        if (!TryReadExpected(ref reader, Lexical.RAngle, isFinal, out result))
+        if (!TryReadExpected(ref reader, Syntax.MapClose, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -651,7 +638,7 @@ sealed class Parser
     {
         if (!TryRequireLayout(ref reader, isFinal, out result))
             return false;
-        if (!TryReadBind(ref reader, isFinal, out result))
+        if (!TryReadDigraph(ref reader, Syntax.MapBind, isFinal, out result))
             return false;
         if (!TryRequireLayout(ref reader, isFinal, out result))
             return false;
@@ -664,7 +651,7 @@ sealed class Parser
         out PaktTypeRef typeRef,
         out StepResult result)
     {
-        if (!TryReadExpected(ref reader, Lexical.Pipe, isFinal, out result))
+        if (!TryReadExpected(ref reader, Syntax.AtomSetOpen, isFinal, out result))
         {
             typeRef = default;
             return false;
@@ -676,7 +663,7 @@ sealed class Parser
         // §5.6: atom_set = PIPE layout_opt IDENT (LAYOUT IDENT)* layout_opt PIPE
         SkipLayout(ref reader);
 
-        if (TryReadEmptyComposite(ref reader, Lexical.Pipe))
+        if (TryReadEmptyComposite(ref reader, Syntax.AtomSetClose))
         {
             typeRef = default;
             result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition));
@@ -699,7 +686,7 @@ sealed class Parser
             atomCount++;
 
             SkipLayout(ref reader);
-            if (TryReadEmptyComposite(ref reader, Lexical.Pipe))
+            if (TryReadEmptyComposite(ref reader, Syntax.AtomSetClose))
                 break;
         }
 
@@ -933,35 +920,36 @@ sealed class Parser
     }
 
     /// <summary>
-    /// Reads the '=>' bind operator (§3.7).
+    /// Reads a two-byte token (digraph). Returns false with MoreData or Error.
     /// </summary>
-    private bool TryReadBind(ref SequenceReader<byte> reader, bool isFinal, out StepResult result)
+    private bool TryReadDigraph(
+        ref SequenceReader<byte> reader, Digraph expected, bool isFinal, out StepResult result)
     {
         if (!reader.TryPeek(out byte b0))
         {
             result = isFinal
-                ? StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition))
+                ? StepResult.Error(PaktParseError.Syntax(CurrentPosition))
                 : StepResult.MoreData();
             return false;
         }
 
-        if (b0 != Lexical.Assign)
+        if (b0 != expected.First)
         {
-            result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition, "expected '=>'"));
+            result = StepResult.Error(PaktParseError.Syntax(CurrentPosition));
             return false;
         }
 
         if (!reader.TryPeek(1, out byte b1))
         {
             result = isFinal
-                ? StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition))
+                ? StepResult.Error(PaktParseError.Syntax(CurrentPosition))
                 : StepResult.MoreData();
             return false;
         }
 
-        if (b1 != Lexical.RAngle)
+        if (b1 != expected.Second)
         {
-            result = StepResult.Error(PaktParseError.InvalidHeader(CurrentPosition, "expected '=>'"));
+            result = StepResult.Error(PaktParseError.Syntax(CurrentPosition));
             return false;
         }
 
@@ -988,19 +976,27 @@ sealed class Parser
     // ── Scalar value helpers ──────────────────────────────────────
 
     private StepResult StepAtomValue(
-        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
+        ref SequenceReader<byte> reader,
+        ref ValueFrame frame,
+        bool isFinal)
     {
         if (!TryReadAtomValue(ref reader, isFinal, out ReadOnlySequence<byte> payload, out StepResult result))
             return result;
 
         _valueStack.Pop();
-        return StepResult.Event(new PaktEvent(
-            PaktEvent.Kind.AtomValue, _cursor.Offset, PaktTypeKind.AtomSet, payload));
+        return StepResult.Event(
+            new PaktEvent(
+                PaktEvent.Kind.AtomValue,
+                _cursor.Offset,
+                PaktTypeKind.AtomSet,
+                payload));
     }
 
     private StepResult ReadNilAndEmit(
-        ref SequenceReader<byte> reader, ref ValueFrame frame,
-        PaktTypeNode node, bool isFinal)
+        ref SequenceReader<byte> reader,
+        ref ValueFrame frame,
+        PaktTypeNode node,
+        bool isFinal)
     {
         if (!TryReadIdentifier(ref reader, isFinal, out ReadOnlySequence<byte> token, out StepResult result))
             return result;
@@ -1014,10 +1010,13 @@ sealed class Parser
     }
 
     private StepResult ReadStringValueAndEmit(
-        ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal, byte first)
+        ref SequenceReader<byte> reader,
+        ref ValueFrame frame,
+        bool isFinal,
+        byte first)
     {
         // str accepts: '…', r'…', '''…''', r'''…'''
-        if (first == Lexical.RawPrefix)
+        if (first == Syntax.RawStringPrefix)
         {
             SequencePosition startPos = reader.Position;
             reader.Advance(1);
@@ -1033,7 +1032,7 @@ sealed class Parser
                 PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.String, payload));
         }
 
-        if (first != Lexical.Quote)
+        if (first != Syntax.StringOpen)
             return StepResult.Error(PaktParseError.TypeMismatch(CurrentPosition, "str requires quoted string"));
 
         if (!TryReadStringLiteral(ref reader, isFinal, out ReadOnlySequence<byte> strPayload, out StepResult strResult))
@@ -1128,7 +1127,7 @@ sealed class Parser
         ref SequenceReader<byte> reader, ref ValueFrame frame, bool isFinal)
     {
         // bin requires x'…' or b'…'
-        if (!reader.TryPeek(out byte prefix) || (prefix != Lexical.HexPrefix && prefix != Lexical.Base64Prefix))
+        if (!reader.TryPeek(out byte prefix) || (prefix != Syntax.HexBinaryPrefix && prefix != Syntax.Base64BinaryPrefix))
             return StepResult.Error(PaktParseError.TypeMismatch(CurrentPosition, "bin requires x'…' or b'…'"));
 
         if (!reader.TryPeek(1, out byte q) || q != Lexical.Quote)
@@ -1316,7 +1315,7 @@ sealed class Parser
     {
         SequencePosition startPos = reader.Position;
 
-        if (!TryReadExpected(ref reader, Lexical.Pipe, isFinal, out result))
+        if (!TryReadExpected(ref reader, Syntax.AtomValuePrefix, isFinal, out result))
         {
             payload = default;
             return false;

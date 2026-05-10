@@ -10,7 +10,7 @@ sealed partial class Parser
         BetweenStatements,
         StatementName,
         TypeAnnotation,
-        TypeEventDrain,
+        TypeParsing,
         StatementOperator,
         StatementValue,
         Complete,
@@ -20,11 +20,10 @@ sealed partial class Parser
     private readonly PaktReaderOptions _options;
     private readonly PaktTypeArena _types;
     private readonly ValueStack _valueStack;
-    private readonly List<PendingTypeEvent> _pendingTypeEvents = [];
+    private readonly TypeParser _typeParser;
 
     private ParserPhase _phase;
     private SourceCursor _cursor;
-    private int _pendingDrainIndex;
 
     // Statement-level state (does not nest)
     private ReadOnlySequence<byte> _statementName;
@@ -36,6 +35,7 @@ sealed partial class Parser
         _options = options;
         _types = new PaktTypeArena();
         _valueStack = new ValueStack(options.MaxNestingDepth);
+        _typeParser = new TypeParser(_types, options);
 
         _phase = ParserPhase.UnitStart;
         _cursor = SourceCursor.Start;
@@ -51,7 +51,7 @@ sealed partial class Parser
             ParserPhase.BetweenStatements => StepBetweenStatements(ref reader, isFinal),
             ParserPhase.StatementName => StepStatementName(ref reader, isFinal),
             ParserPhase.TypeAnnotation => StepTypeAnnotation(ref reader, isFinal),
-            ParserPhase.TypeEventDrain => StepTypeEventDrain(),
+            ParserPhase.TypeParsing => StepTypeParsing(ref reader, isFinal),
             ParserPhase.StatementOperator => StepStatementOperator(ref reader, isFinal),
             ParserPhase.StatementValue => StepValue(ref reader, isFinal),
             ParserPhase.Complete => StepResult.Complete(),

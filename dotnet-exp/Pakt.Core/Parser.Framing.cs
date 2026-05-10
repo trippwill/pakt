@@ -46,33 +46,35 @@ sealed partial class Parser
         if (!TryReadExpected(ref reader, Syntax.TypeAscription, isFinal, out StepResult separatorResult))
             return separatorResult;
 
-        _pendingTypeEvents.Clear();
-        _pendingDrainIndex = 0;
-        _types.ClearNames();
-
-        if (!TryParseTypeReference(ref reader, isFinal, depth: 0, out PaktTypeRef typeRef, out StepResult typeResult))
-            return typeResult;
-
-        _statementType = typeRef;
-        _phase = ParserPhase.TypeEventDrain;
+        _typeParser.Begin(_cursor);
+        _phase = ParserPhase.TypeParsing;
         return StepResult.Continue();
     }
 
-    private StepResult StepTypeEventDrain()
+    private StepResult StepTypeParsing(ref SequenceReader<byte> reader, bool isFinal)
     {
-        if (_pendingDrainIndex >= _pendingTypeEvents.Count)
-        {
-            _pendingTypeEvents.Clear();
-            _pendingDrainIndex = 0;
-            _phase = ParserPhase.StatementOperator;
-            return StepResult.Continue();
-        }
+        TypeStepResult result = _typeParser.Step(
+            reader.UnreadSequence, isFinal, out long bytesConsumed);
 
-        var pe = _pendingTypeEvents[_pendingDrainIndex++];
-        ReadOnlySequence<byte> payload = pe.NameStart >= 0
-            ? new ReadOnlySequence<byte>(_types.NameBuffer, pe.NameStart, pe.NameLength)
-            : default;
-        return StepResult.Event(new PaktEvent(pe.Kind, pe.Offset, pe.TypeKind, payload));
+        reader.Advance(bytesConsumed);
+        _cursor = _typeParser.CurrentCursor;
+
+        return result.Status switch
+        {
+            TypeStepStatus.Continue => StepResult.Continue(),
+            TypeStepStatus.Event => StepResult.Event(result.TypeEvent),
+            TypeStepStatus.MoreData => StepResult.MoreData(),
+            TypeStepStatus.Complete => CompleteTypeParsing(),
+            TypeStepStatus.Error => StepResult.Error(result.ParseError!.Value),
+            _ => StepResult.Error(PaktParseError.Syntax(CurrentPosition)),
+        };
+    }
+
+    private StepResult CompleteTypeParsing()
+    {
+        _statementType = _typeParser.RootTypeRef;
+        _phase = ParserPhase.StatementOperator;
+        return StepResult.Continue();
     }
 
     private StepResult StepStatementOperator(ref SequenceReader<byte> reader, bool isFinal)

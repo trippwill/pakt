@@ -120,6 +120,10 @@ Key repo-wide expectations already configured:
 - no final newline by default
 - C# formatting via `dotnet format`
 
+**Parameter wrapping rule** (not enforced by `dotnet format` — enforced in review):
+- Parameter lists must be either **all on one line** or **each on its own indented line**.
+- No partial wrapping (e.g., two params on the first line, one on the next).
+
 VS Code workspace settings are intentionally minimal and checked in under `.vscode/`.
 
 ## Benchmark project status

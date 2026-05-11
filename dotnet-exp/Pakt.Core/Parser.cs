@@ -2,7 +2,7 @@ using System.Buffers;
 
 namespace Pakt;
 
-sealed partial class Parser
+internal sealed partial class Parser
 {
     private enum ParserPhase
     {

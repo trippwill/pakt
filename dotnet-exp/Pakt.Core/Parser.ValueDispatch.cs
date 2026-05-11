@@ -28,18 +28,192 @@ sealed partial class Parser
         };
     }
 
-    // Stub value handlers — to be implemented in a future effort
-    private StepResult StepStructValue(ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
-        => StepResult.Error(PaktParseError.Syntax(CurrentPosition, "struct value parsing not yet implemented"));
+    // Composite value handlers
 
-    private StepResult StepTupleValue(ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
-        => StepResult.Error(PaktParseError.Syntax(CurrentPosition, "tuple value parsing not yet implemented"));
+    private StepResult StepStructValue(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
+    {
+        if ((frame.Flags & FrameFlags.Opened) == FrameFlags.None)
+        {
+            SkipLayout(ref reader);
+            if (!TryReadExpected(ref reader, Syntax.StructOpen, isFinal, out StepResult r))
+                return r;
+            frame.Flags |= FrameFlags.Opened;
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.StructValueStart, _cursor.Offset, PaktTypeKind.Struct, default));
+        }
 
-    private StepResult StepListValue(ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
-        => StepResult.Error(PaktParseError.Syntax(CurrentPosition, "list value parsing not yet implemented"));
+        SkipLayout(ref reader);
 
-    private StepResult StepMapValue(ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
-        => StepResult.Error(PaktParseError.Syntax(CurrentPosition, "map value parsing not yet implemented"));
+        if (TryReadEmptyComposite(ref reader, Syntax.StructClose))
+        {
+            if (frame.Index != node.MemberCount)
+                return StepResult.Error(PaktParseError.ArityMismatch(CurrentPosition));
+            _valueStack.Pop();
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.StructValueEnd, _cursor.Offset, PaktTypeKind.Struct, default));
+        }
+
+        if (frame.Index >= node.MemberCount)
+            return StepResult.Error(PaktParseError.ArityMismatch(CurrentPosition));
+
+        ReadOnlySpan<PaktTypeRef> members = _types.GetMembers(node);
+        PaktTypeRef childType = members[frame.Index];
+        frame.Index++;
+
+        if (!_valueStack.TryPush(new ValueFrame { TypeRef = childType, Index = 0, Flags = FrameFlags.None }))
+            return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
+
+        return StepResult.Continue();
+    }
+
+    private StepResult StepTupleValue(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
+    {
+        if ((frame.Flags & FrameFlags.Opened) == FrameFlags.None)
+        {
+            SkipLayout(ref reader);
+            if (!TryReadExpected(ref reader, Syntax.TupleOpen, isFinal, out StepResult r))
+                return r;
+            frame.Flags |= FrameFlags.Opened;
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.TupleValueStart, _cursor.Offset, PaktTypeKind.Tuple, default));
+        }
+
+        SkipLayout(ref reader);
+
+        if (TryReadEmptyComposite(ref reader, Syntax.TupleClose))
+        {
+            if (frame.Index != node.MemberCount)
+                return StepResult.Error(PaktParseError.ArityMismatch(CurrentPosition));
+            _valueStack.Pop();
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.TupleValueEnd, _cursor.Offset, PaktTypeKind.Tuple, default));
+        }
+
+        if (frame.Index >= node.MemberCount)
+            return StepResult.Error(PaktParseError.ArityMismatch(CurrentPosition));
+
+        ReadOnlySpan<PaktTypeRef> members = _types.GetMembers(node);
+        PaktTypeRef childType = members[frame.Index];
+        frame.Index++;
+
+        if (!_valueStack.TryPush(new ValueFrame { TypeRef = childType, Index = 0, Flags = FrameFlags.None }))
+            return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
+
+        return StepResult.Continue();
+    }
+
+    private StepResult StepListValue(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
+    {
+        if ((frame.Flags & FrameFlags.Opened) == FrameFlags.None)
+        {
+            SkipLayout(ref reader);
+            if (!TryReadExpected(ref reader, Syntax.ListOpen, isFinal, out StepResult r))
+                return r;
+            frame.Flags |= FrameFlags.Opened;
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.ListValueStart, _cursor.Offset, PaktTypeKind.List, default));
+        }
+
+        SkipLayout(ref reader);
+
+        if (TryReadEmptyComposite(ref reader, Syntax.ListClose))
+        {
+            _valueStack.Pop();
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.ListValueEnd, _cursor.Offset, PaktTypeKind.List, default));
+        }
+
+        if (!_valueStack.TryPush(new ValueFrame { TypeRef = node.ElementType, Index = 0, Flags = FrameFlags.None }))
+            return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
+
+        return StepResult.Continue();
+    }
+
+    private StepResult StepMapValue(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
+    {
+        if ((frame.Flags & FrameFlags.Opened) == FrameFlags.None)
+        {
+            SkipLayout(ref reader);
+            if (!TryReadExpected(ref reader, Syntax.MapOpen, isFinal, out StepResult r))
+                return r;
+            frame.Flags |= FrameFlags.Opened;
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.MapValueStart, _cursor.Offset, PaktTypeKind.Map, default));
+        }
+
+        SkipLayout(ref reader);
+
+        if (TryReadEmptyComposite(ref reader, Syntax.MapClose))
+        {
+            _valueStack.Pop();
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.MapValueEnd, _cursor.Offset, PaktTypeKind.Map, default));
+        }
+
+        // Entry lifecycle: ExpectKey=0 → emit MapEntryStart, push key
+        //                  ExpectKey=1 (after key) → read bind, push value
+        //                  ExpectKey=0 (after value) → emit MapEntryEnd, loop
+        if ((frame.Flags & FrameFlags.ExpectKey) == FrameFlags.None)
+        {
+            // Start a new entry — emit MapEntryStart, set ExpectKey, push key child
+            frame.Flags |= FrameFlags.ExpectKey;
+            return StepResult.Event(new PaktEvent(
+                PaktEvent.Kind.MapEntryStart, _cursor.Offset, PaktTypeKind.Map, default));
+        }
+
+        // After key completed: read LAYOUT => LAYOUT, then push value
+        return StepMapEntryValue(ref reader, ref frame, node, isFinal);
+    }
+
+    private StepResult StepMapEntryValue(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
+    {
+        // We just emitted MapEntryStart + key was pushed. If we're back here,
+        // the key value completed. Now read => and push value.
+        // But wait — we need to distinguish "key just pushed" vs "key completed".
+        // Use frame.Index: 0 = need to push key, 1 = key done need bind, 2 = value done need entry end
+
+        // This is called when ExpectKey is set. Dispatch on Index:
+        // Index 0: push key type
+        // Index 1: bind was read, push value type
+        // Index 2: value done — this shouldn't happen here
+
+        if (frame.Index == 0)
+        {
+            // Push key child
+            frame.Index = 1;
+            if (!_valueStack.TryPush(new ValueFrame { TypeRef = node.KeyType, Index = 0, Flags = FrameFlags.None }))
+                return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
+            return StepResult.Continue();
+        }
+
+        if (frame.Index == 1)
+        {
+            // Key completed — read LAYOUT => LAYOUT
+            if (!TryRequireLayout(ref reader, isFinal, out StepResult layoutResult))
+                return layoutResult;
+            if (!TryReadDigraph(ref reader, Syntax.MapBind, isFinal, out StepResult bindResult))
+                return bindResult;
+            if (!TryRequireLayout(ref reader, isFinal, out StepResult postResult))
+                return postResult;
+
+            // Push value child
+            frame.Index = 2;
+            if (!_valueStack.TryPush(new ValueFrame { TypeRef = node.ValueType, Index = 0, Flags = FrameFlags.None }))
+                return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
+            return StepResult.Continue();
+        }
+
+        // Index 2: value completed — emit MapEntryEnd, reset for next entry
+        frame.Index = 0;
+        frame.Flags &= ~FrameFlags.ExpectKey;
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.MapEntryEnd, _cursor.Offset, PaktTypeKind.Map, default));
+    }
 
     private StepResult StepScalarValue(
         ref SequenceReader<byte> reader,

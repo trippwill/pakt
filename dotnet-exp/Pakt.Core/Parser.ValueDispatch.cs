@@ -18,6 +18,18 @@ sealed partial class Parser
 
         ref ValueFrame frame = ref _valueStack.Top;
         PaktTypeNode node = _types.Get(frame.TypeRef);
+
+        // Pack body: undelimited value sequence
+        if ((frame.Flags & FrameFlags.Pack) != FrameFlags.None)
+        {
+            return node.Kind switch
+            {
+                PaktTypeKind.List => StepListPackBody(ref reader, ref frame, node, isFinal),
+                PaktTypeKind.Map => StepMapPackBody(ref reader, ref frame, node, isFinal),
+                _ => StepResult.Error(PaktParseError.Syntax(CurrentPosition, "pack type must be list or map")),
+            };
+        }
+
         return node.Kind switch
         {
             PaktTypeKind.Struct => StepStructValue(ref reader, ref frame, node, isFinal),
@@ -424,5 +436,113 @@ sealed partial class Parser
         _valueStack.Pop();
         return StepResult.Event(new PaktEvent(
             PaktEvent.Kind.ScalarValue, _cursor.Offset, PaktTypeKind.Binary, payload));
+    }
+
+    // ── Pack body handlers ──────────────────────────────────────────
+
+    private StepResult StepListPackBody(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
+    {
+        SkipLayout(ref reader);
+
+        if (IsPackTerminated(ref reader, isFinal))
+        {
+            _valueStack.Pop();
+            return StepResult.Continue();
+        }
+
+        if (reader.End && !isFinal)
+            return StepResult.MoreData();
+
+        if (!_valueStack.TryPush(new ValueFrame { TypeRef = node.ElementType, Index = 0, Flags = FrameFlags.None }))
+            return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
+
+        return StepResult.Continue();
+    }
+
+    private StepResult StepMapPackBody(
+        ref SequenceReader<byte> reader, ref ValueFrame frame, PaktTypeNode node, bool isFinal)
+    {
+        SkipLayout(ref reader);
+
+        if (IsPackTerminated(ref reader, isFinal))
+        {
+            _valueStack.Pop();
+            return StepResult.Continue();
+        }
+
+        if (reader.End && !isFinal)
+            return StepResult.MoreData();
+
+        // Map pack entry lifecycle uses Index:
+        // 0 = push key, 1 = read bind + push value, 2 = entry done
+        if (frame.Index == 0)
+        {
+            frame.Index = 1;
+            if (!_valueStack.TryPush(new ValueFrame { TypeRef = node.KeyType, Index = 0, Flags = FrameFlags.None }))
+                return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
+            return StepResult.Continue();
+        }
+
+        if (frame.Index == 1)
+        {
+            if (!TryRequireLayout(ref reader, isFinal, out StepResult lr))
+                return lr;
+            if (!TryReadDigraph(ref reader, Syntax.MapBind, isFinal, out StepResult br))
+                return br;
+            if (!TryRequireLayout(ref reader, isFinal, out StepResult pr))
+                return pr;
+
+            frame.Index = 2;
+            if (!_valueStack.TryPush(new ValueFrame { TypeRef = node.ValueType, Index = 0, Flags = FrameFlags.None }))
+                return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
+            return StepResult.Continue();
+        }
+
+        // Index 2: entry complete, reset for next
+        frame.Index = 0;
+        return StepResult.Continue();
+    }
+
+    /// <summary>
+    /// Checks if a pack body is terminated. A pack ends at:
+    /// - EOF (isFinal and reader.End)
+    /// - NUL byte (§10.1)
+    /// - Start of next statement: ident-start char that is NOT a value keyword/prefix.
+    ///   At most 2 bytes of lookahead needed.
+    /// </summary>
+    private bool IsPackTerminated(ref SequenceReader<byte> reader, bool isFinal)
+    {
+        if (reader.End)
+            return isFinal;
+
+        if (!reader.TryPeek(out byte b))
+            return false;
+
+        if (b == Lexical.Nul)
+            return true;
+
+        if (!Lexical.IsIdentifierStart(b))
+            return false;
+
+        // Ident-start: could be keyword value or statement header.
+        // Check second byte to disambiguate.
+        if (!reader.TryPeek(1, out byte b2))
+            return false; // need more data to decide — not terminated yet
+
+        return b switch
+        {
+            // r/x/b + quote = value literal (raw string, binary)
+            Lexical.LowerR or Lexical.LowerX or Lexical.LowerB
+                => b2 != Lexical.SingleQuote,
+            // n + i = "ni..." → nil keyword
+            Lexical.LowerN => b2 != (byte)'i',
+            // t + r = "tr..." → true keyword
+            _ when b == (byte)'t' => b2 != (byte)'r',
+            // f + a = "fa..." → false keyword
+            _ when b == (byte)'f' => b2 != (byte)'a',
+            // Any other ident-start = statement header
+            _ => true,
+        };
     }
 }

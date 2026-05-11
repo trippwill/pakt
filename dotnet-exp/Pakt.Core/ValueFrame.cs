@@ -16,4 +16,5 @@ internal enum FrameFlags : byte
     None = 0,
     Opened = 1,
     ExpectKey = 2,
+    Pack = 4,
 }

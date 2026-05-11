@@ -25,6 +25,7 @@ internal static class Lexical
     public const byte Hash = (byte)'#';
     public const byte Question = (byte)'?';
     public const byte Backslash = (byte)'\\';
+    public const byte Nul = 0x00;
 
     // Whitespace
     public const byte Space = (byte)' ';

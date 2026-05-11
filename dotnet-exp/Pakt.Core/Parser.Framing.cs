@@ -27,6 +27,15 @@ sealed partial class Parser
             return StepResult.MoreData();
         }
 
+        // §10.1: NUL at top level = end-of-unit
+        if (reader.TryPeek(out byte b) && b == Lexical.Nul)
+        {
+            reader.Advance(1);
+            _cursor.Offset++;
+            _phase = ParserPhase.Complete;
+            return StepResult.Event(PaktEvent.UnitEnd(_cursor.Offset));
+        }
+
         _phase = ParserPhase.StatementName;
         return StepResult.Continue();
     }
@@ -89,7 +98,12 @@ sealed partial class Parser
         if (!TryRequireHeaderLayout(ref reader, isFinal, out StepResult postResult))
             return postResult;
 
-        if (!_valueStack.TryPush(new ValueFrame { TypeRef = _statementType, Index = 0, Flags = FrameFlags.None }))
+        if (!_valueStack.TryPush(new ValueFrame
+        {
+            TypeRef = _statementType,
+            Index = 0,
+            Flags = _isPack ? FrameFlags.Pack : FrameFlags.None,
+        }))
             return StepResult.Error(PaktParseError.NestingDepthExceeded(CurrentPosition));
 
         _phase = ParserPhase.StatementValue;

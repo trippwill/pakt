@@ -104,6 +104,7 @@ internal sealed class TypeParser
     private SourceCursor _cursor;
     private PaktTypeRef _rootTypeRef;
     private bool _checkNullable;
+    private bool _pendingPostComplete;
 
     public TypeParser(PaktTypeArena types, PaktReaderOptions options)
     {
@@ -123,6 +124,7 @@ internal sealed class TypeParser
         _scratchUsed = 0;
         _rootTypeRef = default;
         _checkNullable = false;
+        _pendingPostComplete = false;
         _types.ClearNames();
     }
 
@@ -145,6 +147,13 @@ internal sealed class TypeParser
     private TypeStepResult StepCore(
         scoped ref SequenceReader<byte> reader, bool isFinal)
     {
+        // After emitting NullableModifier, complete the post-type step
+        if (_pendingPostComplete)
+        {
+            _pendingPostComplete = false;
+            return PostTypeComplete(ref reader, isFinal);
+        }
+
         // After a completed type, check for nullable suffix
         if (_checkNullable)
         {
@@ -163,6 +172,7 @@ internal sealed class TypeParser
                 _cursor.Offset++;
                 _cursor.Column++;
                 ApplyNullable();
+                _pendingPostComplete = true;
                 return TypeStepResult.Event(new PaktEvent(
                     PaktEvent.Kind.NullableModifier, _cursor.Offset, PaktTypeKind.None, default));
             }
@@ -256,6 +266,16 @@ internal sealed class TypeParser
         CompleteChildType(typeRef);
 
         _checkNullable = true;
+
+        // Inside struct/tuple, the type info is carried by FieldDecl/ElementDecl;
+        // suppress the separate ScalarType event.
+        if (_stackDepth > 0)
+        {
+            PaktTypeKind parentKind = _stack[_stackDepth - 1].CompositeKind;
+            if (parentKind == PaktTypeKind.Struct || parentKind == PaktTypeKind.Tuple)
+                return TypeStepResult.Continue();
+        }
+
         return TypeStepResult.Event(
             new PaktEvent(PaktEvent.Kind.ScalarType, _cursor.Offset, kind, default));
     }
@@ -497,6 +517,7 @@ internal sealed class TypeParser
                 return BeginType(ref reader, isFinal);
 
             case SubState.MapClose:
+                frame.MemberCount++;
                 return StepMapClose(ref reader, ref frame, isFinal);
 
             default:
@@ -895,15 +916,15 @@ internal sealed class TypeParser
     {
         kind = span.Length switch
         {
-            2 when span == "ts"u8 => PaktTypeKind.Timestamp,
-            3 when span == "str"u8 => PaktTypeKind.String,
-            3 when span == "int"u8 => PaktTypeKind.Int,
-            3 when span == "dec"u8 => PaktTypeKind.Decimal,
-            3 when span == "bin"u8 => PaktTypeKind.Binary,
-            4 when span == "bool"u8 => PaktTypeKind.Bool,
-            4 when span == "uuid"u8 => PaktTypeKind.Uuid,
-            4 when span == "date"u8 => PaktTypeKind.Date,
-            5 when span == "float"u8 => PaktTypeKind.Float,
+            2 when span.SequenceEqual("ts"u8) => PaktTypeKind.Timestamp,
+            3 when span.SequenceEqual("str"u8) => PaktTypeKind.String,
+            3 when span.SequenceEqual("int"u8) => PaktTypeKind.Int,
+            3 when span.SequenceEqual("dec"u8) => PaktTypeKind.Decimal,
+            3 when span.SequenceEqual("bin"u8) => PaktTypeKind.Binary,
+            4 when span.SequenceEqual("bool"u8) => PaktTypeKind.Bool,
+            4 when span.SequenceEqual("uuid"u8) => PaktTypeKind.Uuid,
+            4 when span.SequenceEqual("date"u8) => PaktTypeKind.Date,
+            5 when span.SequenceEqual("float"u8) => PaktTypeKind.Float,
             _ => default,
         };
 

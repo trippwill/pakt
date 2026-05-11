@@ -157,6 +157,10 @@ sealed partial class Parser
                 PaktEvent.Kind.MapValueStart, _cursor.Offset, PaktTypeKind.Map, default));
         }
 
+        // Mid-entry: let the entry handler manage its own layout
+        if ((frame.Flags & FrameFlags.ExpectKey) != FrameFlags.None)
+            return StepMapEntryValue(ref reader, ref frame, node, isFinal);
+
         SkipLayout(ref reader);
 
         if (TryReadEmptyComposite(ref reader, Syntax.MapClose))
@@ -166,19 +170,10 @@ sealed partial class Parser
                 PaktEvent.Kind.MapValueEnd, _cursor.Offset, PaktTypeKind.Map, default));
         }
 
-        // Entry lifecycle: ExpectKey=0 → emit MapEntryStart, push key
-        //                  ExpectKey=1 (after key) → read bind, push value
-        //                  ExpectKey=0 (after value) → emit MapEntryEnd, loop
-        if ((frame.Flags & FrameFlags.ExpectKey) == FrameFlags.None)
-        {
-            // Start a new entry — emit MapEntryStart, set ExpectKey, push key child
-            frame.Flags |= FrameFlags.ExpectKey;
-            return StepResult.Event(new PaktEvent(
-                PaktEvent.Kind.MapEntryStart, _cursor.Offset, PaktTypeKind.Map, default));
-        }
-
-        // After key completed: read LAYOUT => LAYOUT, then push value
-        return StepMapEntryValue(ref reader, ref frame, node, isFinal);
+        // Start a new entry — emit MapEntryStart, set ExpectKey, push key child
+        frame.Flags |= FrameFlags.ExpectKey;
+        return StepResult.Event(new PaktEvent(
+            PaktEvent.Kind.MapEntryStart, _cursor.Offset, PaktTypeKind.Map, default));
     }
 
     private StepResult StepMapEntryValue(

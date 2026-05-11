@@ -95,8 +95,16 @@ sealed partial class Parser
         if (!TryReadStatementOperator(ref reader, isFinal, out StepResult opResult))
             return opResult;
 
-        if (!TryRequireHeaderLayout(ref reader, isFinal, out StepResult postResult))
-            return postResult;
+        // Pack body may be empty or start on the next line; assign requires inline layout
+        if (_isPack)
+        {
+            SkipLayout(ref reader);
+        }
+        else
+        {
+            if (!TryRequireHeaderLayout(ref reader, isFinal, out StepResult postResult))
+                return postResult;
+        }
 
         if (!_valueStack.TryPush(new ValueFrame
         {

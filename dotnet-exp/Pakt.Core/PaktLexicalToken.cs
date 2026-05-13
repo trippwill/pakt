@@ -51,6 +51,7 @@ public enum PaktLexicalTokenKind : byte
     LAngle,
     RAngle,
     Pipe,
+    Semicolon,
     Eof,
     Nul,
 }

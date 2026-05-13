@@ -378,8 +378,9 @@ public class PaktReaderTests
     // ── Packs ───────────────────────────────────────────────────────
 
     [Fact]
-    public void ListPack()
+    public void ListPack_TailEof()
     {
+        // Tail pack: terminated by EOF (no semicolon required)
         var tokens = DrainTokens("items:[int] << 1 2 3");
         AssertToken(tokens, 0, PaktTokenType.StatementName, "items");
         AssertToken(tokens, 3, PaktTokenType.PackOperator, "<<");
@@ -390,17 +391,45 @@ public class PaktReaderTests
     }
 
     [Fact]
+    public void ListPack_WithSemicolon()
+    {
+        var tokens = DrainTokens("items:[int] << 1 2 3;");
+        AssertToken(tokens, 0, PaktTokenType.StatementName, "items");
+        AssertToken(tokens, 3, PaktTokenType.PackOperator, "<<");
+        AssertToken(tokens, 4, PaktTokenType.Int, "1");
+        AssertToken(tokens, 5, PaktTokenType.Int, "2");
+        AssertToken(tokens, 6, PaktTokenType.Int, "3");
+        AssertToken(tokens, 7, PaktTokenType.EndOfUnit);
+    }
+
+    [Fact]
+    public void ListPack_ConsecutiveSemicolons()
+    {
+        // Run of semicolons is consumed as single terminator
+        var tokens = DrainTokens("items:[int] << 1 2;;;");
+        AssertToken(tokens, 4, PaktTokenType.Int, "1");
+        AssertToken(tokens, 5, PaktTokenType.Int, "2");
+        AssertToken(tokens, 6, PaktTokenType.EndOfUnit);
+    }
+
+    [Fact]
     public void EmptyPack_Throws()
     {
-        // v7 reader tries to read at least one pack element before checking termination.
         Assert.Throws<PaktParseException>(
             () => DrainTokens("items:[int] <<"));
     }
 
     [Fact]
-    public void PackTerminatedByNextStatement()
+    public void EmptyPackWithSemicolon_Throws()
     {
-        var tokens = DrainTokens("items:[int] << 1 2\nnext:str = 'x'");
+        Assert.Throws<PaktParseException>(
+            () => DrainTokens("items:[int] <<;"));
+    }
+
+    [Fact]
+    public void PackTerminatedBySemicolon_ThenNextStatement()
+    {
+        var tokens = DrainTokens("items:[int] << 1 2;\nnext:str = 'x'");
         int nextIdx = tokens.FindIndex(
             t => t.Type == PaktTokenType.StatementName && string.Equals(t.Value, "next", StringComparison.Ordinal));
         Assert.True(nextIdx >= 0);

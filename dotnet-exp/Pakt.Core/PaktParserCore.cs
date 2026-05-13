@@ -48,12 +48,6 @@ internal sealed class PaktParserCore
 
         /// <summary>Token consumed internally; feed the next lexical token.</summary>
         ConsumeMore,
-
-        /// <summary>
-        /// Pack-mode lookahead required. The reader must peek at the next lexical
-        /// token and call one of the <c>ResolvePackLookahead*</c> methods.
-        /// </summary>
-        NeedLookahead,
     }
 
     public PaktTokenType TokenType => _tokenType;
@@ -98,8 +92,7 @@ internal sealed class PaktParserCore
     /// </summary>
     public ProcessResult ProcessToken(
         PaktLexicalToken token,
-        ReadOnlySpan<byte> buffer,
-        bool sawNewline)
+        ReadOnlySpan<byte> buffer)
     {
         return _phase switch
         {
@@ -107,7 +100,7 @@ internal sealed class PaktParserCore
             ParserPhase.ExpectColon => HandleColon(token),
             ParserPhase.InAnnotation => HandleAnnotation(token),
             ParserPhase.InAssignValue => HandleAssignValue(token, buffer),
-            ParserPhase.InPackValue => HandlePackValue(token, buffer, sawNewline),
+            ParserPhase.InPackValue => HandlePackValue(token, buffer),
             _ => throw new InvalidOperationException($"ProcessToken called in phase {_phase}"),
         };
     }
@@ -127,43 +120,6 @@ internal sealed class PaktParserCore
             _ => throw PaktParseError.UnexpectedEndOfInput(default,
                 $"Unexpected end of input in phase {_phase}").ToException(),
         };
-    }
-
-    // ── Pack lookahead resolution (called by the reader) ──
-
-    /// <summary>
-    /// Resolve pack lookahead: the held ident begins a new statement.
-    /// </summary>
-    public void ResolvePackLookaheadAsStatement()
-    {
-        _statementCount++;
-        if (_statementCount > _maxStatementCount)
-        {
-            throw PaktParseError.Syntax(default, "Max statement count exceeded").ToException();
-        }
-
-        _tokenType = PaktTokenType.StatementName;
-        _phase = ParserPhase.PendingAnnotationStart;
-    }
-
-    /// <summary>
-    /// Resolve pack lookahead: the held ident is a value (not a statement).
-    /// </summary>
-    public PaktTokenType ResolvePackLookaheadAsValue(ReadOnlySpan<byte> identBytes)
-    {
-        _tokenType = ClassifyIdent(identBytes);
-        _phase = ParserPhase.InPackValue;
-        return _tokenType;
-    }
-
-    /// <summary>
-    /// Resolve pack lookahead at end-of-input: held ident is a value, pack ends.
-    /// </summary>
-    public PaktTokenType ResolvePackLookaheadAtEndOfInput(ReadOnlySpan<byte> identBytes)
-    {
-        _tokenType = ClassifyIdent(identBytes);
-        _phase = ParserPhase.Done;
-        return _tokenType;
     }
 
     // ── Annotation byte-range helpers (driven by the reader) ──
@@ -188,13 +144,18 @@ internal sealed class PaktParserCore
 
     private ProcessResult HandleStatementOrEnd(PaktLexicalToken token)
     {
-        return token.Kind switch
+        switch (token.Kind)
         {
-            PaktLexicalTokenKind.Nul => EmitSimple(PaktTokenType.EndOfUnit),
-            PaktLexicalTokenKind.Ident => EmitStatementName(),
-            _ => throw PaktParseError.Syntax(default,
-                $"Expected statement name or NUL; got {token.Kind}").ToException(),
-        };
+            case PaktLexicalTokenKind.Nul:
+                return EmitSimple(PaktTokenType.EndOfUnit);
+            case PaktLexicalTokenKind.Semicolon when _isPack:
+                return ProcessResult.ConsumeMore; // trailing semicolons after pack
+            case PaktLexicalTokenKind.Ident:
+                return EmitStatementName();
+            default:
+                throw PaktParseError.Syntax(default,
+                    $"Expected statement name or NUL; got {token.Kind}").ToException();
+        }
     }
 
     private ProcessResult EmitStatementName()
@@ -286,21 +247,21 @@ internal sealed class PaktParserCore
 
     private ProcessResult HandlePackValue(
         PaktLexicalToken token,
-        ReadOnlySpan<byte> buffer,
-        bool sawNewline)
+        ReadOnlySpan<byte> buffer)
     {
+        // Semicolon at depth 0 terminates the pack.
+        if (token.Kind == PaktLexicalTokenKind.Semicolon && _depth == 0)
+        {
+            _phase = ParserPhase.ExpectStatementOrEnd;
+            return ProcessResult.ConsumeMore;
+        }
+
         // NUL at depth 0 ends the pack.
         if (token.Kind == PaktLexicalTokenKind.Nul && _depth == 0)
         {
             _tokenType = PaktTokenType.EndOfUnit;
             _phase = ParserPhase.ExpectStatementOrEnd;
             return ProcessResult.Emit;
-        }
-
-        // Ident at depth 0 preceded by a newline may start a new statement.
-        if (token.Kind == PaktLexicalTokenKind.Ident && _depth == 0 && sawNewline)
-        {
-            return ProcessResult.NeedLookahead;
         }
 
         ClassifyValueToken(token, buffer);

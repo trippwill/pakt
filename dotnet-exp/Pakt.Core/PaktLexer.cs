@@ -242,6 +242,8 @@ public ref struct PaktLexer
                 return EmitSingleByte(PaktLexicalTokenKind.RBrack, tokenStart, out token);
             case Lexical.RAngle:
                 return EmitSingleByte(PaktLexicalTokenKind.RAngle, tokenStart, out token);
+            case (byte)';':
+                return EmitSingleByte(PaktLexicalTokenKind.Semicolon, tokenStart, out token);
         }
 
         // ── digraphs and compound tokens ──
@@ -1015,7 +1017,8 @@ public ref struct PaktLexer
         || b == Lexical.Question
         || b == Lexical.SingleQuote
         || b == Lexical.Hash
-        || b == Lexical.Nul;
+        || b == Lexical.Nul
+        || b == (byte)';';
 
     private static LexerMode ModeForString(bool isMultiLine, bool isRaw)
     {
@@ -1029,7 +1032,7 @@ public ref struct PaktLexer
     }
 
     private static bool IsReservedByte(byte b) =>
-        b is (byte)',' or (byte)';' or (byte)'"'
+        b is (byte)',' or (byte)'"'
             or (byte)'@' or (byte)'!' or (byte)'*'
             or (byte)'$' or (byte)'&' or (byte)'~'
             or (byte)'`';

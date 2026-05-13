@@ -39,24 +39,10 @@ public sealed class PaktStreamReader : IAsyncDisposable, IPaktReader
     private byte[]? _annotationBuf;
     private int _annotationBufLen;
 
-    // Pack lookahead: held ident bytes saved across FillAsync.
-    private byte[]? _heldIdentBuf;
-    private int _heldIdentLen;
-    private bool _packLookaheadPending;
-
-    // Replay token from pack-lookahead resolution (non-colon case).
-    private byte[]? _replayBuf;
-    private int _replayLen;
-    private PaktLexicalTokenKind _replayKind;
-    private bool _hasReplay;
-    private bool _replaySawNewline;
-
     private enum ValueSpanSource : byte
     {
         Buffer,
         AnnotationBuf,
-        HeldIdentBuf,
-        ReplayBuf,
     }
 
     public PaktStreamReader(Stream stream, PaktReaderOptions? options = null)
@@ -74,8 +60,6 @@ public sealed class PaktStreamReader : IAsyncDisposable, IPaktReader
     public ReadOnlySpan<byte> ValueSpan => _valueSpanSource switch
     {
         ValueSpanSource.AnnotationBuf => _annotationBuf.AsSpan(_valueSpanStart, _valueSpanLength),
-        ValueSpanSource.HeldIdentBuf => _heldIdentBuf.AsSpan(_valueSpanStart, _valueSpanLength),
-        ValueSpanSource.ReplayBuf => _replayBuf.AsSpan(_valueSpanStart, _valueSpanLength),
         _ => _valueSpanLength > 0
             ? _buffer.Span.Slice(_valueSpanStart, _valueSpanLength)
             : ReadOnlySpan<byte>.Empty,
@@ -121,22 +105,10 @@ public sealed class PaktStreamReader : IAsyncDisposable, IPaktReader
 
         NeedMoreData = false;
 
-        // Resume pack lookahead that was interrupted by NeedMoreData.
-        if (_packLookaheadPending)
-        {
-            return ResumePackLookahead();
-        }
-
         // Drain pending structural tokens (annotation end, operator, etc.).
         if (_core.TryEmitPending())
         {
             return EmitFromPending();
-        }
-
-        // Replay a saved token from a previous pack-lookahead resolution.
-        if (_hasReplay)
-        {
-            return ProcessReplayToken();
         }
 
         return RunLexerLoop();
@@ -199,9 +171,8 @@ public sealed class PaktStreamReader : IAsyncDisposable, IPaktReader
         ReadOnlySpan<byte> bufferSpan,
         out bool result)
     {
-        bool sawNewline = lexer.SawNewlineBeforeToken;
         PaktParserCore.ParserPhase phaseBefore = _core.Phase;
-        PaktParserCore.ProcessResult pr = _core.ProcessToken(lexToken, bufferSpan, sawNewline);
+        PaktParserCore.ProcessResult pr = _core.ProcessToken(lexToken, bufferSpan);
 
         if (phaseBefore == PaktParserCore.ParserPhase.InAnnotation
             && _core.Phase == PaktParserCore.ParserPhase.InAnnotation)
@@ -226,114 +197,8 @@ public sealed class PaktStreamReader : IAsyncDisposable, IPaktReader
                 result = EmitFromLexToken(lexToken, (int)lexer.BytesConsumed);
                 return true;
 
-            case PaktParserCore.ProcessResult.NeedLookahead:
-                result = HandlePackLookahead(ref lexer, lexToken, bufferSpan);
-                return true;
-
             default:
                 throw new InvalidOperationException();
-        }
-    }
-
-    // ───────────────────── pack lookahead ─────────────────────
-
-    private bool HandlePackLookahead(
-        ref PaktLexer lexer,
-        PaktLexicalToken heldIdent,
-        ReadOnlySpan<byte> bufferSpan)
-    {
-        PaktReadResult laResult = lexer.Read(out PaktLexicalToken laToken);
-
-        if (laResult == PaktReadResult.NeedMoreData)
-        {
-            SaveHeldIdent(bufferSpan, heldIdent);
-            _packLookaheadPending = true;
-            _buffer.Advance((int)lexer.BytesConsumed);
-            NeedMoreData = true;
-            return false;
-        }
-
-        if (laResult == PaktReadResult.EndOfInput)
-        {
-            _core.ResolvePackLookaheadAtEndOfInput(
-                bufferSpan.Slice(heldIdent.Offset, heldIdent.Length));
-            return EmitFromLexToken(heldIdent, (int)lexer.BytesConsumed);
-        }
-
-        if (laToken.Kind == PaktLexicalTokenKind.Colon)
-        {
-            _core.ResolvePackLookaheadAsStatement();
-            return EmitFromLexToken(heldIdent, (int)lexer.BytesConsumed);
-        }
-
-        // Not a new statement — held ident is a value.
-        _core.ResolvePackLookaheadAsValue(
-            bufferSpan.Slice(heldIdent.Offset, heldIdent.Length));
-        SaveReplayToken(bufferSpan, laToken, lexer.SawNewlineBeforeToken);
-        return EmitFromLexToken(heldIdent, (int)lexer.BytesConsumed);
-    }
-
-    private bool ResumePackLookahead()
-    {
-        _packLookaheadPending = false;
-
-        ReadOnlySpan<byte> bufferSpan = _buffer.Span;
-        PaktLexer lexer = new(bufferSpan, _streamEnded, ref _lexerState);
-        PaktReadResult laResult = lexer.Read(out PaktLexicalToken laToken);
-
-        if (laResult == PaktReadResult.NeedMoreData)
-        {
-            _packLookaheadPending = true;
-            NeedMoreData = true;
-            return false;
-        }
-
-        ReadOnlySpan<byte> heldSpan = _heldIdentBuf.AsSpan(0, _heldIdentLen);
-
-        if (laResult == PaktReadResult.EndOfInput)
-        {
-            _core.ResolvePackLookaheadAtEndOfInput(heldSpan);
-            return EmitFromHeldIdent((int)lexer.BytesConsumed);
-        }
-
-        if (laToken.Kind == PaktLexicalTokenKind.Colon)
-        {
-            _core.ResolvePackLookaheadAsStatement();
-            return EmitFromHeldIdent((int)lexer.BytesConsumed);
-        }
-
-        _core.ResolvePackLookaheadAsValue(heldSpan);
-        SaveReplayToken(bufferSpan, laToken, lexer.SawNewlineBeforeToken);
-        return EmitFromHeldIdent((int)lexer.BytesConsumed);
-    }
-
-    // ───────────────────── replay token ─────────────────────
-
-    private bool ProcessReplayToken()
-    {
-        _hasReplay = false;
-        ReadOnlySpan<byte> replaySpan = _replayBuf.AsSpan(0, _replayLen);
-        PaktLexicalToken syntheticToken = new(_replayKind, 0, _replayLen);
-
-        PaktParserCore.ProcessResult pr = _core.ProcessToken(
-            syntheticToken, replaySpan, _replaySawNewline);
-
-        switch (pr)
-        {
-            case PaktParserCore.ProcessResult.Emit:
-                TokenType = _core.TokenType;
-                _valueSpanStart = 0;
-                _valueSpanLength = _replayLen;
-                _valueSpanSource = ValueSpanSource.ReplayBuf;
-                return true;
-
-            case PaktParserCore.ProcessResult.ConsumeMore:
-                // Replay consumed internally; fall through to normal lexer loop.
-                return RunLexerLoop();
-
-            default:
-                // NeedLookahead should not arise from a replayed non-colon value token.
-                throw new InvalidOperationException("Unexpected NeedLookahead from replay");
         }
     }
 
@@ -405,16 +270,6 @@ public sealed class PaktStreamReader : IAsyncDisposable, IPaktReader
         return true;
     }
 
-    private bool EmitFromHeldIdent(int bytesConsumed)
-    {
-        TokenType = _core.TokenType;
-        _valueSpanStart = 0;
-        _valueSpanLength = _heldIdentLen;
-        _valueSpanSource = ValueSpanSource.HeldIdentBuf;
-        _pendingAdvance = bytesConsumed;
-        return true;
-    }
-
     private bool EmitFromPending()
     {
         TokenType = _core.TokenType;
@@ -448,46 +303,6 @@ public sealed class PaktStreamReader : IAsyncDisposable, IPaktReader
         bool result = EmitFromPending();
         _pendingAdvance = bytesConsumed;
         return result;
-    }
-
-    // ───────────────────── buffer helpers ─────────────────────
-
-    private void SaveHeldIdent(ReadOnlySpan<byte> bufferSpan, PaktLexicalToken token)
-    {
-        _heldIdentLen = token.Length;
-        if (_heldIdentBuf == null || _heldIdentBuf.Length < _heldIdentLen)
-        {
-            if (_heldIdentBuf != null)
-            {
-                _pool.Return(_heldIdentBuf);
-            }
-
-            _heldIdentBuf = _pool.Rent(Math.Max(_heldIdentLen, 64));
-        }
-
-        bufferSpan.Slice(token.Offset, token.Length).CopyTo(_heldIdentBuf);
-    }
-
-    private void SaveReplayToken(
-        ReadOnlySpan<byte> bufferSpan,
-        PaktLexicalToken token,
-        bool sawNewline)
-    {
-        _replayKind = token.Kind;
-        _replayLen = token.Length;
-        _replaySawNewline = sawNewline;
-        if (_replayBuf == null || _replayBuf.Length < _replayLen)
-        {
-            if (_replayBuf != null)
-            {
-                _pool.Return(_replayBuf);
-            }
-
-            _replayBuf = _pool.Rent(Math.Max(_replayLen, 64));
-        }
-
-        bufferSpan.Slice(token.Offset, token.Length).CopyTo(_replayBuf);
-        _hasReplay = true;
     }
 
     // ───────────────────── typed accessors ─────────────────────
@@ -940,18 +755,6 @@ public sealed class PaktStreamReader : IAsyncDisposable, IPaktReader
         {
             _pool.Return(_annotationBuf);
             _annotationBuf = null;
-        }
-
-        if (_heldIdentBuf != null)
-        {
-            _pool.Return(_heldIdentBuf);
-            _heldIdentBuf = null;
-        }
-
-        if (_replayBuf != null)
-        {
-            _pool.Return(_replayBuf);
-            _replayBuf = null;
         }
 
         return default;

@@ -545,34 +545,17 @@ public sealed class PaktMemoryReader : IPaktReader, IDisposable
 
     private bool IsPackTerminated()
     {
-        var saved = _lexerState;
-        var lexer = new PaktLexer(_data.Span[_consumed..], true, ref _lexerState);
-        var res = lexer.Read(out var tok);
-
-        if (res == PaktReadResult.EndOfInput
-            || tok.Kind is PaktLexicalTokenKind.Nul or PaktLexicalTokenKind.Eof)
-        {
-            _lexerState = saved;
+        var kind = PeekLexicalKind();
+        if (kind is PaktLexicalTokenKind.Nul or PaktLexicalTokenKind.Eof)
             return true;
-        }
+        if (kind != PaktLexicalTokenKind.Semicolon)
+            return false;
 
-        if (tok.Kind == PaktLexicalTokenKind.Ident)
-        {
-            var span = _data.Span.Slice(_consumed + tok.Offset, tok.Length);
-            if (!IsKeyword(span))
-            {
-                // Peek for colon → confirms next statement header
-                var r2 = lexer.Read(out var t2);
-                if (r2 == PaktReadResult.Token && t2.Kind == PaktLexicalTokenKind.Colon)
-                {
-                    _lexerState = saved;
-                    return true;
-                }
-            }
-        }
+        // Consume all consecutive semicolons
+        do { _ = LexNext(out _); }
+        while (PeekLexicalKind() == PaktLexicalTokenKind.Semicolon);
 
-        _lexerState = saved;
-        return false;
+        return true;
     }
 
     // ──────────────────────── type annotation parser ────────────────────────
@@ -652,11 +635,11 @@ public sealed class PaktMemoryReader : IPaktReader, IDisposable
     private int ParseStructType(ref PaktLexer lexer, int sliceBase, ref int annotEnd)
     {
         int nodeIdx = AllocNode(default);
-        int[] children = new int[64];
+        Span<int> children = stackalloc int[64];
         int childCount = ParseStructFields(ref lexer, sliceBase, ref annotEnd, children);
 
         int start = AllocChildSlots(childCount);
-        children.AsSpan(0, childCount).CopyTo(_childIndices.AsSpan(start, childCount));
+        children[..childCount].CopyTo(_childIndices.AsSpan(start, childCount));
 
         _typeNodes[nodeIdx] = new TypeNode
         {
@@ -671,7 +654,7 @@ public sealed class PaktMemoryReader : IPaktReader, IDisposable
         ref PaktLexer lexer,
         int sliceBase,
         ref int annotEnd,
-        int[] children)
+        scoped Span<int> children)
     {
         int childCount = 0;
         bool hasPending = false;
@@ -719,11 +702,11 @@ public sealed class PaktMemoryReader : IPaktReader, IDisposable
     private int ParseTupleType(ref PaktLexer lexer, int sliceBase, ref int annotEnd)
     {
         int nodeIdx = AllocNode(default);
-        int[] children = new int[64];
+        Span<int> children = stackalloc int[64];
         int childCount = ParseTupleElements(ref lexer, sliceBase, ref annotEnd, children);
 
         int start = AllocChildSlots(childCount);
-        children.AsSpan(0, childCount).CopyTo(_childIndices.AsSpan(start, childCount));
+        children[..childCount].CopyTo(_childIndices.AsSpan(start, childCount));
 
         _typeNodes[nodeIdx] = new TypeNode
         {
@@ -738,7 +721,7 @@ public sealed class PaktMemoryReader : IPaktReader, IDisposable
         ref PaktLexer lexer,
         int sliceBase,
         ref int annotEnd,
-        int[] children)
+        scoped Span<int> children)
     {
         int childCount = 0;
         bool hasPending = false;

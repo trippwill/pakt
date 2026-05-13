@@ -39,12 +39,13 @@ name:str = 'midwatch'
 version:(int int int) = (1 0 0)
 ```
 
-Packs deliver zero or more values of a collection type, terminated by end-of-unit or the start of the next statement:
+Packs deliver zero or more values of a collection type, terminated by `;`, end-of-unit, or NUL:
 
 ```pakt
 events:[{ts:ts level:|info warn error| msg:str}] <<
 { 2026-06-01T14:30:00Z |info 'server started' }
 { 2026-06-01T14:31:00Z |warn 'high latency' }
+;
 ```
 
 ## 2. Encoding
@@ -195,6 +196,7 @@ PACK    = '<<'
 BIND    = '=>'
 PIPE    = '|'
 QMARK   = '?'
+SEMI    = ';'+                      ; pack terminator (run of one or more)
 LBRACE  = '{'    RBRACE = '}'
 LPAREN  = '('    RPAREN = ')'
 LBRACK  = '['    RBRACK = ']'
@@ -202,7 +204,6 @@ LANGLE  = '<'    RANGLE = '>'
 
 ; Reserved tokens (see §4.5)
 COMMA   = ','
-SEMI    = ';'
 DQUOTE  = '"'
 AT      = '@'
 BANG    = '!'
@@ -292,7 +293,6 @@ The following tokens are reserved for future use or deliberately excluded from P
 | Token | Status / possible future use |
 |-------|-------------------------------|
 | `,` | Reserved; not a separator in PAKT 0.1a |
-| `;` | Reserved; replaced by `=>` for map binding |
 | `"` | Reserved; double-quoted strings are not part of PAKT 0.1a |
 | `@` | Constraints (`@len`, `@range`, `@pattern`) |
 | `!` | Assertions or negation |
@@ -374,7 +374,7 @@ assign = IDENT type_annot LAYOUT ASSIGN LAYOUT value
 ### 5.4 Pack
 
 ```ebnf
-pack = IDENT type_annot LAYOUT PACK (LAYOUT pack_body?)?
+pack = IDENT type_annot LAYOUT PACK (LAYOUT pack_body?)? SEMI?
 ```
 
 A pack delivers zero or more bare values of the annotated collection type. The type must be a list type or map type.
@@ -387,7 +387,12 @@ map_pack_body    = map_entry (LAYOUT map_entry)*
 
 For list packs, each value conforms to the list's element type. For map packs, each entry is `key => value` conforming to the map's key and value types.
 
-**Termination**: A pack ends at end-of-unit (EOF or NUL terminator per §10.1) or when the parser encounters the start of the next top-level statement (`IDENT COLON`). This is decidable because atom values begin with `|`, booleans and `nil` are reserved keywords that cannot be statement names, strings begin with quotes or `r'`, binary literals begin with `x'` or `b'`, and composite values begin with delimiters.
+**Termination**: A pack ends when the parser encounters:
+
+1. **`;`** (semicolon) — the explicit pack terminator. One or more consecutive `;` characters (with optional interleaved layout) are treated as a single terminator. A pack followed by another statement **must** be terminated with `;`.
+2. **End-of-unit** — EOF or NUL terminator (per §10.1). A pack at the tail of a unit may rely on end-of-unit for termination without `;`.
+
+A `;` outside of a pack context (e.g., after an assign statement) is a syntax error.
 
 **Duplicate keys**: Repeated map entries are preserved in encounter order. Interpreting duplicate keys is an application/domain concern (see §6).
 
@@ -516,6 +521,7 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Consecutive layout is equivalent to a single layout separator where layout is permitted.
 - Layout before the first member, after the last member, and around delimiters is ignored where the grammar permits `layout_opt`.
 - Layout is required around `=`, `<<`, and `=>`.
+- Layout is not required around `;` (pack terminator). `;` may appear immediately after the last pack value.
 - Layout is not permitted around `:` in type annotations.
 - Indentation is insignificant to the core parser.
 - A comment does not consume a newline. The newline remains part of layout.
@@ -674,6 +680,7 @@ PACK    = '<<'
 BIND    = '=>'
 PIPE    = '|'
 QMARK   = '?'
+SEMI    = ';'+                      ; pack terminator (run of one or more)
 LBRACE  = '{'    RBRACE  = '}'
 LPAREN  = '('    RPAREN  = ')'
 LBRACK  = '['    RBRACK  = ']'
@@ -681,7 +688,6 @@ LANGLE  = '<'    RANGLE  = '>'
 
 ; Reserved tokens
 COMMA   = ','
-SEMI    = ';'
 DQUOTE  = '"'
 AT      = '@'
 BANG    = '!'
@@ -739,12 +745,13 @@ statement   = assign | pack
 ; --- Statement headers ---
 
 assign      = IDENT type_annot LAYOUT ASSIGN LAYOUT value
-pack        = IDENT type_annot LAYOUT PACK (LAYOUT pack_body?)?
+pack        = IDENT type_annot LAYOUT PACK (LAYOUT pack_body?)? SEMI?
 
 ; no newline is permitted inside the statement header
 
 ; --- Pack body ---
-;     Terminates at end-of-unit (EOF or NUL) or the start of the next statement (IDENT COLON).
+;     Terminates at SEMI, end-of-unit (EOF or NUL).
+;     A pack followed by another statement MUST end with SEMI.
 
 pack_body       = list_pack_body | map_pack_body
 list_pack_body  = value (LAYOUT value)*
@@ -815,4 +822,5 @@ headers:<str => str> = <
 events:[{ts:ts level:|info warn error| msg:str}] <<
 { 2026-06-01T14:30:00Z |info 'server started' }
 { 2026-06-01T14:31:00Z |warn 'high latency' }
+;
 ```

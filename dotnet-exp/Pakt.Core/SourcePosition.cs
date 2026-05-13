@@ -59,5 +59,14 @@ internal struct SourceCursor
         }
     }
 
+    /// <summary>
+    /// Bulk-advance for bytes known to contain no newlines (e.g. spaces, tabs, comment text).
+    /// </summary>
+    public void AdvanceColumns(int count)
+    {
+        Offset += count;
+        Column += count;
+    }
+
     public readonly SourcePosition ToPosition() => new(Offset, Line, Column);
 }

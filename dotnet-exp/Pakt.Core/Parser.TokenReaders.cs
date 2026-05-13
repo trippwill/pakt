@@ -257,6 +257,7 @@ sealed partial class Parser
     /// <summary>
     /// Reads a token from the input using the given character predicate.
     /// Returns the raw bytes as payload.
+    /// Uses span-based bulk scanning for the common single-segment case.
     /// </summary>
     private bool TryReadTokenByCharSet(
         ref SequenceReader<byte> reader, bool isFinal,
@@ -266,16 +267,24 @@ sealed partial class Parser
         SequencePosition startPos = reader.Position;
         long count = 0;
 
-        while (reader.TryPeek(out byte b))
+        while (true)
         {
-            if (isValidChar(b))
+            ReadOnlySpan<byte> span = reader.UnreadSpan;
+            int i = 0;
+            while (i < span.Length && isValidChar(span[i]))
+                i++;
+
+            if (i > 0)
             {
-                reader.Advance(1);
-                _cursor.Advance(b);
-                count++;
-                continue;
+                // Token chars never contain newlines — safe to bulk-advance columns
+                _cursor.AdvanceColumns(i);
+                reader.Advance(i);
+                count += i;
             }
-            break;
+
+            // Stopped before end of span (hit non-matching byte) or reader exhausted
+            if (i < span.Length || reader.End)
+                break;
         }
 
         if (count == 0)
@@ -328,25 +337,45 @@ sealed partial class Parser
     /// <summary>
     /// Skips layout: whitespace, newlines, and comments.
     /// LAYOUT = (LAYOUT_CHAR | COMMENT)+
+    /// Uses span-based bulk scanning for the common single-segment case.
     /// </summary>
     private void SkipLayout(ref SequenceReader<byte> reader)
     {
-        while (reader.TryPeek(out byte b))
+        while (true)
         {
-            if (Lexical.IsLayoutChar(b))
+            ReadOnlySpan<byte> span = reader.UnreadSpan;
+            int i = 0;
+            while (i < span.Length && Lexical.IsLayoutChar(span[i]))
+                i++;
+
+            if (i > 0)
             {
-                reader.Advance(1);
-                _cursor.Advance(b);
-                continue;
+                ReadOnlySpan<byte> consumed = span.Slice(0, i);
+                int nlIndex = consumed.IndexOf(Lexical.Newline);
+                if (nlIndex < 0)
+                {
+                    _cursor.AdvanceColumns(i);
+                }
+                else
+                {
+                    for (int j = 0; j < i; j++)
+                        _cursor.Advance(consumed[j]);
+                }
+                reader.Advance(i);
             }
 
-            if (b == Syntax.CommentStart)
+            if (i < span.Length)
             {
-                SkipComment(ref reader);
-                continue;
+                if (span[i] == Syntax.CommentStart)
+                {
+                    SkipComment(ref reader);
+                    continue;
+                }
+                break;
             }
 
-            break;
+            if (reader.End)
+                break;
         }
     }
 
@@ -357,12 +386,19 @@ sealed partial class Parser
         _cursor.Advance(Lexical.Hash);
 
         // §3.2: consume everything until newline (but not the newline itself)
-        while (reader.TryPeek(out byte b))
+        while (true)
         {
-            if (b == Lexical.Newline || b == Lexical.CarriageReturn)
+            ReadOnlySpan<byte> span = reader.UnreadSpan;
+            // Find the first newline in the span
+            int nlPos = span.IndexOfAny(Lexical.Newline, Lexical.CarriageReturn);
+            int consumed = nlPos < 0 ? span.Length : nlPos;
+            if (consumed > 0)
+            {
+                _cursor.AdvanceColumns(consumed);
+                reader.Advance(consumed);
+            }
+            if (nlPos >= 0 || reader.End)
                 break;
-            reader.Advance(1);
-            _cursor.Advance(b);
         }
     }
 
@@ -423,26 +459,35 @@ sealed partial class Parser
 
     /// <summary>
     /// Skips whitespace (space/tab) and comments within a statement header.
-    /// Does not consume newlines.
+    /// Does not consume newlines. Uses span-based bulk scanning.
     /// </summary>
     private void SkipHeaderLayout(ref SequenceReader<byte> reader)
     {
-        while (reader.TryPeek(out byte b))
+        while (true)
         {
-            if (Lexical.IsWhitespace(b))
+            ReadOnlySpan<byte> span = reader.UnreadSpan;
+            int i = 0;
+            while (i < span.Length && Lexical.IsWhitespace(span[i]))
+                i++;
+
+            if (i > 0)
             {
-                reader.Advance(1);
-                _cursor.Advance(b);
-                continue;
+                _cursor.AdvanceColumns(i);
+                reader.Advance(i);
             }
 
-            if (b == Syntax.CommentStart)
+            if (i < span.Length)
             {
-                SkipComment(ref reader);
-                continue;
+                if (span[i] == Syntax.CommentStart)
+                {
+                    SkipComment(ref reader);
+                    continue;
+                }
+                break;
             }
 
-            break;
+            if (reader.End)
+                break;
         }
     }
 

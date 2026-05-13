@@ -851,24 +851,43 @@ internal sealed class TypeParser
     private bool SkipLayout(scoped ref SequenceReader<byte> reader)
     {
         bool consumed = false;
-        while (reader.TryPeek(out byte b))
+        while (true)
         {
-            if (Lexical.IsLayoutChar(b))
+            ReadOnlySpan<byte> span = reader.UnreadSpan;
+            int i = 0;
+            while (i < span.Length && Lexical.IsLayoutChar(span[i]))
+                i++;
+
+            if (i > 0)
             {
-                reader.Advance(1);
-                _cursor.Advance(b);
                 consumed = true;
-                continue;
+                ReadOnlySpan<byte> chars = span.Slice(0, i);
+                int nlIndex = chars.IndexOf(Lexical.Newline);
+                if (nlIndex < 0)
+                {
+                    _cursor.AdvanceColumns(i);
+                }
+                else
+                {
+                    for (int j = 0; j < i; j++)
+                        _cursor.Advance(chars[j]);
+                }
+                reader.Advance(i);
             }
 
-            if (b == Syntax.CommentStart)
+            if (i < span.Length)
             {
-                SkipComment(ref reader);
-                consumed = true;
-                continue;
+                if (span[i] == Syntax.CommentStart)
+                {
+                    SkipComment(ref reader);
+                    consumed = true;
+                    continue;
+                }
+                break;
             }
 
-            break;
+            if (reader.End)
+                break;
         }
         return consumed;
     }
@@ -880,12 +899,18 @@ internal sealed class TypeParser
         _cursor.Advance(Lexical.Hash);
 
         // §3.2: consume everything until newline (but not the newline itself)
-        while (reader.TryPeek(out byte b))
+        while (true)
         {
-            if (b == Lexical.Newline || b == Lexical.CarriageReturn)
+            ReadOnlySpan<byte> span = reader.UnreadSpan;
+            int nlPos = span.IndexOfAny(Lexical.Newline, Lexical.CarriageReturn);
+            int consumed = nlPos < 0 ? span.Length : nlPos;
+            if (consumed > 0)
+            {
+                _cursor.AdvanceColumns(consumed);
+                reader.Advance(consumed);
+            }
+            if (nlPos >= 0 || reader.End)
                 break;
-            reader.Advance(1);
-            _cursor.Advance(b);
         }
     }
 

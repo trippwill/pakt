@@ -721,7 +721,13 @@ internal sealed class TypeParser
         if (_stackDepth > 0)
         {
             ref TypeFrame parent = ref _stack[_stackDepth - 1];
-            _memberScratch[parent.MemberScratchStart + parent.MemberCount] = typeRef;
+            int writeIndex = parent.MemberScratchStart + parent.MemberCount;
+            _memberScratch[writeIndex] = typeRef;
+
+            // Keep _scratchUsed past all parent member slots so the next
+            // child composite's MemberScratchStart won't overlap.
+            if (_scratchUsed <= writeIndex)
+                _scratchUsed = writeIndex + 1;
         }
         else
         {

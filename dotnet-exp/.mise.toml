@@ -31,9 +31,17 @@ run = "dotnet build Pakt.Cli -c Release -r linux-x64"
 description = "Stage tracked file updates"
 run = "git add -u"
 
+[tasks."bench:stream"]
+description = "Run stream benchmarks (PAKT pack vs JSONL)"
+run = "dotnet run --project Pakt.Benchmarks -c Release -- --filter '*StreamBenchmarks*'"
+
+[tasks."bench:doc"]
+description = "Run document benchmarks (PAKT unit vs JSON)"
+run = "dotnet run --project Pakt.Benchmarks -c Release -- --filter '*DocumentBenchmarks*'"
+
 [tasks.bench]
-description = "Run the benchmark project"
-run = "dotnet run --project Pakt.Benchmarks --"
+description = "Run all benchmarks"
+run = "dotnet run --project Pakt.Benchmarks -c Release -- --filter '*'"
 
 [tasks.ci]
 description = "Run full CI pipeline: build, test, format check, AOT smoke"

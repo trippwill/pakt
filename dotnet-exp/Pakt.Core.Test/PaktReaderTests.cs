@@ -342,6 +342,46 @@ public class PaktReaderTests
         AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // outer
     }
 
+    [Fact]
+    public async Task NestedStruct_StringAfterNested()
+    {
+        List<EventRecord> events = await DrainEvents(
+            "x:{a:{b:int c:int} d:str} = { { 1 2 } 'hello' }");
+        int i = events.FindIndex(e => e.Kind == PaktEvent.Kind.StructValueStart);
+        Assert.True(i >= 0);
+        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // outer
+        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // inner
+        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "1");
+        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "2");
+        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // inner
+        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.String, "'hello'");
+        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // outer
+    }
+
+    [Fact]
+    public async Task NestedStruct_StringInsideNested()
+    {
+        List<EventRecord> events = await DrainEvents(
+            "x:{a:{b:str c:int} d:int} = { { 'hi' 2 } 3 }");
+        int i = events.FindIndex(e => e.Kind == PaktEvent.Kind.StructValueStart);
+        Assert.True(i >= 0);
+        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // outer
+        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // inner
+        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.String, "'hi'");
+        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "2");
+        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // inner
+        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "3");
+        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // outer
+    }
+
+    [Fact]
+    public async Task NestedStruct_MultiMemberWithStrings()
+    {
+        List<EventRecord> events = await DrainEvents(
+            "x:{server:{host:str port:int} db:{host:str port:int name:str}} = { { 'api.example.com' 443 } { 'db.internal' 5432 'myapp' } }");
+        Assert.Equal(PaktEvent.Kind.UnitEnd, events[^1].Kind);
+    }
+
     // ── Packs ───────────────────────────────────────────────────────
 
     [Fact]

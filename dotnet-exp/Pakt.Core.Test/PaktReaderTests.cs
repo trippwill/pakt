@@ -22,7 +22,8 @@ public class PaktReaderTests
             string payload = evt.Payload.IsEmpty ? "" : Encoding.UTF8.GetString(evt.Payload);
             events.Add(new EventRecord(evt.EventKind, evt.TypeKind, payload));
             return PaktReader.HandlerResult.Continue;
-        }).ConfigureAwait(false);
+        }, TestContext.Current.CancellationToken)
+        .ConfigureAwait(false);
 
         return events;
     }

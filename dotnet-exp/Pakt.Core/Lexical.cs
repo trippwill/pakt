@@ -1,3 +1,5 @@
+using System.Buffers;
+
 namespace Pakt;
 
 /// <summary>
@@ -7,6 +9,23 @@ namespace Pakt;
 /// </summary>
 internal static class Lexical
 {
+    // ── Pre-compiled SIMD-optimized byte search sets (.NET 8+) ──
+
+    internal static readonly SearchValues<byte> LayoutBytes =
+        SearchValues.Create(" \t\r\n"u8);
+
+    internal static readonly SearchValues<byte> NonNewlineLayoutBytes =
+        SearchValues.Create(" \t"u8);
+
+    internal static readonly SearchValues<byte> NewlineBytes =
+        SearchValues.Create("\r\n"u8);
+
+    internal static readonly SearchValues<byte> IdentStartBytes =
+        SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"u8);
+
+    internal static readonly SearchValues<byte> IdentPartBytes =
+        SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789-"u8);
+
     // Paired delimiters
     public const byte LBrace = (byte)'{';
     public const byte RBrace = (byte)'}';

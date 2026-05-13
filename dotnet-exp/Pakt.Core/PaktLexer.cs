@@ -15,7 +15,6 @@ public ref struct PaktLexer
 
     private int _pos;
     private int _bytesConsumed;
-    private SourceCursor _cursor;
     private bool _sawNewline;
     private LexerMode _mode;
     private ref PaktLexerState _state;
@@ -34,21 +33,6 @@ public ref struct PaktLexer
         _sawNewline = false;
         _mode = state.Mode;
 
-        // Restore cursor from state.
-        if (state.TotalConsumed == 0 && state.Line == 0)
-        {
-            _cursor = SourceCursor.Start;
-        }
-        else
-        {
-            _cursor = new SourceCursor
-            {
-                Offset = state.TotalConsumed,
-                Line = state.Line,
-                Column = state.Column,
-            };
-        }
-
         // BOM skip on very first buffer.
         if (state.TotalConsumed == 0
             && state.Mode == LexerMode.Normal
@@ -58,7 +42,6 @@ public ref struct PaktLexer
             && _buffer[2] == 0xBF)
         {
             _pos = 3;
-            _cursor.AdvanceColumns(3);
         }
     }
 
@@ -120,7 +103,6 @@ public ref struct PaktLexer
 
             if (Lexical.IsWhitespace(b))
             {
-                _cursor.Advance(b);
                 _pos++;
                 continue;
             }
@@ -128,7 +110,6 @@ public ref struct PaktLexer
             if (b == Lexical.Newline)
             {
                 _sawNewline = true;
-                _cursor.Advance(b);
                 _pos++;
                 continue;
             }
@@ -136,11 +117,9 @@ public ref struct PaktLexer
             if (b == Lexical.CarriageReturn)
             {
                 _sawNewline = true;
-                _cursor.Advance(b);
                 _pos++;
                 if (_pos < _buffer.Length && _buffer[_pos] == Lexical.Newline)
                 {
-                    _cursor.Advance(Lexical.Newline);
                     _pos++;
                 }
                 continue;
@@ -171,9 +150,7 @@ public ref struct PaktLexer
     private bool SkipComment()
     {
         int commentStart = _pos;
-        SourceCursor savedCursor = _cursor;
 
-        _cursor.Advance(_buffer[_pos]); // #
         _pos++;
 
         while (_pos < _buffer.Length)
@@ -189,14 +166,12 @@ public ref struct PaktLexer
                 ThrowSyntax("NUL byte inside comment");
             }
 
-            _cursor.Advance(cb);
             _pos++;
         }
 
         if (_pos >= _buffer.Length && !_isFinalBlock)
         {
             _pos = commentStart;
-            _cursor = savedCursor;
             return false;
         }
 
@@ -215,7 +190,6 @@ public ref struct PaktLexer
         if (b == Lexical.Nul)
         {
             _pos++;
-            _cursor.Advance(b);
             token = new PaktLexicalToken(PaktLexicalTokenKind.Nul, tokenStart, 1);
             CommitToken();
             return PaktReadResult.Token;
@@ -297,7 +271,6 @@ public ref struct PaktLexer
         out PaktLexicalToken token)
     {
         _pos++;
-        _cursor.Advance(_buffer[tokenStart]);
         token = new PaktLexicalToken(kind, tokenStart, 1);
         CommitToken();
         return PaktReadResult.Token;
@@ -322,8 +295,6 @@ public ref struct PaktLexer
         if (_buffer[_pos + 1] == Lexical.RAngle)
         {
             // =>
-            _cursor.Advance(_buffer[_pos]);
-            _cursor.Advance(_buffer[_pos + 1]);
             _pos += 2;
             token = new PaktLexicalToken(PaktLexicalTokenKind.Bind, tokenStart, 2);
             CommitToken();
@@ -350,8 +321,6 @@ public ref struct PaktLexer
         if (_buffer[_pos + 1] == Lexical.LAngle)
         {
             // <<
-            _cursor.Advance(_buffer[_pos]);
-            _cursor.Advance(_buffer[_pos + 1]);
             _pos += 2;
             token = new PaktLexicalToken(PaktLexicalTokenKind.Pack, tokenStart, 2);
             CommitToken();
@@ -380,14 +349,11 @@ public ref struct PaktLexer
         if (Lexical.IsIdentifierStart(_buffer[_pos + 1]))
         {
             // |ident — AtomPrefix
-            _cursor.Advance(_buffer[_pos]); // |
             _pos++;
-            _cursor.Advance(_buffer[_pos]); // first ident char
             _pos++;
 
             while (_pos < _buffer.Length && Lexical.IsIdentifierPart(_buffer[_pos]))
             {
-                _cursor.Advance(_buffer[_pos]);
                 _pos++;
             }
 
@@ -585,7 +551,6 @@ public ref struct PaktLexer
                 ThrowSyntax("Newline in single-line string");
             }
 
-            _cursor.Advance(b);
             _pos++;
         }
 
@@ -635,13 +600,11 @@ public ref struct PaktLexer
             }
 
             // Fewer than 3 consecutive quotes — content, not closing delimiter.
-            _cursor.Advance(_buffer[_pos]);
             _pos++;
             return PaktReadResult.EndOfInput; // sentinel: keep scanning
         }
 
         // Single-line closing quote.
-        _cursor.Advance(_buffer[_pos]);
         _pos++;
         token = new PaktLexicalToken(
             PaktLexicalTokenKind.String, tokenStart, _pos - tokenStart);
@@ -668,7 +631,6 @@ public ref struct PaktLexer
 
             if (b == Lexical.SingleQuote)
             {
-                _cursor.Advance(b);
                 _pos++;
                 token = new PaktLexicalToken(
                     PaktLexicalTokenKind.Binary,
@@ -683,7 +645,6 @@ public ref struct PaktLexer
                 ThrowSyntax("Newline in binary literal");
             }
 
-            _cursor.Advance(b);
             _pos++;
         }
 
@@ -781,12 +742,10 @@ public ref struct PaktLexer
         token = default;
         Debug.Assert(Lexical.IsIdentifierStart(_buffer[tokenStart]));
 
-        _cursor.Advance(_buffer[_pos]);
         _pos++;
 
         while (_pos < _buffer.Length && Lexical.IsIdentifierPart(_buffer[_pos]))
         {
-            _cursor.Advance(_buffer[_pos]);
             _pos++;
         }
 
@@ -815,7 +774,6 @@ public ref struct PaktLexer
                 break;
             }
 
-            _cursor.Advance(b);
             _pos++;
         }
 
@@ -855,7 +813,6 @@ public ref struct PaktLexer
         }
 
         // Consume the '-' then delegate to the main number scanner.
-        _cursor.Advance(_buffer[_pos]);
         _pos++;
         return ScanNumber(tokenStart, out token);
     }
@@ -915,8 +872,6 @@ public ref struct PaktLexer
     private void SaveNormalState()
     {
         _state.TotalConsumed = _totalConsumedBase + _pos;
-        _state.Line = _cursor.Line;
-        _state.Column = (int)_cursor.Column;
         _state.Mode = LexerMode.Normal;
         _state.EscapeSubstate = 0;
         _state.PendingQuoteCount = 0;
@@ -943,8 +898,6 @@ public ref struct PaktLexer
         //
         // For Normal mode (no partial token), this is straightforward:
         // cursor is at the position of buffer[tokenStart].
-        _state.Line = _cursor.Line;
-        _state.Column = (int)_cursor.Column;
         _state.Mode = LexerMode.Normal;
         _state.EscapeSubstate = 0;
         _state.PendingQuoteCount = 0;
@@ -976,8 +929,6 @@ public ref struct PaktLexer
         // because after buffer compaction the preserved bytes start at offset 0
         // and the cursor must match that position.
         _state.TotalConsumed = _totalConsumedBase + tokenStart;
-        _state.Line = _cursor.Line;
-        _state.Column = (int)_cursor.Column;
         _state.Mode = mode;
         _state.EscapeSubstate = 0;
         _state.PendingQuoteCount = 0;
@@ -992,15 +943,8 @@ public ref struct PaktLexer
 
     // ───────────────────── helpers ─────────────────────
 
-    /// <summary>Advance <c>_pos</c> and <c>_cursor</c> by <paramref name="count"/> bytes.</summary>
-    private void AdvanceBytes(int count)
-    {
-        for (int i = 0; i < count; i++)
-        {
-            _cursor.Advance(_buffer[_pos]);
-            _pos++;
-        }
-    }
+    /// <summary>Advance <c>_pos</c> by <paramref name="count"/> bytes.</summary>
+    private void AdvanceBytes(int count) => _pos += count;
 
     /// <summary>
     /// Returns <c>true</c> for any byte that terminates a Number token:
@@ -1047,19 +991,42 @@ public ref struct PaktLexer
 
     // ───────────────────── error helpers ─────────────────────
 
+    /// <summary>
+    /// Compute line/column by scanning from buffer start to current position.
+    /// Only called on error paths — cold code.
+    /// </summary>
+    private SourcePosition ComputePosition()
+    {
+        int line = 1;
+        long col = 1;
+        for (int i = 0; i < _pos && i < _buffer.Length; i++)
+        {
+            if (_buffer[i] == (byte)'\n')
+            {
+                line++;
+                col = 1;
+            }
+            else
+            {
+                col++;
+            }
+        }
+        return new SourcePosition(_totalConsumedBase + _pos, line, col);
+    }
+
     private void ThrowSyntax(string message) =>
-        throw PaktParseError.Syntax(_cursor.ToPosition(), message).ToException();
+        throw PaktParseError.Syntax(ComputePosition(), message).ToException();
 
     private void ThrowReserved(byte b) =>
         throw PaktParseError.ReservedToken(
-            _cursor.ToPosition(),
+            ComputePosition(),
             $"Reserved token '{(char)b}' is not allowed outside strings")
         .ToException();
 
     private T ThrowUnterminatedString<T>()
     {
         throw PaktParseError.UnexpectedEndOfInput(
-            _cursor.ToPosition(),
+            ComputePosition(),
             "Unterminated string or binary literal")
         .ToException();
     }

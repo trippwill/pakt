@@ -1,14 +1,15 @@
+using System.Buffers;
+
 namespace Pakt;
 
-public class PaktReaderOptions
+public sealed class PaktReaderOptions
 {
-    public const int DefaultMaxTokenBytes = 1024 * 1024;
-
-    public const int DefaultMaxNestingDepth = 128;
-
     public static readonly PaktReaderOptions Default = new();
 
-    public int MaxTokenBytes { get; init; } = DefaultMaxTokenBytes;
-
-    public int MaxNestingDepth { get; init; } = DefaultMaxNestingDepth;
+    public int MaxTokenBytes { get; init; } = 1_048_576;
+    public int MaxNestingDepth { get; init; } = 128;
+    public int MaxStringLength { get; init; } = 10_485_760;
+    public int InitialBufferSize { get; init; } = 4_096;
+    public int MaxStatementCount { get; init; } = int.MaxValue;
+    public ArrayPool<byte>? BufferPool { get; init; }
 }

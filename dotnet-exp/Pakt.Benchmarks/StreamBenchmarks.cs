@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Buffers;
-using System.IO.Pipelines;
 using System.Text;
 using System.Text.Json;
 using BenchmarkDotNet.Attributes;
@@ -28,19 +26,13 @@ public class StreamBenchmarks
         _jsonlBytes = GenerateJsonl(EntryCount);
     }
 
-    [Benchmark(Description = "PAKT pack")]
-    public async Task<int> PaktDrain()
+    [Benchmark(Description = "PAKT v7 memory")]
+    public int PaktV7Drain()
     {
-        PipeReader pipe = PipeReader.Create(new ReadOnlySequence<byte>(_paktBytes));
-        PaktReader reader = PaktReader.Create(pipe);
+        using var reader = new PaktMemoryReader(new ReadOnlyMemory<byte>(_paktBytes));
         int count = 0;
-
-        await reader.DrainAsync((scoped in PaktEvent evt) =>
-        {
+        while (reader.Read())
             count++;
-            return PaktReader.HandlerResult.Continue;
-        }).ConfigureAwait(false);
-
         return count;
     }
 

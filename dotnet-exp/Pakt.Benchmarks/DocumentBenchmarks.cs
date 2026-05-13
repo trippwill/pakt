@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Buffers;
-using System.IO.Pipelines;
 using System.Text;
 using System.Text.Json;
 using BenchmarkDotNet.Attributes;
@@ -38,9 +36,9 @@ public class DocumentBenchmarks
 
     // ── Small: 10-field struct ──────────────────────────────────────
 
-    [Benchmark(Description = "PAKT small (10 fields)")]
-    public async Task<int> PaktSmall()
-        => await DrainPakt(_paktSmall).ConfigureAwait(false);
+    [Benchmark(Description = "PAKT v7 small (10 fields)")]
+    public int PaktSmall()
+        => DrainPaktV7(_paktSmall);
 
     [Benchmark(Baseline = true, Description = "JSON small (10 fields)")]
     public int JsonSmall()
@@ -48,9 +46,9 @@ public class DocumentBenchmarks
 
     // ── Wide: 100 scalar statements ─────────────────────────────────
 
-    [Benchmark(Description = "PAKT wide (100 stmts)")]
-    public async Task<int> PaktWide()
-        => await DrainPakt(_paktWide).ConfigureAwait(false);
+    [Benchmark(Description = "PAKT v7 wide (100 stmts)")]
+    public int PaktWide()
+        => DrainPaktV7(_paktWide);
 
     [Benchmark(Description = "JSON wide (100 props)")]
     public int JsonWide()
@@ -58,9 +56,9 @@ public class DocumentBenchmarks
 
     // ── Nested: 3-level struct ──────────────────────────────────────
 
-    [Benchmark(Description = "PAKT nested (3 levels)")]
-    public async Task<int> PaktNested()
-        => await DrainPakt(_paktNested).ConfigureAwait(false);
+    [Benchmark(Description = "PAKT v7 nested (3 levels)")]
+    public int PaktNested()
+        => DrainPaktV7(_paktNested);
 
     [Benchmark(Description = "JSON nested (3 levels)")]
     public int JsonNested()
@@ -68,9 +66,9 @@ public class DocumentBenchmarks
 
     // ── Collections: list + map ─────────────────────────────────────
 
-    [Benchmark(Description = "PAKT collections")]
-    public async Task<int> PaktCollections()
-        => await DrainPakt(_paktCollections).ConfigureAwait(false);
+    [Benchmark(Description = "PAKT v7 collections")]
+    public int PaktCollections()
+        => DrainPaktV7(_paktCollections);
 
     [Benchmark(Description = "JSON collections")]
     public int JsonCollections()
@@ -78,18 +76,12 @@ public class DocumentBenchmarks
 
     // ── Helpers ─────────────────────────────────────────────────────
 
-    private static async Task<int> DrainPakt(byte[] data)
+    private static int DrainPaktV7(byte[] data)
     {
-        PipeReader pipe = PipeReader.Create(new ReadOnlySequence<byte>(data));
-        PaktReader reader = PaktReader.Create(pipe);
+        using var reader = new PaktMemoryReader(new ReadOnlyMemory<byte>(data));
         int count = 0;
-
-        await reader.DrainAsync((scoped in PaktEvent evt) =>
-        {
+        while (reader.Read())
             count++;
-            return PaktReader.HandlerResult.Continue;
-        }).ConfigureAwait(false);
-
         return count;
     }
 

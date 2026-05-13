@@ -62,21 +62,91 @@ sealed partial class Parser
 
     private StepResult StepTypeParsing(ref SequenceReader<byte> reader, bool isFinal)
     {
-        TypeStepResult result = _typeParser.Step(
-            reader.UnreadSequence, isFinal, out long bytesConsumed);
+        // Batch: loop the TypeParser to completion, buffering all events.
+        _typeEventCount = 0;
+        _typeEventDrainIndex = 0;
 
-        reader.Advance(bytesConsumed);
-        _cursor = _typeParser.CurrentCursor;
-
-        return result.Status switch
+        while (true)
         {
-            TypeStepStatus.Continue => StepResult.Continue(),
-            TypeStepStatus.Event => StepResult.Event(result.TypeEvent),
-            TypeStepStatus.MoreData => StepResult.MoreData(),
-            TypeStepStatus.Complete => CompleteTypeParsing(),
-            TypeStepStatus.Error => StepResult.Error(result.ParseError!.Value),
-            _ => StepResult.Error(PaktParseError.Syntax(CurrentPosition)),
-        };
+            TypeStepResult result = _typeParser.Step(
+                reader.UnreadSequence, isFinal, out long bytesConsumed);
+
+            reader.Advance(bytesConsumed);
+            _cursor = _typeParser.CurrentCursor;
+
+            switch (result.Status)
+            {
+                case TypeStepStatus.Continue:
+                    continue;
+
+                case TypeStepStatus.Event:
+                    if (!TryBufferTypeEvent(in result.TypeEvent))
+                        return StepResult.Error(PaktParseError.Syntax(CurrentPosition));
+                    continue;
+
+                case TypeStepStatus.MoreData:
+                    return StepResult.MoreData();
+
+                case TypeStepStatus.Complete:
+                    _statementType = _typeParser.RootTypeRef;
+                    if (_typeEventCount > 0)
+                    {
+                        _phase = ParserPhase.TypeDraining;
+                        return StepTypeDraining();
+                    }
+                    _phase = ParserPhase.StatementOperator;
+                    return StepResult.Continue();
+
+                case TypeStepStatus.Error:
+                    return StepResult.Error(result.ParseError!.Value);
+
+                default:
+                    return StepResult.Error(PaktParseError.Syntax(CurrentPosition));
+            }
+        }
+    }
+
+    private bool TryBufferTypeEvent(in PaktEvent evt)
+    {
+        if (_typeEventCount >= TypeEventBufferSize)
+            return false;
+
+        ref BufferedTypeEvent slot = ref _typeEventBuffer[_typeEventCount++];
+        slot.Kind = evt.EventKind;
+        slot.Offset = evt.Offset;
+        slot.TypeKind = evt.TypeKind;
+
+        if (evt.Payload.Length > 0)
+        {
+            ReadOnlySequence<byte> payload = evt.Payload;
+            slot.PayloadStart = (int)payload.GetOffset(payload.Start);
+            slot.PayloadLength = (int)payload.Length;
+        }
+        else
+        {
+            slot.PayloadStart = -1;
+            slot.PayloadLength = 0;
+        }
+
+        return true;
+    }
+
+    private StepResult StepTypeDraining()
+    {
+        ref BufferedTypeEvent slot = ref _typeEventBuffer[_typeEventDrainIndex++];
+
+        ReadOnlySequence<byte> payload = slot.PayloadStart >= 0
+            ? new ReadOnlySequence<byte>(_types.NameBuffer, slot.PayloadStart, slot.PayloadLength)
+            : default;
+
+        PaktEvent evt = new(slot.Kind, slot.Offset, slot.TypeKind, payload);
+
+        if (_typeEventDrainIndex >= _typeEventCount)
+        {
+            _phase = ParserPhase.StatementOperator;
+        }
+
+        return StepResult.Event(evt);
     }
 
     private StepResult CompleteTypeParsing()

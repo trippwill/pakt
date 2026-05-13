@@ -516,4 +516,71 @@ public class PaktReaderTests
         Assert.Throws<PaktParseException>(
             () => DrainTokens("x:{a:int b:int} = { 1 }"));
     }
+
+    // ── Stream reader (NUL-framed) ──────────────────────────────────
+
+    [Fact]
+    public async Task StreamReader_SingleUnit()
+    {
+        byte[] data = Encoding.UTF8.GetBytes("x:int = 42");
+        using var stream = new MemoryStream(data);
+        await using var reader = new PaktStreamReader(stream);
+
+        Assert.True(await reader.ReadUnitAsync(TestContext.Current.CancellationToken));
+
+        var tokens = new List<(PaktTokenType, string)>();
+        while (reader.Read())
+        {
+            string val = reader.ValueSpan.IsEmpty ? "" : Encoding.UTF8.GetString(reader.ValueSpan);
+            tokens.Add((reader.TokenType, val));
+        }
+
+        AssertToken(tokens, 0, PaktTokenType.StatementName, "x");
+        AssertToken(tokens, 4, PaktTokenType.Int, "42");
+
+        Assert.False(await reader.ReadUnitAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task StreamReader_NulFramedUnits()
+    {
+        // Two units separated by NUL
+        byte[] unit1 = Encoding.UTF8.GetBytes("a:int = 1");
+        byte[] unit2 = Encoding.UTF8.GetBytes("b:str = 'hi'");
+        byte[] data = [..unit1, 0x00, ..unit2];
+
+        using var stream = new MemoryStream(data);
+        await using var reader = new PaktStreamReader(stream);
+
+        // First unit
+        Assert.True(await reader.ReadUnitAsync(TestContext.Current.CancellationToken));
+        var tokens1 = DrainStreamTokens(reader);
+        AssertToken(tokens1, 0, PaktTokenType.StatementName, "a");
+
+        // Second unit
+        Assert.True(await reader.ReadUnitAsync(TestContext.Current.CancellationToken));
+        var tokens2 = DrainStreamTokens(reader);
+        AssertToken(tokens2, 0, PaktTokenType.StatementName, "b");
+
+        Assert.False(await reader.ReadUnitAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task StreamReader_EmptyStream()
+    {
+        using var stream = new MemoryStream([]);
+        await using var reader = new PaktStreamReader(stream);
+        Assert.False(await reader.ReadUnitAsync(TestContext.Current.CancellationToken));
+    }
+
+    private static List<(PaktTokenType Type, string Value)> DrainStreamTokens(PaktStreamReader reader)
+    {
+        var tokens = new List<(PaktTokenType, string)>();
+        while (reader.Read())
+        {
+            string val = reader.ValueSpan.IsEmpty ? "" : Encoding.UTF8.GetString(reader.ValueSpan);
+            tokens.Add((reader.TokenType, val));
+        }
+        return tokens;
+    }
 }

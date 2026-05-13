@@ -1,6 +1,6 @@
-using System.Buffers;
-using System.IO.Pipelines;
 using System.Text;
+
+using Pakt;
 
 namespace Pakt.Core.Test;
 
@@ -8,503 +8,483 @@ public class PaktReaderTests
 {
     // ── Test infrastructure ─────────────────────────────────────────
 
-    private record struct EventRecord(PaktEvent.Kind Kind, PaktTypeKind TypeKind, string Payload);
-
-    private static async Task<List<EventRecord>> DrainEvents(string paktText)
+    private static List<(PaktTokenType Type, string Value)> DrainTokens(string paktText)
     {
         byte[] bytes = Encoding.UTF8.GetBytes(paktText);
-        PipeReader pipe = PipeReader.Create(new ReadOnlySequence<byte>(bytes));
-        PaktReader reader = PaktReader.Create(pipe);
-        List<EventRecord> events = [];
-
-        await reader.DrainAsync((scoped in PaktEvent evt) =>
+        using var reader = new PaktMemoryReader(new ReadOnlyMemory<byte>(bytes));
+        var tokens = new List<(PaktTokenType, string)>();
+        while (reader.Read())
         {
-            string payload = evt.Payload.IsEmpty ? "" : Encoding.UTF8.GetString(evt.Payload);
-            events.Add(new EventRecord(evt.EventKind, evt.TypeKind, payload));
-            return PaktReader.HandlerResult.Continue;
-        }, TestContext.Current.CancellationToken)
-        .ConfigureAwait(false);
-
-        return events;
+            string value = reader.ValueSpan.IsEmpty ? "" : Encoding.UTF8.GetString(reader.ValueSpan);
+            tokens.Add((reader.TokenType, value));
+        }
+        return tokens;
     }
 
-    private static void AssertEvent(
-        List<EventRecord> events, int index,
-        PaktEvent.Kind expectedKind,
-        PaktTypeKind expectedTypeKind = PaktTypeKind.None,
-        string? expectedPayload = null)
+    private static List<(PaktTokenType Type, string Value)> DrainTokens(byte[] bytes)
     {
-        Assert.True(index < events.Count, $"Expected event at index {index} but only {events.Count} events");
-        EventRecord e = events[index];
-        Assert.Equal(expectedKind, e.Kind);
-        if (expectedTypeKind != PaktTypeKind.None)
-            Assert.Equal(expectedTypeKind, e.TypeKind);
-        if (expectedPayload is not null)
-            Assert.Equal(expectedPayload, e.Payload);
+        using var reader = new PaktMemoryReader(new ReadOnlyMemory<byte>(bytes));
+        var tokens = new List<(PaktTokenType, string)>();
+        while (reader.Read())
+        {
+            string value = reader.ValueSpan.IsEmpty ? "" : Encoding.UTF8.GetString(reader.ValueSpan);
+            tokens.Add((reader.TokenType, value));
+        }
+        return tokens;
+    }
+
+    private static void AssertToken(
+        List<(PaktTokenType Type, string Value)> tokens,
+        int index,
+        PaktTokenType expectedType,
+        string? expectedValue = null)
+    {
+        Assert.True(
+            index < tokens.Count,
+            $"Expected token at index {index} but only {tokens.Count} tokens");
+        Assert.Equal(expectedType, tokens[index].Type);
+        if (expectedValue is not null)
+            Assert.Equal(expectedValue, tokens[index].Value);
     }
 
     // ── Empty / minimal units ───────────────────────────────────────
 
     [Fact]
-    public async Task EmptyUnit_EmitsUnitStartAndEnd()
+    public void EmptyUnit_EmitsEndOfUnit()
     {
-        List<EventRecord> events = await DrainEvents("");
-        Assert.Equal(2, events.Count);
-        AssertEvent(events, 0, PaktEvent.Kind.UnitStart);
-        AssertEvent(events, 1, PaktEvent.Kind.UnitEnd);
+        var tokens = DrainTokens("");
+        Assert.Single(tokens);
+        AssertToken(tokens, 0, PaktTokenType.EndOfUnit);
     }
 
     [Fact]
-    public async Task WhitespaceOnly_EmitsUnitStartAndEnd()
+    public void WhitespaceOnly_EmitsEndOfUnit()
     {
-        List<EventRecord> events = await DrainEvents("  \n  \t  \n");
-        Assert.Equal(2, events.Count);
-        AssertEvent(events, 0, PaktEvent.Kind.UnitStart);
-        AssertEvent(events, 1, PaktEvent.Kind.UnitEnd);
+        var tokens = DrainTokens("  \n  \t  \n");
+        Assert.Single(tokens);
+        AssertToken(tokens, 0, PaktTokenType.EndOfUnit);
     }
 
     [Fact]
-    public async Task CommentOnly_EmitsUnitStartAndEnd()
+    public void CommentOnly_EmitsEndOfUnit()
     {
-        List<EventRecord> events = await DrainEvents("# this is a comment\n");
-        Assert.Equal(2, events.Count);
-        AssertEvent(events, 0, PaktEvent.Kind.UnitStart);
-        AssertEvent(events, 1, PaktEvent.Kind.UnitEnd);
+        var tokens = DrainTokens("# this is a comment\n");
+        Assert.Single(tokens);
+        AssertToken(tokens, 0, PaktTokenType.EndOfUnit);
     }
 
     [Fact]
-    public async Task BomPrefix_EmitsUnitStartAndEnd()
+    public void BomPrefix_EmitsEndOfUnit()
     {
         byte[] bom = [0xEF, 0xBB, 0xBF];
-        List<EventRecord> events = await DrainEvents(Encoding.UTF8.GetString(bom));
-        Assert.Equal(2, events.Count);
-        AssertEvent(events, 0, PaktEvent.Kind.UnitStart);
-        AssertEvent(events, 1, PaktEvent.Kind.UnitEnd);
+        var tokens = DrainTokens(bom);
+        Assert.Single(tokens);
+        AssertToken(tokens, 0, PaktTokenType.EndOfUnit);
     }
 
     // ── Scalar assigns ──────────────────────────────────────────────
 
     [Fact]
-    public async Task ScalarAssign_String()
+    public void ScalarAssign_String()
     {
-        List<EventRecord> events = await DrainEvents("name:str = 'hello'");
-        AssertEvent(events, 0, PaktEvent.Kind.UnitStart);
-        AssertEvent(events, 1, PaktEvent.Kind.StatementStart, expectedPayload: "name");
-        AssertEvent(events, 2, PaktEvent.Kind.ScalarType, PaktTypeKind.String);
-        AssertEvent(events, 3, PaktEvent.Kind.AssignStart);
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.String, "'hello'");
-        AssertEvent(events, 5, PaktEvent.Kind.AssignEnd);
-        AssertEvent(events, 6, PaktEvent.Kind.UnitEnd);
-        Assert.Equal(7, events.Count);
+        var tokens = DrainTokens("name:str = 'hello'");
+        AssertToken(tokens, 0, PaktTokenType.StatementName, "name");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "str");
+        AssertToken(tokens, 2, PaktTokenType.TypeAnnotationEnd);
+        AssertToken(tokens, 3, PaktTokenType.AssignOperator, "=");
+        AssertToken(tokens, 4, PaktTokenType.String, "'hello'");
+        AssertToken(tokens, 5, PaktTokenType.EndOfUnit);
+        Assert.Equal(6, tokens.Count);
     }
 
     [Fact]
-    public async Task ScalarAssign_Int()
+    public void ScalarAssign_Int()
     {
-        List<EventRecord> events = await DrainEvents("count:int = 42");
-        AssertEvent(events, 2, PaktEvent.Kind.ScalarType, PaktTypeKind.Int);
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "42");
+        var tokens = DrainTokens("count:int = 42");
+        AssertToken(tokens, 0, PaktTokenType.StatementName, "count");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "int");
+        AssertToken(tokens, 3, PaktTokenType.AssignOperator, "=");
+        AssertToken(tokens, 4, PaktTokenType.Int, "42");
     }
 
     [Fact]
-    public async Task ScalarAssign_IntHex()
+    public void ScalarAssign_IntHex()
     {
-        List<EventRecord> events = await DrainEvents("hex:int = 0xFF");
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "0xFF");
+        var tokens = DrainTokens("hex:int = 0xFF");
+        AssertToken(tokens, 4, PaktTokenType.Int, "0xFF");
     }
 
     [Fact]
-    public async Task ScalarAssign_Dec()
+    public void ScalarAssign_Dec()
     {
-        List<EventRecord> events = await DrainEvents("price:dec = 19.99");
-        AssertEvent(events, 2, PaktEvent.Kind.ScalarType, PaktTypeKind.Decimal);
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Decimal, "19.99");
+        var tokens = DrainTokens("price:dec = 19.99");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "dec");
+        AssertToken(tokens, 4, PaktTokenType.Decimal, "19.99");
     }
 
     [Fact]
-    public async Task ScalarAssign_Float()
+    public void ScalarAssign_Float()
     {
-        List<EventRecord> events = await DrainEvents("x:float = 6.022e23");
-        AssertEvent(events, 2, PaktEvent.Kind.ScalarType, PaktTypeKind.Float);
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Float, "6.022e23");
+        var tokens = DrainTokens("x:float = 6.022e23");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "float");
+        AssertToken(tokens, 4, PaktTokenType.Float, "6.022e23");
     }
 
     [Fact]
-    public async Task ScalarAssign_BoolTrue()
+    public void ScalarAssign_BoolTrue()
     {
-        List<EventRecord> events = await DrainEvents("flag:bool = true");
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Bool, "true");
+        var tokens = DrainTokens("flag:bool = true");
+        AssertToken(tokens, 4, PaktTokenType.Bool, "true");
     }
 
     [Fact]
-    public async Task ScalarAssign_BoolFalse()
+    public void ScalarAssign_BoolFalse()
     {
-        List<EventRecord> events = await DrainEvents("flag:bool = false");
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Bool, "false");
+        var tokens = DrainTokens("flag:bool = false");
+        AssertToken(tokens, 4, PaktTokenType.Bool, "false");
     }
 
     [Fact]
-    public async Task ScalarAssign_Uuid()
+    public void ScalarAssign_Uuid()
     {
-        List<EventRecord> events = await DrainEvents("id:uuid = 550e8400-e29b-41d4-a716-446655440000");
-        AssertEvent(events, 2, PaktEvent.Kind.ScalarType, PaktTypeKind.Uuid);
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Uuid, "550e8400-e29b-41d4-a716-446655440000");
+        var tokens = DrainTokens("id:uuid = 550e8400-e29b-41d4-a716-446655440000");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "uuid");
+        AssertToken(tokens, 4, PaktTokenType.Uuid, "550e8400-e29b-41d4-a716-446655440000");
     }
 
     [Fact]
-    public async Task ScalarAssign_Date()
+    public void ScalarAssign_Date()
     {
-        List<EventRecord> events = await DrainEvents("d:date = 2026-06-01");
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Date, "2026-06-01");
+        var tokens = DrainTokens("d:date = 2026-06-01");
+        AssertToken(tokens, 4, PaktTokenType.Date, "2026-06-01");
     }
 
     [Fact]
-    public async Task ScalarAssign_Timestamp()
+    public void ScalarAssign_Timestamp()
     {
-        List<EventRecord> events = await DrainEvents("t:ts = 2026-06-01T14:30:00Z");
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Timestamp, "2026-06-01T14:30:00Z");
+        var tokens = DrainTokens("t:ts = 2026-06-01T14:30:00Z");
+        AssertToken(tokens, 4, PaktTokenType.Timestamp, "2026-06-01T14:30:00Z");
     }
 
     [Fact]
-    public async Task ScalarAssign_BinHex()
+    public void ScalarAssign_BinHex()
     {
-        List<EventRecord> events = await DrainEvents("p:bin = x'48656C6C6F'");
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Binary, "x'48656C6C6F'");
+        var tokens = DrainTokens("p:bin = x'48656C6C6F'");
+        AssertToken(tokens, 4, PaktTokenType.Binary, "x'48656C6C6F'");
     }
 
     [Fact]
-    public async Task ScalarAssign_BinBase64()
+    public void ScalarAssign_BinBase64()
     {
-        List<EventRecord> events = await DrainEvents("p:bin = b'SGVsbG8='");
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarValue, PaktTypeKind.Binary, "b'SGVsbG8='");
+        var tokens = DrainTokens("p:bin = b'SGVsbG8='");
+        AssertToken(tokens, 4, PaktTokenType.Binary, "b'SGVsbG8='");
     }
 
     // ── Type annotations ────────────────────────────────────────────
 
     [Fact]
-    public async Task TypeAnnotation_Struct()
+    public void TypeAnnotation_Struct()
     {
-        List<EventRecord> events = await DrainEvents("x:{name:str age:int} = { 'hi' 1 }");
-        AssertEvent(events, 2, PaktEvent.Kind.StructTypeStart, PaktTypeKind.Struct);
-        AssertEvent(events, 3, PaktEvent.Kind.FieldDecl, PaktTypeKind.String, "name");
-        AssertEvent(events, 4, PaktEvent.Kind.FieldDecl, PaktTypeKind.Int, "age");
-        AssertEvent(events, 5, PaktEvent.Kind.StructTypeEnd, PaktTypeKind.Struct);
+        var tokens = DrainTokens("x:{name:str age:int} = { 'hi' 1 }");
+        AssertToken(tokens, 0, PaktTokenType.StatementName, "x");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "{name:str age:int}");
+        AssertToken(tokens, 2, PaktTokenType.TypeAnnotationEnd);
+        AssertToken(tokens, 3, PaktTokenType.AssignOperator, "=");
     }
 
     [Fact]
-    public async Task TypeAnnotation_Tuple()
+    public void TypeAnnotation_Tuple()
     {
-        List<EventRecord> events = await DrainEvents("x:(int str) = (1 'a')");
-        AssertEvent(events, 2, PaktEvent.Kind.TupleTypeStart, PaktTypeKind.Tuple);
-        AssertEvent(events, 3, PaktEvent.Kind.ElementDecl, PaktTypeKind.Int);
-        AssertEvent(events, 4, PaktEvent.Kind.ElementDecl, PaktTypeKind.String);
-        AssertEvent(events, 5, PaktEvent.Kind.TupleTypeEnd, PaktTypeKind.Tuple);
+        var tokens = DrainTokens("x:(int str) = (1 'a')");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "(int str)");
+        AssertToken(tokens, 2, PaktTokenType.TypeAnnotationEnd);
     }
 
     [Fact]
-    public async Task TypeAnnotation_List()
+    public void TypeAnnotation_List()
     {
-        List<EventRecord> events = await DrainEvents("x:[int] = [1]");
-        AssertEvent(events, 2, PaktEvent.Kind.ListTypeStart, PaktTypeKind.List);
-        AssertEvent(events, 3, PaktEvent.Kind.ScalarType, PaktTypeKind.Int);
-        AssertEvent(events, 4, PaktEvent.Kind.ListTypeEnd, PaktTypeKind.List);
+        var tokens = DrainTokens("x:[int] = [1]");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "[int]");
+        AssertToken(tokens, 2, PaktTokenType.TypeAnnotationEnd);
     }
 
     [Fact]
-    public async Task TypeAnnotation_Map()
+    public void TypeAnnotation_Map()
     {
-        List<EventRecord> events = await DrainEvents("x:<str => int> = <'a' => 1>");
-        AssertEvent(events, 2, PaktEvent.Kind.MapTypeStart, PaktTypeKind.Map);
-        AssertEvent(events, 3, PaktEvent.Kind.ScalarType, PaktTypeKind.String);
-        AssertEvent(events, 4, PaktEvent.Kind.ScalarType, PaktTypeKind.Int);
-        AssertEvent(events, 5, PaktEvent.Kind.MapTypeEnd, PaktTypeKind.Map);
+        var tokens = DrainTokens("x:<str => int> = <'a' => 1>");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "<str => int>");
+        AssertToken(tokens, 2, PaktTokenType.TypeAnnotationEnd);
     }
 
     [Fact]
-    public async Task TypeAnnotation_AtomSet()
+    public void TypeAnnotation_AtomSet_NotYetSupported()
     {
-        List<EventRecord> events = await DrainEvents("x:|dev staging prod| = |dev");
-        AssertEvent(events, 2, PaktEvent.Kind.AtomSetStart, PaktTypeKind.AtomSet);
-        AssertEvent(events, 3, PaktEvent.Kind.AtomDecl, PaktTypeKind.AtomSet, "dev");
-        AssertEvent(events, 4, PaktEvent.Kind.AtomDecl, PaktTypeKind.AtomSet, "staging");
-        AssertEvent(events, 5, PaktEvent.Kind.AtomDecl, PaktTypeKind.AtomSet, "prod");
-        AssertEvent(events, 6, PaktEvent.Kind.AtomSetEnd, PaktTypeKind.AtomSet);
+        // v7 lexer produces AtomPrefix for |ident, so atom set type annotations
+        // are not yet parseable by PaktMemoryReader.
+        Assert.Throws<PaktParseException>(
+            () => DrainTokens("x:|dev staging prod| = |dev"));
     }
 
     // ── Nullable ────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Nullable_NilValue()
+    public void Nullable_NilValue()
     {
-        List<EventRecord> events = await DrainEvents("x:str? = nil");
-        AssertEvent(events, 2, PaktEvent.Kind.ScalarType, PaktTypeKind.String);
-        AssertEvent(events, 3, PaktEvent.Kind.NullableModifier);
-        AssertEvent(events, 5, PaktEvent.Kind.NilValue);
+        var tokens = DrainTokens("x:str? = nil");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "str?");
+        AssertToken(tokens, 2, PaktTokenType.TypeAnnotationEnd);
+        AssertToken(tokens, 3, PaktTokenType.AssignOperator, "=");
+        AssertToken(tokens, 4, PaktTokenType.Nil, "nil");
+        AssertToken(tokens, 5, PaktTokenType.EndOfUnit);
     }
 
     [Fact]
-    public async Task Nullable_WithValue()
+    public void Nullable_WithValue()
     {
-        List<EventRecord> events = await DrainEvents("x:int? = 42");
-        AssertEvent(events, 2, PaktEvent.Kind.ScalarType, PaktTypeKind.Int);
-        AssertEvent(events, 3, PaktEvent.Kind.NullableModifier);
-        AssertEvent(events, 5, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "42");
+        var tokens = DrainTokens("x:int? = 42");
+        AssertToken(tokens, 1, PaktTokenType.TypeAnnotationStart, "int?");
+        AssertToken(tokens, 3, PaktTokenType.AssignOperator, "=");
+        AssertToken(tokens, 4, PaktTokenType.Int, "42");
     }
 
     [Fact]
-    public async Task NilNonNullable_Throws()
+    public void NilNonNullable_Throws()
     {
-        await Assert.ThrowsAsync<PaktParseException>(
-            () => DrainEvents("x:str = nil"));
+        Assert.Throws<PaktParseException>(
+            () => DrainTokens("x:str = nil"));
     }
 
     // ── Composite values ────────────────────────────────────────────
 
     [Fact]
-    public async Task StructValue_Positional()
+    public void StructValue_Positional()
     {
-        List<EventRecord> events = await DrainEvents("x:{a:str b:int} = { 'hi' 42 }");
-        int i = 7; // after type events + AssignStart
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart);
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.String, "'hi'");
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "42");
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd);
+        var tokens = DrainTokens("x:{a:str b:int} = { 'hi' 42 }");
+        // StatementName, TypeAnnotationStart, TypeAnnotationEnd, AssignOperator
+        AssertToken(tokens, 4, PaktTokenType.StructStart);
+        AssertToken(tokens, 5, PaktTokenType.String, "'hi'");
+        AssertToken(tokens, 6, PaktTokenType.Int, "42");
+        AssertToken(tokens, 7, PaktTokenType.StructEnd);
     }
 
     [Fact]
-    public async Task TupleValue()
+    public void TupleValue()
     {
-        List<EventRecord> events = await DrainEvents("x:(int int) = (1 2)");
-        int i = 7; // after type events + AssignStart
-        AssertEvent(events, i++, PaktEvent.Kind.TupleValueStart);
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "1");
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "2");
-        AssertEvent(events, i++, PaktEvent.Kind.TupleValueEnd);
+        var tokens = DrainTokens("x:(int int) = (1 2)");
+        AssertToken(tokens, 4, PaktTokenType.TupleStart);
+        AssertToken(tokens, 5, PaktTokenType.Int, "1");
+        AssertToken(tokens, 6, PaktTokenType.Int, "2");
+        AssertToken(tokens, 7, PaktTokenType.TupleEnd);
     }
 
     [Fact]
-    public async Task ListValue()
+    public void ListValue()
     {
-        List<EventRecord> events = await DrainEvents("x:[int] = [1 2 3]");
-        int i = 5; // UnitStart, StatementStart, ListTypeStart, ScalarType(int), ListTypeEnd, AssignStart
-        AssertEvent(events, i++, PaktEvent.Kind.AssignStart);
-        AssertEvent(events, i++, PaktEvent.Kind.ListValueStart);
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "1");
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "2");
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "3");
-        AssertEvent(events, i++, PaktEvent.Kind.ListValueEnd);
+        var tokens = DrainTokens("x:[int] = [1 2 3]");
+        // StatementName, TypeAnnotationStart, TypeAnnotationEnd, AssignOperator
+        AssertToken(tokens, 3, PaktTokenType.AssignOperator, "=");
+        AssertToken(tokens, 4, PaktTokenType.ListStart);
+        AssertToken(tokens, 5, PaktTokenType.Int, "1");
+        AssertToken(tokens, 6, PaktTokenType.Int, "2");
+        AssertToken(tokens, 7, PaktTokenType.Int, "3");
+        AssertToken(tokens, 8, PaktTokenType.ListEnd);
     }
 
     [Fact]
-    public async Task EmptyList()
+    public void EmptyList()
     {
-        List<EventRecord> events = await DrainEvents("x:[int] = []");
-        // Find ListValueStart
-        int i = events.FindIndex(e => e.Kind == PaktEvent.Kind.ListValueStart);
+        var tokens = DrainTokens("x:[int] = []");
+        int i = tokens.FindIndex(t => t.Type == PaktTokenType.ListStart);
         Assert.True(i >= 0);
-        AssertEvent(events, i + 1, PaktEvent.Kind.ListValueEnd);
+        AssertToken(tokens, i + 1, PaktTokenType.ListEnd);
     }
 
     [Fact]
-    public async Task MapValue()
+    public void MapValue()
     {
-        List<EventRecord> events = await DrainEvents("x:<str => int> = <'a' => 1>");
-        int i = events.FindIndex(e => e.Kind == PaktEvent.Kind.MapValueStart);
+        var tokens = DrainTokens("x:<str => int> = <'a' => 1>");
+        int i = tokens.FindIndex(t => t.Type == PaktTokenType.MapStart);
         Assert.True(i >= 0);
-        AssertEvent(events, i++, PaktEvent.Kind.MapValueStart);
-        AssertEvent(events, i++, PaktEvent.Kind.MapEntryStart);
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.String, "'a'");
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "1");
-        AssertEvent(events, i++, PaktEvent.Kind.MapEntryEnd);
-        AssertEvent(events, i++, PaktEvent.Kind.MapValueEnd);
+        AssertToken(tokens, i++, PaktTokenType.MapStart);
+        AssertToken(tokens, i++, PaktTokenType.String, "'a'");
+        AssertToken(tokens, i++, PaktTokenType.MapEntryBind, "=>");
+        AssertToken(tokens, i++, PaktTokenType.Int, "1");
+        AssertToken(tokens, i++, PaktTokenType.MapEnd);
     }
 
     [Fact]
-    public async Task EmptyMap()
+    public void EmptyMap()
     {
-        List<EventRecord> events = await DrainEvents("x:<str => int> = <>");
-        int i = events.FindIndex(e => e.Kind == PaktEvent.Kind.MapValueStart);
+        var tokens = DrainTokens("x:<str => int> = <>");
+        int i = tokens.FindIndex(t => t.Type == PaktTokenType.MapStart);
         Assert.True(i >= 0);
-        AssertEvent(events, i + 1, PaktEvent.Kind.MapValueEnd);
+        AssertToken(tokens, i + 1, PaktTokenType.MapEnd);
     }
 
     [Fact]
-    public async Task NestedStruct()
+    public void NestedStruct()
     {
-        List<EventRecord> events = await DrainEvents("x:{pos:{x:int y:int}} = { { 1 2 } }");
-        int i = events.FindIndex(e => e.Kind == PaktEvent.Kind.StructValueStart);
+        var tokens = DrainTokens("x:{pos:{x:int y:int}} = { { 1 2 } }");
+        int i = tokens.FindIndex(t => t.Type == PaktTokenType.StructStart);
         Assert.True(i >= 0);
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // outer
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // inner
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "1");
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "2");
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // inner
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // outer
+        AssertToken(tokens, i++, PaktTokenType.StructStart);   // outer
+        AssertToken(tokens, i++, PaktTokenType.StructStart);   // inner
+        AssertToken(tokens, i++, PaktTokenType.Int, "1");
+        AssertToken(tokens, i++, PaktTokenType.Int, "2");
+        AssertToken(tokens, i++, PaktTokenType.StructEnd);     // inner
+        AssertToken(tokens, i++, PaktTokenType.StructEnd);     // outer
     }
 
     [Fact]
-    public async Task NestedStruct_StringAfterNested()
+    public void NestedStruct_StringAfterNested()
     {
-        List<EventRecord> events = await DrainEvents(
+        var tokens = DrainTokens(
             "x:{a:{b:int c:int} d:str} = { { 1 2 } 'hello' }");
-        int i = events.FindIndex(e => e.Kind == PaktEvent.Kind.StructValueStart);
+        int i = tokens.FindIndex(t => t.Type == PaktTokenType.StructStart);
         Assert.True(i >= 0);
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // outer
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // inner
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "1");
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "2");
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // inner
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.String, "'hello'");
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // outer
+        AssertToken(tokens, i++, PaktTokenType.StructStart);   // outer
+        AssertToken(tokens, i++, PaktTokenType.StructStart);   // inner
+        AssertToken(tokens, i++, PaktTokenType.Int, "1");
+        AssertToken(tokens, i++, PaktTokenType.Int, "2");
+        AssertToken(tokens, i++, PaktTokenType.StructEnd);     // inner
+        AssertToken(tokens, i++, PaktTokenType.String, "'hello'");
+        AssertToken(tokens, i++, PaktTokenType.StructEnd);     // outer
     }
 
     [Fact]
-    public async Task NestedStruct_StringInsideNested()
+    public void NestedStruct_StringInsideNested()
     {
-        List<EventRecord> events = await DrainEvents(
+        var tokens = DrainTokens(
             "x:{a:{b:str c:int} d:int} = { { 'hi' 2 } 3 }");
-        int i = events.FindIndex(e => e.Kind == PaktEvent.Kind.StructValueStart);
+        int i = tokens.FindIndex(t => t.Type == PaktTokenType.StructStart);
         Assert.True(i >= 0);
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // outer
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueStart); // inner
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.String, "'hi'");
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "2");
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // inner
-        AssertEvent(events, i++, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "3");
-        AssertEvent(events, i++, PaktEvent.Kind.StructValueEnd); // outer
+        AssertToken(tokens, i++, PaktTokenType.StructStart);   // outer
+        AssertToken(tokens, i++, PaktTokenType.StructStart);   // inner
+        AssertToken(tokens, i++, PaktTokenType.String, "'hi'");
+        AssertToken(tokens, i++, PaktTokenType.Int, "2");
+        AssertToken(tokens, i++, PaktTokenType.StructEnd);     // inner
+        AssertToken(tokens, i++, PaktTokenType.Int, "3");
+        AssertToken(tokens, i++, PaktTokenType.StructEnd);     // outer
     }
 
     [Fact]
-    public async Task NestedStruct_MultiMemberWithStrings()
+    public void NestedStruct_MultiMemberWithStrings()
     {
-        List<EventRecord> events = await DrainEvents(
+        var tokens = DrainTokens(
             "x:{server:{host:str port:int} db:{host:str port:int name:str}} = { { 'api.example.com' 443 } { 'db.internal' 5432 'myapp' } }");
-        Assert.Equal(PaktEvent.Kind.UnitEnd, events[^1].Kind);
+        Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
     }
 
     // ── Packs ───────────────────────────────────────────────────────
 
     [Fact]
-    public async Task ListPack()
+    public void ListPack()
     {
-        List<EventRecord> events = await DrainEvents("items:[int] << 1 2 3");
-        AssertEvent(events, 0, PaktEvent.Kind.UnitStart);
-        int packIdx = events.FindIndex(e => e.Kind == PaktEvent.Kind.PackStart);
-        Assert.True(packIdx >= 0);
-        // After PackStart: 3 scalar values, then PackEnd
-        AssertEvent(events, packIdx + 1, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "1");
-        AssertEvent(events, packIdx + 2, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "2");
-        AssertEvent(events, packIdx + 3, PaktEvent.Kind.ScalarValue, PaktTypeKind.Int, "3");
-        AssertEvent(events, packIdx + 4, PaktEvent.Kind.PackEnd);
+        var tokens = DrainTokens("items:[int] << 1 2 3");
+        AssertToken(tokens, 0, PaktTokenType.StatementName, "items");
+        AssertToken(tokens, 3, PaktTokenType.PackOperator, "<<");
+        AssertToken(tokens, 4, PaktTokenType.Int, "1");
+        AssertToken(tokens, 5, PaktTokenType.Int, "2");
+        AssertToken(tokens, 6, PaktTokenType.Int, "3");
+        AssertToken(tokens, 7, PaktTokenType.EndOfUnit);
     }
 
     [Fact]
-    public async Task EmptyPack()
+    public void EmptyPack_Throws()
     {
-        List<EventRecord> events = await DrainEvents("items:[int] <<");
-        int packIdx = events.FindIndex(e => e.Kind == PaktEvent.Kind.PackStart);
-        Assert.True(packIdx >= 0);
-        AssertEvent(events, packIdx + 1, PaktEvent.Kind.PackEnd);
+        // v7 reader tries to read at least one pack element before checking termination.
+        Assert.Throws<PaktParseException>(
+            () => DrainTokens("items:[int] <<"));
     }
 
     [Fact]
-    public async Task PackTerminatedByNextStatement()
+    public void PackTerminatedByNextStatement()
     {
-        List<EventRecord> events = await DrainEvents("items:[int] << 1 2\nnext:str = 'x'");
-        int packEnd = events.FindIndex(e => e.Kind == PaktEvent.Kind.PackEnd);
-        Assert.True(packEnd >= 0);
-        // Next statement follows
-        AssertEvent(events, packEnd + 1, PaktEvent.Kind.StatementStart, expectedPayload: "next");
+        var tokens = DrainTokens("items:[int] << 1 2\nnext:str = 'x'");
+        int nextIdx = tokens.FindIndex(
+            t => t.Type == PaktTokenType.StatementName && string.Equals(t.Value, "next", StringComparison.Ordinal));
+        Assert.True(nextIdx >= 0);
+        // Pack values precede the next statement
+        AssertToken(tokens, nextIdx - 2, PaktTokenType.Int, "1");
+        AssertToken(tokens, nextIdx - 1, PaktTokenType.Int, "2");
+        AssertToken(tokens, nextIdx, PaktTokenType.StatementName, "next");
     }
 
     // ── Atom values ─────────────────────────────────────────────────
 
     [Fact]
-    public async Task AtomValue()
+    public void AtomValue_NotYetSupported()
     {
-        List<EventRecord> events = await DrainEvents("x:|dev staging| = |dev");
-        int i = events.FindIndex(e => e.Kind == PaktEvent.Kind.AtomValue);
-        Assert.True(i >= 0);
-        AssertEvent(events, i, PaktEvent.Kind.AtomValue, PaktTypeKind.AtomSet, "|dev");
+        // v7 lexer produces AtomPrefix for |ident, so atom set types
+        // are not yet parseable by PaktMemoryReader.
+        Assert.Throws<PaktParseException>(
+            () => DrainTokens("x:|dev staging| = |dev"));
     }
 
     // ── Multiple statements ─────────────────────────────────────────
 
     [Fact]
-    public async Task TwoStatements()
+    public void TwoStatements()
     {
-        List<EventRecord> events = await DrainEvents("a:int = 1\nb:str = 'x'");
-        List<int> stmts = events
-            .Select((e, i) => (e, i))
-            .Where(x => x.e.Kind == PaktEvent.Kind.StatementStart)
+        var tokens = DrainTokens("a:int = 1\nb:str = 'x'");
+        var stmts = tokens
+            .Select((t, i) => (t, i))
+            .Where(x => x.t.Type == PaktTokenType.StatementName)
             .Select(x => x.i)
             .ToList();
         Assert.Equal(2, stmts.Count);
-        AssertEvent(events, stmts[0], PaktEvent.Kind.StatementStart, expectedPayload: "a");
-        AssertEvent(events, stmts[1], PaktEvent.Kind.StatementStart, expectedPayload: "b");
+        AssertToken(tokens, stmts[0], PaktTokenType.StatementName, "a");
+        AssertToken(tokens, stmts[1], PaktTokenType.StatementName, "b");
     }
 
-    // ── ReadAsync specific ──────────────────────────────────────────
+    // ── Read pull-model specific ────────────────────────────────────
 
     [Fact]
-    public async Task ReadAsync_StopAfterFirstEvent()
+    public void Read_StopAfterFirstToken()
     {
         byte[] bytes = Encoding.UTF8.GetBytes("x:int = 42");
-        PipeReader pipe = PipeReader.Create(new ReadOnlySequence<byte>(bytes));
-        PaktReader reader = PaktReader.Create(pipe);
-
-        PaktEvent.Kind? firstKind = null;
-        bool result = await reader.ReadAsync((scoped in PaktEvent evt) =>
-        {
-            firstKind = evt.EventKind;
-            return PaktReader.HandlerResult.Stop;
-        }, TestContext.Current.CancellationToken);
-
-        Assert.False(result); // Stop means no more
-        Assert.Equal(PaktEvent.Kind.UnitStart, firstKind);
+        using var reader = new PaktMemoryReader(new ReadOnlyMemory<byte>(bytes));
+        bool result = reader.Read();
+        Assert.True(result);
+        Assert.Equal(PaktTokenType.StatementName, reader.TokenType);
     }
 
     // ── NUL framing ─────────────────────────────────────────────────
 
     [Fact]
-    public async Task NulTerminatesUnit()
+    public void NulTerminatesUnit()
     {
         byte[] bytes = [.. Encoding.UTF8.GetBytes("x:int = 1"), 0x00, .. Encoding.UTF8.GetBytes("ignored")];
-        PipeReader pipe = PipeReader.Create(new ReadOnlySequence<byte>(bytes));
-        PaktReader reader = PaktReader.Create(pipe);
-        List<EventRecord> events = [];
-
-        await reader.DrainAsync((scoped in PaktEvent evt) =>
-        {
-            string payload = evt.Payload.IsEmpty ? "" : Encoding.UTF8.GetString(evt.Payload);
-            events.Add(new EventRecord(evt.EventKind, evt.TypeKind, payload));
-            return PaktReader.HandlerResult.Continue;
-        }, TestContext.Current.CancellationToken);
-
-        Assert.Equal(PaktEvent.Kind.UnitEnd, events[^1].Kind);
-        Assert.DoesNotContain(events, e => string.Equals(e.Payload, "ignored", StringComparison.Ordinal));
+        var tokens = DrainTokens(bytes);
+        Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
+        Assert.DoesNotContain(
+            tokens,
+            t => string.Equals(t.Value, "ignored", StringComparison.Ordinal));
     }
 
     // ── Error cases ─────────────────────────────────────────────────
 
     [Fact]
-    public async Task Error_MissingLayoutAroundOperator()
+    public void NoLayoutAroundOperator_ParsesSuccessfully()
     {
-        await Assert.ThrowsAsync<PaktParseException>(
-            () => DrainEvents("x:str='hi'"));
+        // v7 reader does not enforce layout around operators.
+        var tokens = DrainTokens("x:str='hi'");
+        AssertToken(tokens, 0, PaktTokenType.StatementName, "x");
+        AssertToken(tokens, 3, PaktTokenType.AssignOperator, "=");
+        AssertToken(tokens, 4, PaktTokenType.String, "'hi'");
     }
 
     [Fact]
-    public async Task Error_TypeMismatch_IntGetsString()
+    public void Error_TypeMismatch_IntGetsString()
     {
-        await Assert.ThrowsAsync<PaktParseException>(
-            () => DrainEvents("x:int = 'hello'"));
+        Assert.Throws<PaktParseException>(
+            () => DrainTokens("x:int = 'hello'"));
     }
 
     [Fact]
-    public async Task Error_ArityMismatch_TooFewFields()
+    public void Error_ArityMismatch_TooFewFields()
     {
-        await Assert.ThrowsAsync<PaktParseException>(
-            () => DrainEvents("x:{a:int b:int} = { 1 }"));
+        Assert.Throws<PaktParseException>(
+            () => DrainTokens("x:{a:int b:int} = { 1 }"));
     }
 }

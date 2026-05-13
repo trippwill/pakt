@@ -10,11 +10,31 @@ public sealed class PaktParseException : Exception
         Position = position;
     }
 
+    public PaktParseException(
+        string message,
+        SourcePosition position,
+        PaktTokenType expected = default,
+        PaktTokenType actual = default,
+        string? context = null)
+        : base(message)
+    {
+        Position = position;
+        Expected = expected;
+        Actual = actual;
+        Context = context;
+    }
+
     public int Code { get; internal init; }
 
-    public string Identifier { get; internal init; }
+    public string Identifier { get; internal init; } = string.Empty;
 
     public SourcePosition Position { get; internal init; }
+
+    public PaktTokenType Expected { get; }
+
+    public PaktTokenType Actual { get; }
+
+    public string? Context { get; }
 
     public static string GetErrorIdentifier(PaktErrorCode code) => code switch
     {

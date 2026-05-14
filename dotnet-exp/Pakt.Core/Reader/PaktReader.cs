@@ -173,14 +173,5 @@ public ref partial struct PaktReader
         _options);
 
     // ───────────────────── Read ─────────────────────
-
-    /// <summary>
-    /// Advance to the next token. Returns <c>false</c> when no more tokens
-    /// are available (end of input or need more data for streaming).
-    /// </summary>
-    public bool Read()
-    {
-        // Stub — Phase 2 will implement dispatch
-        return false;
-    }
+    // Implemented in PaktReader.Read.cs (partial)
 }

@@ -36,6 +36,17 @@ public class StreamBenchmarks
         return count;
     }
 
+    [Benchmark(Description = "PAKT v8 sequence")]
+    public int PaktV8Drain()
+    {
+        var seq = new System.Buffers.ReadOnlySequence<byte>(_paktBytes);
+        var reader = new PaktReader(seq, isFinalBlock: true);
+        int count = 0;
+        while (reader.Read())
+            count++;
+        return count;
+    }
+
     [Benchmark(Baseline = true, Description = "JSONL Utf8JsonReader")]
     public int JsonlTokenize()
     {

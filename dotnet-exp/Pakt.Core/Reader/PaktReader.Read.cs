@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Runtime.CompilerServices;
 
 namespace Pakt;
@@ -214,13 +215,15 @@ public ref partial struct PaktReader
     /// </summary>
     private bool ConsumeTypeAnnotation()
     {
-        int start = _consumed;
+        long absStart = _totalConsumed + _consumed;
         int nesting = 0;
-        ReadOnlySpan<byte> local = _buffer;
 
-        while (_consumed < local.Length)
+        while (true)
         {
-            byte b = local[_consumed];
+            ReadOnlySpan<byte> local = _buffer;
+            while (_consumed < local.Length)
+            {
+                byte b = local[_consumed];
 
             switch (b)
             {
@@ -243,7 +246,7 @@ public ref partial struct PaktReader
 
                 case PaktConstants.LAngle:
                     // Could be '<' in map type or '<<' pack operator
-                    if (nesting == 0 && _consumed + 1 < local.Length && local[_consumed + 1] == PaktConstants.LAngle)
+                    if (nesting == 0 && TryPeek(1, out byte laNext) && laNext == PaktConstants.LAngle)
                     {
                         // This is '<<' — annotation ends here
                         goto AnnotationEnd;
@@ -254,7 +257,7 @@ public ref partial struct PaktReader
                     break;
 
                 case PaktConstants.EqualsSign:
-                    if (_consumed + 1 < local.Length && local[_consumed + 1] == PaktConstants.RAngle)
+                    if (TryPeek(1, out byte eqNextA) && eqNextA == PaktConstants.RAngle)
                     {
                         // '=>' — map binding inside annotation (or operator at depth 0)
                         // At nesting 0, this should not appear (operator is '=' not '=>')
@@ -280,21 +283,44 @@ public ref partial struct PaktReader
             }
         }
 
-        // Ran out of buffer inside annotation
-        if (IsLastSpan)
-            ThrowUnexpectedEndOfInput();
-        return false; // need more data
+            // Exhausted current segment — try next
+            if (!GetNextSpan())
+            {
+                if (IsLastSpan)
+                    ThrowUnexpectedEndOfInput();
+                return false; // need more data
+            }
+        }
 
     AnnotationEnd:
-        int len = _consumed - start;
-        // Trim trailing whitespace from annotation
-        while (len > 0 && PaktConstants.IsLayout(local[start + len - 1]))
+        long absEnd = _totalConsumed + _consumed;
+        long len = absEnd - absStart;
+        // Trim trailing layout from the annotation sequence
+        // For simplicity, trim from the sequence slice
+        ReadOnlySequence<byte> annotSeq = _sequence.Slice(absStart, len);
+        // Trim trailing whitespace
+        while (len > 0)
+        {
+            byte last = GetByteAt(absStart + len - 1);
+            if (!PaktConstants.IsLayout(last)) break;
             len--;
+        }
 
         _tokenType = PaktTokenType.TypeAnnotationStart;
-        _valueSequence = _sequence.Slice(_totalConsumed + start, len);
+        _valueSequence = _sequence.Slice(absStart, len);
         _phase = PaktReaderPhase.ExpectOperator;
         return true;
+    }
+
+    /// <summary>Get a byte at an absolute position in the sequence.</summary>
+    private byte GetByteAt(long absolutePosition)
+    {
+        var pos = _sequence.GetPosition(absolutePosition);
+        foreach (var mem in _sequence.Slice(pos, 1))
+        {
+            return mem.Span[0];
+        }
+        return 0;
     }
 
     // ───────────────────── Operator ─────────────────────
@@ -309,8 +335,7 @@ public ref partial struct PaktReader
 
         if (b == PaktConstants.EqualsSign)
         {
-            // Check it's not '=>'
-            if (_consumed + 1 < _buffer.Length && _buffer[_consumed + 1] == PaktConstants.RAngle)
+            if (TryPeek(1, out byte eqNext) && eqNext == PaktConstants.RAngle)
                 ThrowSyntax("Unexpected '=>' — expected '=' or '<<'");
 
             _consumed++;
@@ -324,18 +349,22 @@ public ref partial struct PaktReader
 
         if (b == PaktConstants.LAngle)
         {
-            if (_consumed + 1 >= _buffer.Length)
+            if (!TryPeek(1, out byte packNext))
             {
                 if (IsLastSpan)
                     ThrowSyntax("Unexpected '<' at end of input — expected '<<'");
-                return false; // need more data
+                return false;
             }
 
-            if (_buffer[_consumed + 1] != PaktConstants.LAngle)
+            if (packNext != PaktConstants.LAngle)
                 ThrowSyntax("Expected '<<' pack operator");
 
-            _consumed += 2;
-            _bytePositionInLine += 2;
+            // Consume both '<' bytes — may span segments
+            _consumed++;
+            _bytePositionInLine++;
+            if (_consumed >= _buffer.Length) GetNextSpan();
+            _consumed++;
+            _bytePositionInLine++;
             _tokenType = PaktTokenType.PackOperator;
             _valueSequence = _sequence.Slice(_tokenStartIndex, 2);
             _isPack = true;
@@ -401,11 +430,13 @@ public ref partial struct PaktReader
         }
 
         // Map entry bind
-        if (b == PaktConstants.EqualsSign && _consumed + 1 < _buffer.Length
-            && _buffer[_consumed + 1] == PaktConstants.RAngle)
+        if (b == PaktConstants.EqualsSign && TryPeek(1, out byte next) && next == PaktConstants.RAngle)
         {
-            _consumed += 2;
-            _bytePositionInLine += 2;
+            _consumed++;
+            _bytePositionInLine++;
+            if (_consumed >= _buffer.Length) GetNextSpan();
+            _consumed++;
+            _bytePositionInLine++;
             _tokenType = PaktTokenType.MapEntryBind;
             _valueSequence = _sequence.Slice(_tokenStartIndex, 2);
             return true;
@@ -416,14 +447,12 @@ public ref partial struct PaktReader
             return ConsumeString();
 
         // Raw string: r'...'
-        if (b == PaktConstants.LowerR && _consumed + 1 < _buffer.Length
-            && _buffer[_consumed + 1] == PaktConstants.SingleQuote)
+        if (b == PaktConstants.LowerR && TryPeek(1, out byte rNext) && rNext == PaktConstants.SingleQuote)
             return ConsumeRawString();
 
         // Binary: x'...' or b'...'
         if ((b == PaktConstants.LowerX || b == PaktConstants.LowerB)
-            && _consumed + 1 < _buffer.Length
-            && _buffer[_consumed + 1] == PaktConstants.SingleQuote)
+            && TryPeek(1, out byte bNext) && bNext == PaktConstants.SingleQuote)
             return ConsumeBinary();
 
         // Number (digit or minus)
@@ -478,26 +507,18 @@ public ref partial struct PaktReader
 
     private bool ConsumeIdentifier(PaktTokenType tokenType, PaktReaderPhase nextPhase)
     {
-        int start = _consumed;
-        _consumed++;
+        long absStart = _totalConsumed + _consumed;
+        _consumed++; // consume first ident char
         _bytePositionInLine++;
 
-        while (_consumed < _buffer.Length && PaktConstants.IsIdentPart(_buffer[_consumed]))
-        {
-            _consumed++;
-            _bytePositionInLine++;
-        }
+        int partLen = ScanIdentParts();
+        int totalLen = 1 + partLen;
 
         if (_consumed >= _buffer.Length && !IsLastSpan)
-        {
-            // Ident may continue in next segment — need more data
-            // For now: only handle single-segment idents (Phase 6 handles multi-seg)
-            return false;
-        }
+            return false; // ident may continue in next buffer refill
 
-        int len = _consumed - start;
         _tokenType = tokenType;
-        _valueSequence = _sequence.Slice(_totalConsumed + start, len);
+        _valueSequence = _sequence.Slice(absStart, totalLen);
         _phase = nextPhase;
 
         if (tokenType == PaktTokenType.StatementName)
@@ -512,39 +533,49 @@ public ref partial struct PaktReader
 
     private bool ConsumeIdentifierOrKeyword()
     {
-        int start = _consumed;
+        long absStart = _totalConsumed + _consumed;
         _consumed++;
         _bytePositionInLine++;
 
-        while (_consumed < _buffer.Length && PaktConstants.IsIdentPart(_buffer[_consumed]))
-        {
-            _consumed++;
-            _bytePositionInLine++;
-        }
+        int partLen = ScanIdentParts();
+        int totalLen = 1 + partLen;
 
-        int len = _consumed - start;
-        ReadOnlySpan<byte> ident = _buffer.Slice(start, len);
+        ReadOnlySequence<byte> identSeq = _sequence.Slice(absStart, totalLen);
 
-        if (ident.SequenceEqual("true"u8) || ident.SequenceEqual("false"u8))
+        // Classify — for single-segment (common case) use span directly
+        PaktTokenType identType;
+        if (identSeq.IsSingleSegment)
         {
-            _tokenType = PaktTokenType.Bool;
-        }
-        else if (ident.SequenceEqual("nil"u8))
-        {
-            _tokenType = PaktTokenType.Nil;
+            ReadOnlySpan<byte> ident = identSeq.FirstSpan;
+            if (ident.SequenceEqual("true"u8) || ident.SequenceEqual("false"u8))
+                identType = PaktTokenType.Bool;
+            else if (ident.SequenceEqual("nil"u8))
+                identType = PaktTokenType.Nil;
+            else
+            {
+                ThrowSyntax("Unknown identifier in value position");
+                return false;
+            }
         }
         else
         {
-            ThrowSyntax("Unknown identifier in value position");
-            return false;
+            // Multi-segment: copy to stack for comparison
+            Span<byte> tmp = stackalloc byte[(int)identSeq.Length];
+            identSeq.CopyTo(tmp);
+            if (tmp.SequenceEqual("true"u8) || tmp.SequenceEqual("false"u8))
+                identType = PaktTokenType.Bool;
+            else if (tmp.SequenceEqual("nil"u8))
+                identType = PaktTokenType.Nil;
+            else
+            {
+                ThrowSyntax("Unknown identifier in value position");
+                return false;
+            }
         }
 
-        _valueSequence = _sequence.Slice(_totalConsumed + start, len);
-
-        // After scalar at depth 0 in assign, statement done
-        if (_containerStack.CurrentDepth == 0 && _phase == PaktReaderPhase.InAssignValue)
-            _phase = PaktReaderPhase.ExpectStatementOrEnd;
-
+        _tokenType = identType;
+        _valueSequence = identSeq;
+        CompleteScalar();
         return true;
     }
 
@@ -553,194 +584,225 @@ public ref partial struct PaktReader
     private bool ConsumeString()
     {
         // Single-quoted string: '...' or multiline '''...'''
-        int start = _consumed;
+        long absStart = _totalConsumed + _consumed;
         _consumed++; // skip opening '
         _bytePositionInLine++;
 
-        ReadOnlySpan<byte> local = _buffer;
-
         // Check for triple-quote (multiline)
-        if (_consumed + 1 < local.Length
-            && local[_consumed] == PaktConstants.SingleQuote
-            && local[_consumed + 1] == PaktConstants.SingleQuote)
+        if (TryPeek(0, out byte p1) && p1 == PaktConstants.SingleQuote
+            && TryPeek(1, out byte p2) && p2 == PaktConstants.SingleQuote)
         {
             _consumed += 2;
             _bytePositionInLine += 2;
-            return ConsumeMultiLineString(start, isRaw: false);
+            return ConsumeMultiLineString(absStart, isRaw: false);
         }
 
         // Single-line string: scan for closing quote, backslash, or newline
         bool escaped = false;
-        while (_consumed < local.Length)
+        while (true)
         {
-            byte b = local[_consumed];
-
-            if (b == PaktConstants.Nul)
-                ThrowSyntax("NUL byte inside string");
-
-            if (b == PaktConstants.SingleQuote)
+            while (_consumed < _buffer.Length)
             {
-                _consumed++; // consume closing quote
+                byte b = _buffer[_consumed];
+
+                if (b == PaktConstants.Nul)
+                    ThrowSyntax("NUL byte inside string");
+
+                if (b == PaktConstants.SingleQuote)
+                {
+                    _consumed++;
+                    _bytePositionInLine++;
+                    long len = (_totalConsumed + _consumed) - absStart;
+                    _tokenType = PaktTokenType.String;
+                    _valueSequence = _sequence.Slice(absStart, len);
+                    _valueIsEscaped = escaped;
+                    CompleteScalar();
+                    return true;
+                }
+
+                if (b == PaktConstants.Backslash)
+                {
+                    escaped = true;
+                    _consumed++;
+                    _bytePositionInLine++;
+                    // Skip escaped char — may need next segment
+                    if (_consumed >= _buffer.Length)
+                    {
+                        if (!GetNextSpan()) goto NeedMore;
+                    }
+                    _consumed++;
+                    _bytePositionInLine++;
+                    continue;
+                }
+
+                if (b == PaktConstants.LF || b == PaktConstants.CR)
+                    ThrowSyntax("Newline inside single-line string");
+
+                _consumed++;
                 _bytePositionInLine++;
-                int len = _consumed - start;
-                _tokenType = PaktTokenType.String;
-                _valueSequence = _sequence.Slice(_totalConsumed + start, len);
-                _valueIsEscaped = escaped;
-                CompleteScalar();
-                return true;
             }
 
-            if (b == PaktConstants.Backslash)
-            {
-                escaped = true;
-                _consumed += 2; // skip escape + next char
-                _bytePositionInLine += 2;
-                continue;
-            }
-
-            if (b == PaktConstants.LF || b == PaktConstants.CR)
-                ThrowSyntax("Newline inside single-line string");
-
-            _consumed++;
-            _bytePositionInLine++;
+            // Hit segment boundary — try next segment
+            if (!GetNextSpan()) goto NeedMore;
         }
 
+    NeedMore:
         if (IsLastSpan) ThrowSyntax("Unterminated string");
-        return false; // need more data
+        return false;
     }
 
     private bool ConsumeRawString()
     {
-        // r'...' or r'''...'''
-        int start = _consumed;
+        long absStart = _totalConsumed + _consumed;
         _consumed += 2; // skip r'
         _bytePositionInLine += 2;
 
-        ReadOnlySpan<byte> local = _buffer;
-
         // Check for triple-quote
-        if (_consumed + 1 < local.Length
-            && local[_consumed] == PaktConstants.SingleQuote
-            && local[_consumed + 1] == PaktConstants.SingleQuote)
+        if (TryPeek(0, out byte p1) && p1 == PaktConstants.SingleQuote
+            && TryPeek(1, out byte p2) && p2 == PaktConstants.SingleQuote)
         {
             _consumed += 2;
             _bytePositionInLine += 2;
-            return ConsumeMultiLineString(start, isRaw: true);
+            return ConsumeMultiLineString(absStart, isRaw: true);
         }
 
         // Single-line raw: scan for closing quote only
-        while (_consumed < local.Length)
+        while (true)
         {
-            byte b = local[_consumed];
-
-            if (b == PaktConstants.Nul)
-                ThrowSyntax("NUL byte inside string");
-
-            if (b == PaktConstants.SingleQuote)
+            while (_consumed < _buffer.Length)
             {
+                byte b = _buffer[_consumed];
+
+                if (b == PaktConstants.Nul)
+                    ThrowSyntax("NUL byte inside string");
+
+                if (b == PaktConstants.SingleQuote)
+                {
+                    _consumed++;
+                    _bytePositionInLine++;
+                    long len = (_totalConsumed + _consumed) - absStart;
+                    _tokenType = PaktTokenType.String;
+                    _valueSequence = _sequence.Slice(absStart, len);
+                    _valueIsEscaped = false;
+                    CompleteScalar();
+                    return true;
+                }
+
+                if (b == PaktConstants.LF || b == PaktConstants.CR)
+                    ThrowSyntax("Newline inside single-line string");
+
                 _consumed++;
                 _bytePositionInLine++;
-                int len = _consumed - start;
-                _tokenType = PaktTokenType.String;
-                _valueSequence = _sequence.Slice(_totalConsumed + start, len);
-                _valueIsEscaped = false;
-                CompleteScalar();
-                return true;
             }
 
-            if (b == PaktConstants.LF || b == PaktConstants.CR)
-                ThrowSyntax("Newline inside single-line string");
-
-            _consumed++;
-            _bytePositionInLine++;
+            if (!GetNextSpan()) break;
         }
 
         if (IsLastSpan) ThrowSyntax("Unterminated raw string");
         return false;
     }
 
-    private bool ConsumeMultiLineString(int start, bool isRaw)
+    private bool ConsumeMultiLineString(long absStart, bool isRaw)
     {
-        // Scan for closing '''
-        ReadOnlySpan<byte> local = _buffer;
         bool escaped = false;
 
-        while (_consumed < local.Length)
+        while (true)
         {
-            byte b = local[_consumed];
-
-            if (b == PaktConstants.Nul)
-                ThrowSyntax("NUL byte inside string");
-
-            if (b == PaktConstants.SingleQuote
-                && _consumed + 2 < local.Length
-                && local[_consumed + 1] == PaktConstants.SingleQuote
-                && local[_consumed + 2] == PaktConstants.SingleQuote)
+            while (_consumed < _buffer.Length)
             {
-                _consumed += 3; // closing '''
-                _bytePositionInLine += 3;
-                int len = _consumed - start;
-                _tokenType = PaktTokenType.String;
-                _valueSequence = _sequence.Slice(_totalConsumed + start, len);
-                _valueIsEscaped = escaped;
-                CompleteScalar();
-                return true;
-            }
+                byte b = _buffer[_consumed];
 
-            if (!isRaw && b == PaktConstants.Backslash)
-            {
-                escaped = true;
-                _consumed += 2;
-                _bytePositionInLine += 2;
-                continue;
-            }
+                if (b == PaktConstants.Nul)
+                    ThrowSyntax("NUL byte inside string");
 
-            if (b == PaktConstants.LF) { _lineNumber++; _bytePositionInLine = 0; }
-            else if (b == PaktConstants.CR)
-            {
-                _lineNumber++;
-                _bytePositionInLine = 0;
-                if (_consumed + 1 < local.Length && local[_consumed + 1] == PaktConstants.LF)
+                if (b == PaktConstants.SingleQuote
+                    && TryPeek(1, out byte q2) && q2 == PaktConstants.SingleQuote
+                    && TryPeek(2, out byte q3) && q3 == PaktConstants.SingleQuote)
+                {
+                    _consumed += 3;
+                    _bytePositionInLine += 3;
+                    long len = (_totalConsumed + _consumed) - absStart;
+                    _tokenType = PaktTokenType.String;
+                    _valueSequence = _sequence.Slice(absStart, len);
+                    _valueIsEscaped = escaped;
+                    CompleteScalar();
+                    return true;
+                }
+
+                if (!isRaw && b == PaktConstants.Backslash)
+                {
+                    escaped = true;
                     _consumed++;
-            }
-            else _bytePositionInLine++;
+                    _bytePositionInLine++;
+                    if (_consumed >= _buffer.Length && !GetNextSpan()) goto NeedMore;
+                    _consumed++;
+                    _bytePositionInLine++;
+                    continue;
+                }
 
-            _consumed++;
+                if (b == PaktConstants.LF)
+                {
+                    _consumed++;
+                    _lineNumber++;
+                    _bytePositionInLine = 0;
+                }
+                else if (b == PaktConstants.CR)
+                {
+                    _consumed++;
+                    _lineNumber++;
+                    _bytePositionInLine = 0;
+                    if (_consumed < _buffer.Length && _buffer[_consumed] == PaktConstants.LF)
+                        _consumed++;
+                    else if (TryPeek(0, out byte lf) && lf == PaktConstants.LF)
+                        _consumed++;
+                }
+                else
+                {
+                    _consumed++;
+                    _bytePositionInLine++;
+                }
+            }
+
+            if (!GetNextSpan()) goto NeedMore;
         }
 
+    NeedMore:
         if (IsLastSpan) ThrowSyntax("Unterminated multiline string");
         return false;
     }
 
     private bool ConsumeBinary()
     {
-        // x'hex' or b'base64'
-        int start = _consumed;
+        long absStart = _totalConsumed + _consumed;
         _consumed += 2; // skip x' or b'
         _bytePositionInLine += 2;
 
-        ReadOnlySpan<byte> local = _buffer;
-        while (_consumed < local.Length)
+        while (true)
         {
-            byte b = local[_consumed];
-
-            if (b == PaktConstants.Nul)
-                ThrowSyntax("NUL byte inside binary literal");
-
-            if (b == PaktConstants.SingleQuote)
+            while (_consumed < _buffer.Length)
             {
+                byte b = _buffer[_consumed];
+
+                if (b == PaktConstants.Nul)
+                    ThrowSyntax("NUL byte inside binary literal");
+
+                if (b == PaktConstants.SingleQuote)
+                {
+                    _consumed++;
+                    _bytePositionInLine++;
+                    long len = (_totalConsumed + _consumed) - absStart;
+                    _tokenType = PaktTokenType.Binary;
+                    _valueSequence = _sequence.Slice(absStart, len);
+                    _valueIsEscaped = false;
+                    CompleteScalar();
+                    return true;
+                }
+
                 _consumed++;
                 _bytePositionInLine++;
-                int len = _consumed - start;
-                _tokenType = PaktTokenType.Binary;
-                _valueSequence = _sequence.Slice(_totalConsumed + start, len);
-                _valueIsEscaped = false;
-                CompleteScalar();
-                return true;
             }
 
-            _consumed++;
-            _bytePositionInLine++;
+            if (!GetNextSpan()) break;
         }
 
         if (IsLastSpan) ThrowSyntax("Unterminated binary literal");
@@ -756,30 +818,31 @@ public ref partial struct PaktReader
 
     private bool ConsumeNumber()
     {
-        // Simple number scanner — find delimiter boundary
-        int start = _consumed;
+        long absStart = _totalConsumed + _consumed;
+        int len = ScanUntilDelimiter(absStart);
 
-        while (_consumed < _buffer.Length)
-        {
-            if (PaktConstants.Delimiters.Contains(_buffer[_consumed]))
-                break;
-            _consumed++;
-            _bytePositionInLine++;
-        }
-
-        if (_consumed == start)
+        if (len == 0)
         {
             ThrowSyntax("Expected number");
             return false;
         }
 
-        int len = _consumed - start;
-        _tokenType = ClassifyNumber(_buffer.Slice(start, len));
-        _valueSequence = _sequence.Slice(_totalConsumed + start, len);
+        ReadOnlySequence<byte> numSeq = _sequence.Slice(absStart, len);
 
-        if (_containerStack.CurrentDepth == 0 && _phase == PaktReaderPhase.InAssignValue)
-            _phase = PaktReaderPhase.ExpectStatementOrEnd;
+        // Classify — single-segment fast path
+        if (numSeq.IsSingleSegment)
+        {
+            _tokenType = ClassifyNumber(numSeq.FirstSpan);
+        }
+        else
+        {
+            Span<byte> tmp = stackalloc byte[(int)numSeq.Length];
+            numSeq.CopyTo(tmp);
+            _tokenType = ClassifyNumber(tmp);
+        }
 
+        _valueSequence = numSeq;
+        CompleteScalar();
         return true;
     }
 

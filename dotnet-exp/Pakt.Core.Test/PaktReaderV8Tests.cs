@@ -199,4 +199,76 @@ public class PaktReaderV8Tests
         var tokens = DrainV8("x:int? = nil");
         Assert.Equal(PaktTokenType.Nil, tokens[3].Type);
     }
+
+    // ── Multi-segment tests ─────────────────────────────────────────
+
+    private static List<(PaktTokenType Type, string Value)> DrainV8Seq(ReadOnlySequence<byte> seq)
+    {
+        var reader = new PaktReader(seq, isFinalBlock: true);
+        var tokens = new List<(PaktTokenType, string)>();
+        while (reader.Read())
+        {
+            string val = reader.ValueSequence.Length > 0
+                ? Encoding.UTF8.GetString(reader.ValueSequence) : "";
+            tokens.Add((reader.TokenType, val));
+        }
+        return tokens;
+    }
+
+    [Fact]
+    public void MultiSegment_IntSplitAcrossSegments()
+    {
+        var seq = CreateMultiSegment("x:int = 4"u8, "2"u8);
+        var tokens = DrainV8Seq(seq);
+        Assert.Equal(PaktTokenType.Int, tokens[3].Type);
+        Assert.Equal("42", tokens[3].Value);
+    }
+
+    [Fact]
+    public void MultiSegment_StringSplitAcrossSegments()
+    {
+        var seq = CreateMultiSegment("x:str = 'hel"u8, "lo'"u8);
+        var tokens = DrainV8Seq(seq);
+        Assert.Equal(PaktTokenType.String, tokens[3].Type);
+        Assert.Equal("'hello'", tokens[3].Value);
+    }
+
+    [Fact]
+    public void MultiSegment_IdentSplitAcrossSegments()
+    {
+        var seq = CreateMultiSegment("my-"u8, "field:int = 1"u8);
+        var tokens = DrainV8Seq(seq);
+        Assert.Equal(PaktTokenType.StatementName, tokens[0].Type);
+        Assert.Equal("my-field", tokens[0].Value);
+    }
+
+    [Fact]
+    public void MultiSegment_OperatorSplitAcrossSegments()
+    {
+        var seq = CreateMultiSegment("items:[int] <"u8, "< 1 2"u8);
+        var tokens = DrainV8Seq(seq);
+        Assert.Equal(PaktTokenType.PackOperator, tokens[2].Type);
+        Assert.Equal(PaktTokenType.Int, tokens[3].Type);
+    }
+
+    private static ReadOnlySequence<byte> CreateMultiSegment(
+        ReadOnlySpan<byte> first, ReadOnlySpan<byte> second)
+    {
+        var seg2 = new MemorySegment(second.ToArray());
+        var seg1 = new MemorySegment(first.ToArray(), seg2);
+        return new ReadOnlySequence<byte>(seg1, 0, seg2, second.Length);
+    }
+
+    private sealed class MemorySegment : ReadOnlySequenceSegment<byte>
+    {
+        public MemorySegment(byte[] data, MemorySegment? next = null)
+        {
+            Memory = data;
+            if (next is not null)
+            {
+                Next = next;
+                next.RunningIndex = data.Length;
+            }
+        }
+    }
 }

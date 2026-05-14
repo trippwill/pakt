@@ -41,7 +41,7 @@ internal static class ContextEmitter
             sb.AppendLine($"    public global::Pakt.PaktTypeInfo<{type.FullyQualifiedName}> {type.Name} =>");
             sb.AppendLine($"        _{type.Name}TypeInfo ??= new global::Pakt.PaktTypeInfo<{type.FullyQualifiedName}>(\"{BuildPaktTypeName(type)}\")");
             sb.AppendLine($"        {{");
-            sb.AppendLine($"            Deserialize = static reader => Deserialize{type.Name}(reader),");
+            sb.AppendLine($"            Deserialize = static (ref global::Pakt.PaktSequenceReader reader) => Deserialize{type.Name}(ref reader),");
             sb.AppendLine($"        }};");
             sb.AppendLine();
         }

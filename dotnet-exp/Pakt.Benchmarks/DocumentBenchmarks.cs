@@ -36,9 +36,9 @@ public class DocumentBenchmarks
 
     // ── Small: 10-field struct ──────────────────────────────────────
 
-    [Benchmark(Description = "PAKT v7 small (10 fields)")]
+    [Benchmark(Description = "PAKT small (10 fields)")]
     public int PaktSmall()
-        => DrainPaktV7(_paktSmall);
+        => DrainPakt(_paktSmall);
 
     [Benchmark(Baseline = true, Description = "JSON small (10 fields)")]
     public int JsonSmall()
@@ -46,9 +46,9 @@ public class DocumentBenchmarks
 
     // ── Wide: 100 scalar statements ─────────────────────────────────
 
-    [Benchmark(Description = "PAKT v7 wide (100 stmts)")]
+    [Benchmark(Description = "PAKT wide (100 stmts)")]
     public int PaktWide()
-        => DrainPaktV7(_paktWide);
+        => DrainPakt(_paktWide);
 
     [Benchmark(Description = "JSON wide (100 props)")]
     public int JsonWide()
@@ -56,9 +56,9 @@ public class DocumentBenchmarks
 
     // ── Nested: 3-level struct ──────────────────────────────────────
 
-    [Benchmark(Description = "PAKT v7 nested (3 levels)")]
+    [Benchmark(Description = "PAKT nested (3 levels)")]
     public int PaktNested()
-        => DrainPaktV7(_paktNested);
+        => DrainPakt(_paktNested);
 
     [Benchmark(Description = "JSON nested (3 levels)")]
     public int JsonNested()
@@ -66,9 +66,9 @@ public class DocumentBenchmarks
 
     // ── Collections: list + map ─────────────────────────────────────
 
-    [Benchmark(Description = "PAKT v7 collections")]
+    [Benchmark(Description = "PAKT collections")]
     public int PaktCollections()
-        => DrainPaktV7(_paktCollections);
+        => DrainPakt(_paktCollections);
 
     [Benchmark(Description = "JSON collections")]
     public int JsonCollections()
@@ -76,9 +76,10 @@ public class DocumentBenchmarks
 
     // ── Helpers ─────────────────────────────────────────────────────
 
-    private static int DrainPaktV7(byte[] data)
+    private static int DrainPakt(byte[] data)
     {
-        using var reader = new PaktMemoryReader(new ReadOnlyMemory<byte>(data));
+        var seq = new System.Buffers.ReadOnlySequence<byte>(data);
+        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
         int count = 0;
         while (reader.Read())
             count++;

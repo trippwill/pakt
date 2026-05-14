@@ -26,18 +26,8 @@ public class StreamBenchmarks
         _jsonlBytes = GenerateJsonl(EntryCount);
     }
 
-    [Benchmark(Description = "PAKT v7 memory")]
-    public int PaktV7Drain()
-    {
-        using var reader = new PaktMemoryReader(new ReadOnlyMemory<byte>(_paktBytes));
-        int count = 0;
-        while (reader.Read())
-            count++;
-        return count;
-    }
-
-    [Benchmark(Description = "PAKT v8 sequence")]
-    public int PaktV8Drain()
+    [Benchmark(Description = "PAKT sequence")]
+    public int PaktDrain()
     {
         var seq = new System.Buffers.ReadOnlySequence<byte>(_paktBytes);
         var reader = new PaktSequenceReader(seq, isFinalBlock: true);

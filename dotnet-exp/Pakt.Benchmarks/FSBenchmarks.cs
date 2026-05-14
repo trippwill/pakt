@@ -25,10 +25,11 @@ public class FSBenchmarks
         (_paktBytes, _jsonBytes) = GenerateData(EntryCount);
     }
 
-    [Benchmark(Description = "PAKT v7 FS decode")]
+    [Benchmark(Description = "PAKT FS decode")]
     public int PaktDecode()
     {
-        using var reader = new PaktMemoryReader(new ReadOnlyMemory<byte>(_paktBytes));
+        var seq = new System.Buffers.ReadOnlySequence<byte>(_paktBytes);
+        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
         int count = 0;
         while (reader.Read())
             count++;

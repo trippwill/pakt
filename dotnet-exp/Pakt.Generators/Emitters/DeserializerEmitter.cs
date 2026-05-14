@@ -13,9 +13,9 @@ internal static class DeserializerEmitter
         var sb = new StringBuilder(1024);
         string typeFqn = model.FullyQualifiedName;
 
-        sb.AppendLine($"    public static {typeFqn} Deserialize{model.Name}(global::Pakt.PaktMemoryReader reader)");
+        sb.AppendLine($"    public static {typeFqn} Deserialize{model.Name}(ref global::Pakt.PaktSequenceReader reader)");
         sb.AppendLine("    {");
-        sb.AppendLine($"        reader.ExpectToken(global::Pakt.PaktTokenType.StructStart);");
+        sb.AppendLine($"        reader.Read(); // StructStart");
 
         // Emit positional field reads
         foreach (var prop in model.Properties)
@@ -24,7 +24,7 @@ internal static class DeserializerEmitter
             EmitFieldRead(sb, prop, model);
         }
 
-        sb.AppendLine($"        reader.ExpectToken(global::Pakt.PaktTokenType.StructEnd);");
+        sb.AppendLine($"        reader.Read(); // StructEnd");
         sb.AppendLine();
 
         // Construct the result
@@ -91,29 +91,35 @@ internal static class DeserializerEmitter
 
     private static string EmitScalarRead(PropertyModel prop)
     {
-        return prop.Kind switch
+        string getter = prop.Kind switch
         {
-            PaktTypeKind.String => "reader.ReadString()",
-            PaktTypeKind.Int => "reader.ReadInt32()",
-            PaktTypeKind.Long => "reader.ReadInt64()",
-            PaktTypeKind.Decimal => "reader.ReadDecimal()",
-            PaktTypeKind.Double => "reader.ReadDouble()",
-            PaktTypeKind.Float => "(float)reader.ReadDouble()",
-            PaktTypeKind.Bool => "reader.ReadBool()",
-            _ => $"default({prop.ClrTypeFqn})", // TODO: Guid, DateOnly, DateTimeOffset, byte[]
+            PaktTypeKind.String => "reader.GetString()",
+            PaktTypeKind.Int => "reader.GetInt32()",
+            PaktTypeKind.Long => "reader.GetInt64()",
+            PaktTypeKind.Decimal => "reader.GetDecimal()",
+            PaktTypeKind.Double => "reader.GetDouble()",
+            PaktTypeKind.Float => "reader.GetFloat()",
+            PaktTypeKind.Bool => "reader.GetBool()",
+            PaktTypeKind.Guid => "reader.GetGuid()",
+            PaktTypeKind.DateOnly => "reader.GetDate()",
+            PaktTypeKind.DateTimeOffset => "reader.GetTimestamp()",
+            PaktTypeKind.ByteArray => "reader.GetBytes()",
+            _ => $"default({prop.ClrTypeFqn})",
         };
+        // v8 pattern: Read() advances to token, Get*() decodes value
+        return $"(reader.Read() ? {getter} : default({prop.ClrTypeFqn})!)";
     }
 
     private static void EmitListRead(StringBuilder sb, PropertyModel prop, string varName)
     {
         string elemFqn = prop.ElementTypeFqn ?? "object";
         var elemKind = ClassifyElementKind(elemFqn);
-        sb.AppendLine($"        reader.ExpectToken(global::Pakt.PaktTokenType.ListStart);");
+        sb.AppendLine($"        reader.Read(); // ListStart");
         sb.AppendLine($"        var {varName} = new global::System.Collections.Generic.List<{elemFqn}>();");
         sb.AppendLine($"        while (reader.Read())");
         sb.AppendLine($"        {{");
         sb.AppendLine($"            if (reader.TokenType == global::Pakt.PaktTokenType.ListEnd) break;");
-        sb.AppendLine($"            {varName}.Add({EmitScalarReadForKind(elemKind, elemFqn)});");
+        sb.AppendLine($"            {varName}.Add({EmitGetForKind(elemKind, elemFqn)});");
         sb.AppendLine($"        }}");
     }
 
@@ -122,29 +128,30 @@ internal static class DeserializerEmitter
         string keyFqn = prop.KeyTypeFqn ?? "string";
         string valFqn = prop.ValueTypeFqn ?? "object";
         var valKind = ClassifyElementKind(valFqn);
-        sb.AppendLine($"        reader.ExpectToken(global::Pakt.PaktTokenType.MapStart);");
+        sb.AppendLine($"        reader.Read(); // MapStart");
         sb.AppendLine($"        var {varName} = new global::System.Collections.Generic.Dictionary<{keyFqn}, {valFqn}>();");
         sb.AppendLine($"        while (reader.Read())");
         sb.AppendLine($"        {{");
         sb.AppendLine($"            if (reader.TokenType == global::Pakt.PaktTokenType.MapEnd) break;");
-        sb.AppendLine($"            var __key = reader.ReadString();");
-        sb.AppendLine($"            reader.ExpectToken(global::Pakt.PaktTokenType.MapEntryBind);");
-        sb.AppendLine($"            var __val = {EmitScalarReadForKind(valKind, valFqn)};");
+        sb.AppendLine($"            var __key = reader.GetString();");
+        sb.AppendLine($"            reader.Read(); // MapEntryBind");
+        sb.AppendLine($"            reader.Read(); // value token");
+        sb.AppendLine($"            var __val = {EmitGetForKind(valKind, valFqn)};");
         sb.AppendLine($"            {varName}[__key] = __val;");
         sb.AppendLine($"        }}");
     }
 
-    private static string EmitScalarReadForKind(PaktTypeKind kind, string fqn)
+    private static string EmitGetForKind(PaktTypeKind kind, string fqn)
     {
         return kind switch
         {
-            PaktTypeKind.String => "reader.ReadString()",
-            PaktTypeKind.Int => "reader.ReadInt32()",
-            PaktTypeKind.Long => "reader.ReadInt64()",
-            PaktTypeKind.Decimal => "reader.ReadDecimal()",
-            PaktTypeKind.Double => "reader.ReadDouble()",
-            PaktTypeKind.Float => "(float)reader.ReadDouble()",
-            PaktTypeKind.Bool => "reader.ReadBool()",
+            PaktTypeKind.String => "reader.GetString()",
+            PaktTypeKind.Int => "reader.GetInt32()",
+            PaktTypeKind.Long => "reader.GetInt64()",
+            PaktTypeKind.Decimal => "reader.GetDecimal()",
+            PaktTypeKind.Double => "reader.GetDouble()",
+            PaktTypeKind.Float => "reader.GetFloat()",
+            PaktTypeKind.Bool => "reader.GetBool()",
             _ => $"default({fqn})",
         };
     }

@@ -819,7 +819,7 @@ public ref partial struct PaktReader
     private bool ConsumeNumber()
     {
         long absStart = _totalConsumed + _consumed;
-        int len = ScanUntilDelimiter(absStart);
+        int len = ScanNumericValue();
 
         if (len == 0)
         {
@@ -829,21 +829,104 @@ public ref partial struct PaktReader
 
         ReadOnlySequence<byte> numSeq = _sequence.Slice(absStart, len);
 
-        // Classify — single-segment fast path
         if (numSeq.IsSingleSegment)
         {
-            _tokenType = ClassifyNumber(numSeq.FirstSpan);
+            _tokenType = ClassifyNumericValue(numSeq.FirstSpan);
         }
         else
         {
             Span<byte> tmp = stackalloc byte[(int)numSeq.Length];
             numSeq.CopyTo(tmp);
-            _tokenType = ClassifyNumber(tmp);
+            _tokenType = ClassifyNumericValue(tmp);
         }
 
         _valueSequence = numSeq;
         CompleteScalar();
         return true;
+    }
+
+    /// <summary>
+    /// Scan a numeric-like value: numbers, dates, timestamps, UUIDs.
+    /// These all start with a digit (or minus) and may contain digits, letters,
+    /// colons, dashes, dots, plus, underscores — everything except layout and
+    /// structural delimiters.
+    /// </summary>
+    private int ScanNumericValue()
+    {
+        int totalLen = 0;
+
+        while (true)
+        {
+            ReadOnlySpan<byte> local = _buffer;
+
+            while (_consumed < local.Length)
+            {
+                byte b = local[_consumed];
+                // Stop at layout, structural delimiters, quotes, semicolons, NUL
+                if (b is PaktConstants.Space or PaktConstants.Tab
+                    or PaktConstants.LF or PaktConstants.CR
+                    or PaktConstants.LBrace or PaktConstants.RBrace
+                    or PaktConstants.LParen or PaktConstants.RParen
+                    or PaktConstants.LBrack or PaktConstants.RBrack
+                    or PaktConstants.LAngle or PaktConstants.RAngle
+                    or PaktConstants.Pipe or PaktConstants.SingleQuote
+                    or PaktConstants.Hash or PaktConstants.Semicolon
+                    or PaktConstants.Nul
+                    or PaktConstants.EqualsSign or PaktConstants.Question)
+                {
+                    return totalLen;
+                }
+
+                // Allow: digits, letters, colon, dash, dot, plus, underscore
+                _consumed++;
+                _bytePositionInLine++;
+                totalLen++;
+            }
+
+            if (!_isMultiSegment || _isLastSegment)
+                return totalLen;
+
+            if (!GetNextSpan())
+                return totalLen;
+        }
+    }
+
+    /// <summary>
+    /// Classify a numeric-like value span into Int, Decimal, Float,
+    /// Date, Timestamp, or Uuid.
+    /// </summary>
+    private static PaktTokenType ClassifyNumericValue(ReadOnlySpan<byte> span)
+    {
+        if (span.Length == 0) return PaktTokenType.Int;
+
+        int i = 0;
+        if (span[i] == (byte)'-') i++;
+
+        bool hasColon = false;
+        bool hasDot = false;
+        bool hasExp = false;
+        bool hasT = false;
+        bool hasZ = false;
+        int dashCount = 0;
+
+        for (; i < span.Length; i++)
+        {
+            byte b = span[i];
+            if (b == (byte)':') hasColon = true;
+            else if (b == (byte)'.') hasDot = true;
+            else if (b is (byte)'e' or (byte)'E') hasExp = true;
+            else if (b == (byte)'T') hasT = true;
+            else if (b == (byte)'Z') hasZ = true;
+            else if (b == (byte)'-' && i > 0) dashCount++;
+            else if (b is (byte)'x' or (byte)'o') return PaktTokenType.Int;
+        }
+
+        if (hasT || hasZ || hasColon) return PaktTokenType.Timestamp;
+        if (dashCount == 4 && span.Length >= 32) return PaktTokenType.Uuid;
+        if (dashCount >= 2 && !hasDot && !hasExp) return PaktTokenType.Date;
+        if (hasExp) return PaktTokenType.Float;
+        if (hasDot) return PaktTokenType.Decimal;
+        return PaktTokenType.Int;
     }
 
     private bool ConsumeAtom()
@@ -873,29 +956,6 @@ public ref partial struct PaktReader
             _phase = PaktReaderPhase.ExpectStatementOrEnd;
 
         return true;
-    }
-
-    // ───────────────────── Number Classification ─────────────────────
-
-    private static PaktTokenType ClassifyNumber(ReadOnlySpan<byte> span)
-    {
-        int i = 0;
-        if (i < span.Length && span[i] == (byte)'-') i++;
-
-        bool hasDot = false;
-        bool hasExp = false;
-
-        for (; i < span.Length; i++)
-        {
-            byte b = span[i];
-            if (b == (byte)'.') hasDot = true;
-            else if (b is (byte)'e' or (byte)'E') hasExp = true;
-            else if (b is (byte)'x' or (byte)'o') return PaktTokenType.Int;
-        }
-
-        if (hasExp) return PaktTokenType.Float;
-        if (hasDot) return PaktTokenType.Decimal;
-        return PaktTokenType.Int;
     }
 
     // ───────────────────── Segment Walking ─────────────────────

@@ -42,7 +42,7 @@ public ref partial struct PaktSequenceReader
     private ContainerStack _containerStack;
     private bool _isPack;
     private int _statementCount;
-    private int _annotationNesting;
+    private readonly int _annotationNesting;
 
     // ── Output token (set by Read() in later phases) ──
     private ReadOnlySequence<byte> _valueSequence = default;

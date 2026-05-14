@@ -1,4 +1,5 @@
 using System.Text;
+
 using Pakt.Generators.Models;
 
 namespace Pakt.Generators.Emitters;

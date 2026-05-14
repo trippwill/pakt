@@ -10,9 +10,9 @@ namespace Pakt;
 internal enum ContainerKind : byte
 {
     Struct = 0b00,
-    Tuple  = 0b01,
-    List   = 0b10,
-    Map    = 0b11,
+    Tuple = 0b01,
+    List = 0b10,
+    Map = 0b11,
 }
 
 /// <summary>

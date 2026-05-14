@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 using Pakt.Generators.Emitters;
 using Pakt.Generators.Models;
 using Pakt.Generators.Parser;

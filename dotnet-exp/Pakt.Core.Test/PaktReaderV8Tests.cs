@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+
 using Pakt;
 
 namespace Pakt.Core.Test;
@@ -133,7 +134,7 @@ public class PaktReaderV8Tests
     [Fact]
     public void NulTermination()
     {
-        byte[] data = [.."x:int = 42"u8, 0x00];
+        byte[] data = [.. "x:int = 42"u8, 0x00];
         var seq = new ReadOnlySequence<byte>(data);
         var reader = new PaktSequenceReader(seq, isFinalBlock: true);
         var tokens = new List<PaktTokenType>();

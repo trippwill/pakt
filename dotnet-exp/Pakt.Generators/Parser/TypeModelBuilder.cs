@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+
 using Pakt.Generators.Models;
 
 namespace Pakt.Generators.Parser;

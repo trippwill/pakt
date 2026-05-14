@@ -225,63 +225,63 @@ public ref partial struct PaktSequenceReader
             {
                 byte b = local[_consumed];
 
-            switch (b)
-            {
-                case PaktConstants.LBrace:
-                case PaktConstants.LParen:
-                case PaktConstants.LBrack:
-                    nesting++;
-                    _consumed++;
-                    _bytePositionInLine++;
-                    break;
-
-                case PaktConstants.RBrace:
-                case PaktConstants.RParen:
-                case PaktConstants.RBrack:
-                case PaktConstants.RAngle:
-                    nesting--;
-                    _consumed++;
-                    _bytePositionInLine++;
-                    break;
-
-                case PaktConstants.LAngle:
-                    // Could be '<' in map type or '<<' pack operator
-                    if (nesting == 0 && TryPeek(1, out byte laNext) && laNext == PaktConstants.LAngle)
-                    {
-                        // This is '<<' — annotation ends here
-                        goto AnnotationEnd;
-                    }
-                    nesting++;
-                    _consumed++;
-                    _bytePositionInLine++;
-                    break;
-
-                case PaktConstants.EqualsSign:
-                    if (TryPeek(1, out byte eqNextA) && eqNextA == PaktConstants.RAngle)
-                    {
-                        // '=>' — map binding inside annotation (or operator at depth 0)
-                        // At nesting 0, this should not appear (operator is '=' not '=>')
-                        _consumed += 2;
-                        _bytePositionInLine += 2;
+                switch (b)
+                {
+                    case PaktConstants.LBrace:
+                    case PaktConstants.LParen:
+                    case PaktConstants.LBrack:
+                        nesting++;
+                        _consumed++;
+                        _bytePositionInLine++;
                         break;
-                    }
-                    if (nesting == 0)
-                    {
-                        // Plain '=' — annotation ends here
-                        goto AnnotationEnd;
-                    }
-                    _consumed++;
-                    _bytePositionInLine++;
-                    break;
 
-                default:
-                    // Skip layout inside annotation, ident chars, '?', '|', ':'
-                    _consumed++;
-                    if (b == PaktConstants.LF) { _lineNumber++; _bytePositionInLine = 0; }
-                    else _bytePositionInLine++;
-                    break;
+                    case PaktConstants.RBrace:
+                    case PaktConstants.RParen:
+                    case PaktConstants.RBrack:
+                    case PaktConstants.RAngle:
+                        nesting--;
+                        _consumed++;
+                        _bytePositionInLine++;
+                        break;
+
+                    case PaktConstants.LAngle:
+                        // Could be '<' in map type or '<<' pack operator
+                        if (nesting == 0 && TryPeek(1, out byte laNext) && laNext == PaktConstants.LAngle)
+                        {
+                            // This is '<<' — annotation ends here
+                            goto AnnotationEnd;
+                        }
+                        nesting++;
+                        _consumed++;
+                        _bytePositionInLine++;
+                        break;
+
+                    case PaktConstants.EqualsSign:
+                        if (TryPeek(1, out byte eqNextA) && eqNextA == PaktConstants.RAngle)
+                        {
+                            // '=>' — map binding inside annotation (or operator at depth 0)
+                            // At nesting 0, this should not appear (operator is '=' not '=>')
+                            _consumed += 2;
+                            _bytePositionInLine += 2;
+                            break;
+                        }
+                        if (nesting == 0)
+                        {
+                            // Plain '=' — annotation ends here
+                            goto AnnotationEnd;
+                        }
+                        _consumed++;
+                        _bytePositionInLine++;
+                        break;
+
+                    default:
+                        // Skip layout inside annotation, ident chars, '?', '|', ':'
+                        _consumed++;
+                        if (b == PaktConstants.LF) { _lineNumber++; _bytePositionInLine = 0; }
+                        else _bytePositionInLine++;
+                        break;
+                }
             }
-        }
 
             // Exhausted current segment — try next
             if (!GetNextSpan())

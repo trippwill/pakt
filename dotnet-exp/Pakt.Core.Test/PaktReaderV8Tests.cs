@@ -154,6 +154,46 @@ public class PaktReaderV8Tests
     }
 
     [Fact]
+    public void StringValue()
+    {
+        var tokens = DrainV8("x:str = 'hello world'");
+        Assert.Equal(PaktTokenType.String, tokens[3].Type);
+        Assert.Equal("'hello world'", tokens[3].Value);
+    }
+
+    [Fact]
+    public void StringWithEscape()
+    {
+        var tokens = DrainV8(@"x:str = 'hello\nworld'");
+        Assert.Equal(PaktTokenType.String, tokens[3].Type);
+        Assert.True(tokens[3].Value.Contains("\\n", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RawString()
+    {
+        var tokens = DrainV8(@"x:str = r'hello\nworld'");
+        Assert.Equal(PaktTokenType.String, tokens[3].Type);
+        Assert.StartsWith("r'", tokens[3].Value, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BinaryHex()
+    {
+        var tokens = DrainV8("x:bin = x'48656c6c6f'");
+        Assert.Equal(PaktTokenType.Binary, tokens[3].Type);
+        Assert.Equal("x'48656c6c6f'", tokens[3].Value);
+    }
+
+    [Fact]
+    public void MapWithStrings()
+    {
+        var tokens = DrainV8("h:<str => str> = < 'a' => 'b' >");
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.MapEntryBind);
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.String);
+    }
+
+    [Fact]
     public void NilValue()
     {
         var tokens = DrainV8("x:int? = nil");

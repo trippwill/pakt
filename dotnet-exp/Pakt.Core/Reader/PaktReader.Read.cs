@@ -552,21 +552,206 @@ public ref partial struct PaktReader
 
     private bool ConsumeString()
     {
-        // Stub — Phase 4 will implement full string scanning
-        ThrowSyntax("String scanning not yet implemented");
-        return false;
+        // Single-quoted string: '...' or multiline '''...'''
+        int start = _consumed;
+        _consumed++; // skip opening '
+        _bytePositionInLine++;
+
+        ReadOnlySpan<byte> local = _buffer;
+
+        // Check for triple-quote (multiline)
+        if (_consumed + 1 < local.Length
+            && local[_consumed] == PaktConstants.SingleQuote
+            && local[_consumed + 1] == PaktConstants.SingleQuote)
+        {
+            _consumed += 2;
+            _bytePositionInLine += 2;
+            return ConsumeMultiLineString(start, isRaw: false);
+        }
+
+        // Single-line string: scan for closing quote, backslash, or newline
+        bool escaped = false;
+        while (_consumed < local.Length)
+        {
+            byte b = local[_consumed];
+
+            if (b == PaktConstants.Nul)
+                ThrowSyntax("NUL byte inside string");
+
+            if (b == PaktConstants.SingleQuote)
+            {
+                _consumed++; // consume closing quote
+                _bytePositionInLine++;
+                int len = _consumed - start;
+                _tokenType = PaktTokenType.String;
+                _valueSequence = _sequence.Slice(_totalConsumed + start, len);
+                _valueIsEscaped = escaped;
+                CompleteScalar();
+                return true;
+            }
+
+            if (b == PaktConstants.Backslash)
+            {
+                escaped = true;
+                _consumed += 2; // skip escape + next char
+                _bytePositionInLine += 2;
+                continue;
+            }
+
+            if (b == PaktConstants.LF || b == PaktConstants.CR)
+                ThrowSyntax("Newline inside single-line string");
+
+            _consumed++;
+            _bytePositionInLine++;
+        }
+
+        if (IsLastSpan) ThrowSyntax("Unterminated string");
+        return false; // need more data
     }
 
     private bool ConsumeRawString()
     {
-        ThrowSyntax("Raw string scanning not yet implemented");
+        // r'...' or r'''...'''
+        int start = _consumed;
+        _consumed += 2; // skip r'
+        _bytePositionInLine += 2;
+
+        ReadOnlySpan<byte> local = _buffer;
+
+        // Check for triple-quote
+        if (_consumed + 1 < local.Length
+            && local[_consumed] == PaktConstants.SingleQuote
+            && local[_consumed + 1] == PaktConstants.SingleQuote)
+        {
+            _consumed += 2;
+            _bytePositionInLine += 2;
+            return ConsumeMultiLineString(start, isRaw: true);
+        }
+
+        // Single-line raw: scan for closing quote only
+        while (_consumed < local.Length)
+        {
+            byte b = local[_consumed];
+
+            if (b == PaktConstants.Nul)
+                ThrowSyntax("NUL byte inside string");
+
+            if (b == PaktConstants.SingleQuote)
+            {
+                _consumed++;
+                _bytePositionInLine++;
+                int len = _consumed - start;
+                _tokenType = PaktTokenType.String;
+                _valueSequence = _sequence.Slice(_totalConsumed + start, len);
+                _valueIsEscaped = false;
+                CompleteScalar();
+                return true;
+            }
+
+            if (b == PaktConstants.LF || b == PaktConstants.CR)
+                ThrowSyntax("Newline inside single-line string");
+
+            _consumed++;
+            _bytePositionInLine++;
+        }
+
+        if (IsLastSpan) ThrowSyntax("Unterminated raw string");
+        return false;
+    }
+
+    private bool ConsumeMultiLineString(int start, bool isRaw)
+    {
+        // Scan for closing '''
+        ReadOnlySpan<byte> local = _buffer;
+        bool escaped = false;
+
+        while (_consumed < local.Length)
+        {
+            byte b = local[_consumed];
+
+            if (b == PaktConstants.Nul)
+                ThrowSyntax("NUL byte inside string");
+
+            if (b == PaktConstants.SingleQuote
+                && _consumed + 2 < local.Length
+                && local[_consumed + 1] == PaktConstants.SingleQuote
+                && local[_consumed + 2] == PaktConstants.SingleQuote)
+            {
+                _consumed += 3; // closing '''
+                _bytePositionInLine += 3;
+                int len = _consumed - start;
+                _tokenType = PaktTokenType.String;
+                _valueSequence = _sequence.Slice(_totalConsumed + start, len);
+                _valueIsEscaped = escaped;
+                CompleteScalar();
+                return true;
+            }
+
+            if (!isRaw && b == PaktConstants.Backslash)
+            {
+                escaped = true;
+                _consumed += 2;
+                _bytePositionInLine += 2;
+                continue;
+            }
+
+            if (b == PaktConstants.LF) { _lineNumber++; _bytePositionInLine = 0; }
+            else if (b == PaktConstants.CR)
+            {
+                _lineNumber++;
+                _bytePositionInLine = 0;
+                if (_consumed + 1 < local.Length && local[_consumed + 1] == PaktConstants.LF)
+                    _consumed++;
+            }
+            else _bytePositionInLine++;
+
+            _consumed++;
+        }
+
+        if (IsLastSpan) ThrowSyntax("Unterminated multiline string");
         return false;
     }
 
     private bool ConsumeBinary()
     {
-        ThrowSyntax("Binary scanning not yet implemented");
+        // x'hex' or b'base64'
+        int start = _consumed;
+        _consumed += 2; // skip x' or b'
+        _bytePositionInLine += 2;
+
+        ReadOnlySpan<byte> local = _buffer;
+        while (_consumed < local.Length)
+        {
+            byte b = local[_consumed];
+
+            if (b == PaktConstants.Nul)
+                ThrowSyntax("NUL byte inside binary literal");
+
+            if (b == PaktConstants.SingleQuote)
+            {
+                _consumed++;
+                _bytePositionInLine++;
+                int len = _consumed - start;
+                _tokenType = PaktTokenType.Binary;
+                _valueSequence = _sequence.Slice(_totalConsumed + start, len);
+                _valueIsEscaped = false;
+                CompleteScalar();
+                return true;
+            }
+
+            _consumed++;
+            _bytePositionInLine++;
+        }
+
+        if (IsLastSpan) ThrowSyntax("Unterminated binary literal");
         return false;
+    }
+
+    /// <summary>After a scalar value at depth 0 in assign mode, transition to next statement.</summary>
+    private void CompleteScalar()
+    {
+        if (_containerStack.CurrentDepth == 0 && _phase == PaktReaderPhase.InAssignValue)
+            _phase = PaktReaderPhase.ExpectStatementOrEnd;
     }
 
     private bool ConsumeNumber()

@@ -3,4 +3,5 @@
   <Project Path="Pakt.Cli/Pakt.Cli.csproj" />
   <Project Path="Pakt.Core.Test/Pakt.Core.Test.csproj" />
   <Project Path="Pakt.Core/Pakt.Core.csproj" />
+  <Project Path="Pakt.Generators/Pakt.Generators.csproj" />
 </Solution>

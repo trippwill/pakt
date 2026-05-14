@@ -11,6 +11,30 @@ public ref partial struct PaktSequenceReader
 {
     private const int StackAllocThreshold = 256;
 
+    // ───────────────────── Guard ─────────────────────
+
+    /// <summary>Throw if current token is not the expected type.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void EnsureTokenType(PaktTokenType expected)
+    {
+        if (_tokenType != expected)
+            ThrowTokenMismatch(expected);
+    }
+
+    /// <summary>Throw if current token is not one of the expected types.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void EnsureNumericToken()
+    {
+        if (_tokenType is not (PaktTokenType.Int or PaktTokenType.Decimal or PaktTokenType.Float))
+            ThrowTokenMismatch(PaktTokenType.Int);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ThrowTokenMismatch(PaktTokenType expected) =>
+        throw PaktParseError.TypeMismatch(
+            new SourcePosition(_totalConsumed + _consumed, (int)_lineNumber, _bytePositionInLine),
+            $"Cannot read {_tokenType} as {expected}").ToException();
+
     // ───────────────────── String ─────────────────────
 
     /// <summary>
@@ -19,6 +43,7 @@ public ref partial struct PaktSequenceReader
     /// </summary>
     public string GetString()
     {
+        EnsureTokenType(PaktTokenType.String);
         ReadOnlySequence<byte> seq = _valueSequence;
         if (seq.Length == 0) return string.Empty;
 
@@ -101,7 +126,8 @@ public ref partial struct PaktSequenceReader
 
     public int GetInt32()
     {
-        long val = GetInt64();
+        EnsureTokenType(PaktTokenType.Int);
+        long val = GetInt64Core();
         if (val is < int.MinValue or > int.MaxValue)
             ThrowSyntax($"Value {val} is out of range for Int32");
         return (int)val;
@@ -109,7 +135,8 @@ public ref partial struct PaktSequenceReader
 
     public bool TryGetInt32(out int value)
     {
-        if (TryGetInt64(out long lval) && lval is >= int.MinValue and <= int.MaxValue)
+        if (_tokenType != PaktTokenType.Int) { value = 0; return false; }
+        if (TryGetInt64Core(out long lval) && lval is >= int.MinValue and <= int.MaxValue)
         {
             value = (int)lval;
             return true;
@@ -120,12 +147,24 @@ public ref partial struct PaktSequenceReader
 
     public long GetInt64()
     {
-        if (!TryGetInt64(out long val))
+        EnsureTokenType(PaktTokenType.Int);
+        return GetInt64Core();
+    }
+
+    public bool TryGetInt64(out long value)
+    {
+        if (_tokenType != PaktTokenType.Int) { value = 0; return false; }
+        return TryGetInt64Core(out value);
+    }
+
+    private long GetInt64Core()
+    {
+        if (!TryGetInt64Core(out long val))
             ThrowSyntax("Invalid integer value");
         return val;
     }
 
-    public bool TryGetInt64(out long value)
+    private bool TryGetInt64Core(out long value)
     {
         ReadOnlySpan<byte> raw = GetValueSpanContiguous();
         return ParseInteger(raw, out value);
@@ -191,12 +230,20 @@ public ref partial struct PaktSequenceReader
 
     public double GetDouble()
     {
-        if (!TryGetDouble(out double val))
+        EnsureNumericToken();
+        if (!TryGetDoubleCore(out double val))
             ThrowSyntax("Invalid floating-point value");
         return val;
     }
 
     public bool TryGetDouble(out double value)
+    {
+        if (_tokenType is not (PaktTokenType.Int or PaktTokenType.Decimal or PaktTokenType.Float))
+        { value = 0; return false; }
+        return TryGetDoubleCore(out value);
+    }
+
+    private bool TryGetDoubleCore(out double value)
     {
         ReadOnlySpan<byte> raw = GetValueSpanContiguous();
         ReadOnlySpan<byte> input = StripUnderscores(raw, out Span<byte> buf) ? buf : raw;
@@ -211,18 +258,27 @@ public ref partial struct PaktSequenceReader
 
     public float GetFloat()
     {
-        double d = GetDouble();
-        return (float)d;
+        EnsureNumericToken();
+        return (float)GetDouble();
     }
 
     public decimal GetDecimal()
     {
-        if (!TryGetDecimal(out decimal val))
+        if (_tokenType is not (PaktTokenType.Decimal or PaktTokenType.Int))
+            ThrowTokenMismatch(PaktTokenType.Decimal);
+        if (!TryGetDecimalCore(out decimal val))
             ThrowSyntax("Invalid decimal value");
         return val;
     }
 
     public bool TryGetDecimal(out decimal value)
+    {
+        if (_tokenType is not (PaktTokenType.Decimal or PaktTokenType.Int))
+        { value = 0; return false; }
+        return TryGetDecimalCore(out value);
+    }
+
+    private bool TryGetDecimalCore(out decimal value)
     {
         ReadOnlySpan<byte> raw = GetValueSpanContiguous();
         ReadOnlySpan<byte> input = StripUnderscores(raw, out Span<byte> buf) ? buf : raw;
@@ -238,6 +294,7 @@ public ref partial struct PaktSequenceReader
 
     public bool GetBool()
     {
+        EnsureTokenType(PaktTokenType.Bool);
         ReadOnlySpan<byte> raw = GetValueSpanContiguous();
         if (raw.SequenceEqual("true"u8)) return true;
         if (raw.SequenceEqual("false"u8)) return false;
@@ -249,6 +306,7 @@ public ref partial struct PaktSequenceReader
 
     public Guid GetGuid()
     {
+        EnsureTokenType(PaktTokenType.Uuid);
         ReadOnlySpan<byte> raw = GetValueSpanContiguous();
         if (Utf8Parser.TryParse(raw, out Guid value, out int consumed, 'D') && consumed == raw.Length)
             return value;
@@ -260,6 +318,7 @@ public ref partial struct PaktSequenceReader
 
     public DateOnly GetDate()
     {
+        EnsureTokenType(PaktTokenType.Date);
         ReadOnlySpan<byte> raw = GetValueSpanContiguous();
         string str = Encoding.UTF8.GetString(raw);
         if (DateOnly.TryParse(str, CultureInfo.InvariantCulture, out DateOnly val))
@@ -272,6 +331,7 @@ public ref partial struct PaktSequenceReader
 
     public DateTimeOffset GetTimestamp()
     {
+        EnsureTokenType(PaktTokenType.Timestamp);
         ReadOnlySpan<byte> raw = GetValueSpanContiguous();
         string str = Encoding.UTF8.GetString(raw);
         if (DateTimeOffset.TryParse(str, CultureInfo.InvariantCulture,
@@ -288,6 +348,7 @@ public ref partial struct PaktSequenceReader
     /// </summary>
     public byte[] GetBytes()
     {
+        EnsureTokenType(PaktTokenType.Binary);
         ReadOnlySpan<byte> raw = GetValueSpanContiguous();
         if (raw.Length < 3) return [];
 
@@ -316,6 +377,7 @@ public ref partial struct PaktSequenceReader
     /// </summary>
     public string GetAtom()
     {
+        EnsureTokenType(PaktTokenType.Atom);
         ReadOnlySpan<byte> raw = GetValueSpanContiguous();
         // Strip the | prefix
         return Encoding.UTF8.GetString(raw[1..]);

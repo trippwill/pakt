@@ -261,6 +261,71 @@ public class PaktReaderV8ScalarTests
         Assert.Equal(PaktTokenType.Nil, reader.TokenType);
     }
 
+    // ── Accessor Guard Tests ────────────────────────────────────────
+
+    [Fact]
+    public void Guard_GetStringOnInt_Throws()
+    {
+        var reader = MakeReader("x:int = 42");
+        AdvanceToValue(ref reader);
+        Assert.Equal(PaktTokenType.Int, reader.TokenType);
+        try { reader.GetString(); Assert.Fail("Expected PaktParseException"); }
+        catch (PaktParseException) { }
+    }
+
+    [Fact]
+    public void Guard_GetInt32OnString_Throws()
+    {
+        var reader = MakeReader("x:str = 'hello'");
+        AdvanceToValue(ref reader);
+        Assert.Equal(PaktTokenType.String, reader.TokenType);
+        try { reader.GetInt32(); Assert.Fail("Expected PaktParseException"); }
+        catch (PaktParseException) { }
+    }
+
+    [Fact]
+    public void Guard_GetBoolOnInt_Throws()
+    {
+        var reader = MakeReader("x:int = 42");
+        AdvanceToValue(ref reader);
+        try { reader.GetBool(); Assert.Fail("Expected PaktParseException"); }
+        catch (PaktParseException) { }
+    }
+
+    [Fact]
+    public void Guard_GetGuidOnString_Throws()
+    {
+        var reader = MakeReader("x:str = 'not-a-uuid'");
+        AdvanceToValue(ref reader);
+        try { reader.GetGuid(); Assert.Fail("Expected PaktParseException"); }
+        catch (PaktParseException) { }
+    }
+
+    [Fact]
+    public void Guard_TryGetInt32OnString_ReturnsFalse()
+    {
+        var reader = MakeReader("x:str = 'hello'");
+        AdvanceToValue(ref reader);
+        Assert.False(reader.TryGetInt32(out _));
+    }
+
+    [Fact]
+    public void Guard_GetDoubleAcceptsInt()
+    {
+        // Pragmatic widening: GetDouble accepts Int tokens
+        var reader = MakeReader("x:int = 42");
+        AdvanceToValue(ref reader);
+        Assert.Equal(42.0, reader.GetDouble());
+    }
+
+    [Fact]
+    public void Guard_GetDecimalAcceptsInt()
+    {
+        var reader = MakeReader("x:int = 42");
+        AdvanceToValue(ref reader);
+        Assert.Equal(42m, reader.GetDecimal());
+    }
+
     // ── All-Scalars Composite ───────────────────────────────────────
     // One struct with every scalar type — the "JSON can't do this natively" test
 

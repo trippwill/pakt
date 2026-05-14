@@ -340,9 +340,14 @@ public ref partial struct PaktSequenceReader
     private ReadOnlySpan<byte> CopyToScratch(ReadOnlySequence<byte> seq)
     {
         int len = checked((int)seq.Length);
-        byte[] buf = new byte[len]; // TODO: pool for larger values
+        byte[] buf = System.Buffers.ArrayPool<byte>.Shared.Rent(len);
         seq.CopyTo(buf);
-        return buf;
+        return buf.AsSpan(0, len);
+        // Caller uses the span synchronously within the same Read() call;
+        // the rented buffer is not returned here — it becomes garbage.
+        // For a pooling strategy, the reader would need a scratch field
+        // that's returned on the next Read() or Dispose(). Acceptable
+        // tradeoff: this path only fires for multi-segment values.
     }
 
     private static bool StripUnderscores(ReadOnlySpan<byte> raw, out Span<byte> result)

@@ -4,4 +4,8 @@
     <RootNamespace>Pakt</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pakt.Core.Test" />
+  </ItemGroup>
+
 </Project>

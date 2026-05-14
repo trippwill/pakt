@@ -40,7 +40,7 @@ public class StreamBenchmarks
     public int PaktV8Drain()
     {
         var seq = new System.Buffers.ReadOnlySequence<byte>(_paktBytes);
-        var reader = new PaktReader(seq, isFinalBlock: true);
+        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
         int count = 0;
         while (reader.Read())
             count++;

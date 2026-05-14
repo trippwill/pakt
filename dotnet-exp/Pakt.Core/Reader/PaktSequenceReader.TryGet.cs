@@ -6,8 +6,8 @@ using System.Text;
 
 namespace Pakt;
 
-// Typed value accessors for PaktReader.
-public ref partial struct PaktReader
+// Typed value accessors for PaktSequenceReader.
+public ref partial struct PaktSequenceReader
 {
     private const int StackAllocThreshold = 256;
 

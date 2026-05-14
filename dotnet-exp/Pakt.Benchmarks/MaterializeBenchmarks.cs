@@ -31,7 +31,7 @@ public class MaterializeBenchmarks
     public int PaktV8Materialize()
     {
         var seq = new ReadOnlySequence<byte>(_paktBytes);
-        var reader = new PaktReader(seq, isFinalBlock: true);
+        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
         int count = 0;
 
         while (reader.Read())

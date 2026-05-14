@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace Pakt;
 
-public ref partial struct PaktReader
+public ref partial struct PaktSequenceReader
 {
     /// <summary>
     /// Advance to the next token. Returns <c>false</c> when no more tokens

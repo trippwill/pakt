@@ -5,7 +5,7 @@ using Pakt;
 namespace Pakt.Core.Test;
 
 /// <summary>
-/// Tests exercising all PAKT scalar types through the v8 PaktReader typed accessors.
+/// Tests exercising all PAKT scalar types through the v8 PaktSequenceReader typed accessors.
 /// Highlights types where JSON must use string workarounds.
 /// </summary>
 public class PaktReaderV8ScalarTests
@@ -331,14 +331,14 @@ public class PaktReaderV8ScalarTests
 
     // ── Helpers ──────────────────────────────────────────────────────
 
-    private static PaktReader MakeReader(string pakt)
+    private static PaktSequenceReader MakeReader(string pakt)
     {
         byte[] bytes = Encoding.UTF8.GetBytes(pakt);
-        return new PaktReader(new ReadOnlySequence<byte>(bytes), isFinalBlock: true);
+        return new PaktSequenceReader(new ReadOnlySequence<byte>(bytes), isFinalBlock: true);
     }
 
     /// <summary>Advance past statement header to the first value token.</summary>
-    private static void AdvanceToValue(ref PaktReader reader)
+    private static void AdvanceToValue(ref PaktSequenceReader reader)
     {
         // StatementName → TypeAnnotationStart → AssignOperator → value
         Assert.True(reader.Read()); // StatementName

@@ -10,7 +10,7 @@ public class PaktReaderV8Tests
     {
         byte[] bytes = Encoding.UTF8.GetBytes(paktText);
         var seq = new ReadOnlySequence<byte>(bytes);
-        var reader = new PaktReader(seq, isFinalBlock: true);
+        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
         var tokens = new List<(PaktTokenType, string)>();
         while (reader.Read())
         {
@@ -135,7 +135,7 @@ public class PaktReaderV8Tests
     {
         byte[] data = [.."x:int = 42"u8, 0x00];
         var seq = new ReadOnlySequence<byte>(data);
-        var reader = new PaktReader(seq, isFinalBlock: true);
+        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
         var tokens = new List<PaktTokenType>();
         while (reader.Read())
             tokens.Add(reader.TokenType);
@@ -204,7 +204,7 @@ public class PaktReaderV8Tests
 
     private static List<(PaktTokenType Type, string Value)> DrainV8Seq(ReadOnlySequence<byte> seq)
     {
-        var reader = new PaktReader(seq, isFinalBlock: true);
+        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
         var tokens = new List<(PaktTokenType, string)>();
         while (reader.Read())
         {

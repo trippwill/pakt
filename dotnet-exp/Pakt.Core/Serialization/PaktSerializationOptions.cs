@@ -27,6 +27,12 @@ public sealed class PaktSerializationOptions
     /// How to handle duplicate map keys within a map value or map pack.
     /// </summary>
     public DuplicatePolicy DuplicateMapKeys { get; init; } = DuplicatePolicy.LastWins;
+
+    /// <summary>
+    /// Custom converters, checked in order. First converter whose
+    /// <see cref="PaktConverter.TargetType"/> matches wins.
+    /// </summary>
+    public IReadOnlyList<PaktConverter> Converters { get; init; } = [];
 }
 
 public enum UnknownMemberPolicy : byte

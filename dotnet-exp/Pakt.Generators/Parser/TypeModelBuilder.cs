@@ -116,7 +116,14 @@ internal static class TypeModelBuilder
         if (type is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte })
             return PaktTypeKind.ByteArray;
 
-        // List<T>, IList<T>, IReadOnlyList<T>, ICollection<T>, IEnumerable<T>, arrays
+        // Dictionary/Map checks BEFORE List checks (IDictionary implements ICollection which would match List)
+        if (IsGenericInterface(type, "System.Collections.Generic.IDictionary`2")) return PaktTypeKind.Map;
+        if (IsGenericInterface(type, "System.Collections.Generic.IReadOnlyDictionary`2")) return PaktTypeKind.Map;
+        if (type is INamedTypeSymbol { IsGenericType: true } dictNts
+            && string.Equals(dictNts.OriginalDefinition.ToDisplayString(), "System.Collections.Generic.Dictionary<TKey, TValue>", System.StringComparison.Ordinal))
+            return PaktTypeKind.Map;
+
+        // List<T>, IList<T>, IReadOnlyList<T>, ICollection<T>, arrays
         if (type is IArrayTypeSymbol) return PaktTypeKind.List;
         if (IsGenericInterface(type, "System.Collections.Generic.IList`1")) return PaktTypeKind.List;
         if (IsGenericInterface(type, "System.Collections.Generic.IReadOnlyList`1")) return PaktTypeKind.List;
@@ -124,13 +131,6 @@ internal static class TypeModelBuilder
         if (type is INamedTypeSymbol { IsGenericType: true } listNts
             && string.Equals(listNts.OriginalDefinition.ToDisplayString(), "System.Collections.Generic.List<T>", System.StringComparison.Ordinal))
             return PaktTypeKind.List;
-
-        // Dictionary<K,V>, IDictionary<K,V>, IReadOnlyDictionary<K,V>
-        if (IsGenericInterface(type, "System.Collections.Generic.IDictionary`2")) return PaktTypeKind.Map;
-        if (IsGenericInterface(type, "System.Collections.Generic.IReadOnlyDictionary`2")) return PaktTypeKind.Map;
-        if (type is INamedTypeSymbol { IsGenericType: true } dictNts
-            && string.Equals(dictNts.OriginalDefinition.ToDisplayString(), "System.Collections.Generic.Dictionary<TKey, TValue>", System.StringComparison.Ordinal))
-            return PaktTypeKind.Map;
 
         // Named type with public properties → nested struct
         if (type is INamedTypeSymbol { TypeKind: TypeKind.Class or TypeKind.Struct } named
@@ -140,10 +140,17 @@ internal static class TypeModelBuilder
         return null; // unsupported
     }
 
-    private static bool IsGenericInterface(ITypeSymbol type, string interfaceFqn)
+    private static bool IsGenericInterface(ITypeSymbol type, string interfaceMetadataName)
     {
+        // Check if the type itself is the interface
+        if (type is INamedTypeSymbol { IsGenericType: true } nts
+            && string.Equals(nts.OriginalDefinition.MetadataName, interfaceMetadataName.Substring(interfaceMetadataName.LastIndexOf('.') + 1), System.StringComparison.Ordinal)
+            && string.Equals(nts.OriginalDefinition.ContainingNamespace?.ToDisplayString(), interfaceMetadataName.Substring(0, interfaceMetadataName.LastIndexOf('.')), System.StringComparison.Ordinal))
+            return true;
+
+        // Check implemented interfaces
         return type.AllInterfaces.Any(i =>
-            i.IsGenericType && string.Equals(i.OriginalDefinition.ToDisplayString(), interfaceFqn, System.StringComparison.Ordinal));
+            i.IsGenericType && string.Equals(i.OriginalDefinition.ToDisplayString(), interfaceMetadataName.Replace('`', '<').Split('<')[0] + "<" + string.Join(", ", i.OriginalDefinition.TypeParameters.Select(t => t.Name)) + ">", System.StringComparison.Ordinal));
     }
 
     private static string GetPaktName(IPropertySymbol prop)

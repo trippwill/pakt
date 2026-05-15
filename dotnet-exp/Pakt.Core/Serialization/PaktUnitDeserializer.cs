@@ -86,7 +86,7 @@ public static class PaktUnitDeserializer
     /// <summary>
     /// Skip the current statement's value (everything after the operator token).
     /// </summary>
-    internal static void SkipStatementValue(ref PaktValidatingReader reader)
+    public static void SkipStatementValue(ref PaktValidatingReader reader)
     {
         int depth = 0;
         while (reader.Read())

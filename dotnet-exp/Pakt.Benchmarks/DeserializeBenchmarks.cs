@@ -9,25 +9,23 @@ using BenchmarkDotNet.Configs;
 
 namespace Pakt.Benchmarks;
 
-// ── Model types matching dotnet/ FSEntry shape ──
+// ── Model types ──
 
-public class BenchFSEntry
-{
-    public string Path { get; set; } = "";
-    public long Size { get; set; }
-    public long Mode { get; set; }
-    public string ModTime { get; set; } = "";
-    public bool IsDir { get; set; }
-    public string Owner { get; set; } = "";
-    public string Group { get; set; } = "";
-    public string Hash { get; set; } = "";
-}
-
+/// <summary>
+/// Identical to dotnet/ SmallDoc: 10 mixed scalar fields.
+/// </summary>
 public class BenchSmallDoc
 {
     public string Name { get; set; } = "";
     public int Version { get; set; }
     public bool Debug { get; set; }
+    public double Rate { get; set; }
+    public string Host { get; set; } = "";
+    public int Port { get; set; }
+    public int MaxRetry { get; set; }
+    public int Timeout { get; set; }
+    public bool Verbose { get; set; }
+    public string Label { get; set; } = "";
 }
 
 // ── Source gen contexts ──
@@ -37,7 +35,6 @@ public partial class BenchDeserContext : PaktSerializerContext;
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 [JsonSerializable(typeof(BenchSmallDoc))]
-[JsonSerializable(typeof(List<BenchFSEntry>))]
 public partial class BenchJsonContext : JsonSerializerContext;
 
 /// <summary>
@@ -64,9 +61,9 @@ public class DeserializeBenchmarks
     public void Setup()
     {
         _smallPakt = Encoding.UTF8.GetBytes(
-            "name:str = 'my-app'\nversion:int = 42\ndebug:bool = true");
+            "name:str = 'my-app'\nversion:int = 42\ndebug:bool = true\nrate:float = 3.14e0\nhost:str = 'localhost'\nport:int = 8080\nmax-retry:int = 3\ntimeout:int = 30\nverbose:bool = false\nlabel:str = 'production'");
         _smallJson = Encoding.UTF8.GetBytes(
-            """{"name":"my-app","version":42,"debug":true}""");
+            """{"name":"my-app","version":42,"debug":true,"rate":3.14,"host":"localhost","port":8080,"max_retry":3,"timeout":30,"verbose":false,"label":"production"}""");
         _fsPakt = GenerateFSPakt(EntryCount);
         _fsJson = GenerateFSJson(EntryCount);
     }

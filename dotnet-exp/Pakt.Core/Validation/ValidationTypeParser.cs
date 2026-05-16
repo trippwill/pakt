@@ -360,14 +360,13 @@ internal ref struct ValidationTypeParser
 
         SkipLayout();
 
-        // Expect '=>' bind operator
-        if (_pos + 1 >= _annotation.Length
-            || _annotation[_pos] != PaktConstants.EqualsSign
-            || _annotation[_pos + 1] != PaktConstants.RAngle)
+        // Expect '=' between key and value types
+        if (_pos >= _annotation.Length
+            || _annotation[_pos] != PaktConstants.EqualsSign)
         {
-            ThrowSyntax("Expected '=>' in map type");
+            ThrowSyntax("Expected '=' in map type");
         }
-        _pos += 2; // skip =>
+        _pos++; // skip =
 
         SkipLayout();
 

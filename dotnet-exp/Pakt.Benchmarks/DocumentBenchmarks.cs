@@ -153,7 +153,7 @@ public class DocumentBenchmarks
         StringBuilder sb = new();
         sb.AppendLine("tags:[str] = ['alpha' 'beta' 'gamma' 'delta' 'epsilon']");
         sb.AppendLine("scores:[int] = [95 87 92 78 88 91 85 93 76 99]");
-        sb.AppendLine("headers:<str => str> = <'content-type' => 'application/json' 'accept' => 'text/html' 'x-request-id' => 'abc-123'>");
+        sb.AppendLine("headers:<str = str> = <'content-type' = 'application/json' 'accept' = 'text/html' 'x-request-id' = 'abc-123'>");
         return Encoding.UTF8.GetBytes(sb.ToString());
     }
 

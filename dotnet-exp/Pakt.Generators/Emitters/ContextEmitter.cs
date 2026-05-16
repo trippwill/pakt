@@ -153,7 +153,7 @@ internal static class ContextEmitter
             PaktTypeKind.DateTimeOffset => "ts",
             PaktTypeKind.ByteArray => "bin",
             PaktTypeKind.List => $"[{MapElementKindToPaktType(prop.ElementTypeFqn)}]",
-            PaktTypeKind.Map => $"<{MapElementKindToPaktType(prop.KeyTypeFqn)} => {MapElementKindToPaktType(prop.ValueTypeFqn)}>",
+            PaktTypeKind.Map => $"<{MapElementKindToPaktType(prop.KeyTypeFqn)} = {MapElementKindToPaktType(prop.ValueTypeFqn)}>",
             PaktTypeKind.Struct => "struct",
             _ => "unknown",
         };

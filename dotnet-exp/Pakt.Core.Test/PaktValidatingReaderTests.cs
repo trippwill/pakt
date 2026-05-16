@@ -129,7 +129,7 @@ public class PaktValidatingReaderTests
     [Fact]
     public void TypeParser_MapType()
     {
-        int root = ValidationTypeParser.Parse("<str => int>"u8, 32, out var nodes, out _);
+        int root = ValidationTypeParser.Parse("<str = int>"u8, 32, out var nodes, out _);
         Assert.Equal(ValidationNodeKind.Map, nodes[root].Kind);
         Assert.Equal(2, nodes[root].ChildCount);
     }
@@ -365,7 +365,7 @@ public class PaktValidatingReaderTests
     [Fact]
     public void Map_ValidKeyValue_Passes()
     {
-        var tokens = Drain("ages:<str => int> = <'Alice' => 30 'Bob' => 25>");
+        var tokens = Drain("ages:<str = int> = <'Alice' = 30 'Bob' = 25>");
         Assert.Contains(tokens, t => t.Type == PaktTokenType.MapStart);
         Assert.Contains(tokens, t => t.Type == PaktTokenType.MapEnd);
     }
@@ -373,21 +373,21 @@ public class PaktValidatingReaderTests
     [Fact]
     public void Map_WrongKeyType_ThrowsTypeMismatch()
     {
-        var ex = AssertThrows("ages:<str => int> = <42 => 30>");
+        var ex = AssertThrows("ages:<str = int> = <42 = 30>");
         Assert.Equal((int)PaktErrorCode.TypeMismatch, ex.Code);
     }
 
     [Fact]
     public void Map_WrongValueType_ThrowsTypeMismatch()
     {
-        var ex = AssertThrows("ages:<str => int> = <'Alice' => 'thirty'>");
+        var ex = AssertThrows("ages:<str = int> = <'Alice' = 'thirty'>");
         Assert.Equal((int)PaktErrorCode.TypeMismatch, ex.Code);
     }
 
     [Fact]
     public void Map_Empty_Passes()
     {
-        var tokens = Drain("m:<str => int> = <>");
+        var tokens = Drain("m:<str = int> = <>");
         Assert.Contains(tokens, t => t.Type == PaktTokenType.MapStart);
         Assert.Contains(tokens, t => t.Type == PaktTokenType.MapEnd);
     }
@@ -411,7 +411,7 @@ public class PaktValidatingReaderTests
     [Fact]
     public void MapWithTupleKeys_Passes()
     {
-        var tokens = Drain("grid:<(int int) => str> = <(1 2) => 'a' (3 4) => 'b'>");
+        var tokens = Drain("grid:<(int int) = str> = <(1 2) = 'a' (3 4) = 'b'>");
         Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
     }
 
@@ -435,7 +435,7 @@ public class PaktValidatingReaderTests
     [Fact]
     public void MapPack_ValidEntries_Passes()
     {
-        var tokens = Drain("ages:<str => int> << 'Alice' => 30 'Bob' => 25");
+        var tokens = Drain("ages:<str = int> << 'Alice' = 30 'Bob' = 25");
         Assert.Contains(tokens, t => t.Type == PaktTokenType.PackOperator);
         Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
     }
@@ -443,7 +443,7 @@ public class PaktValidatingReaderTests
     [Fact]
     public void MapPack_WrongKeyType_ThrowsTypeMismatch()
     {
-        var ex = AssertThrows("ages:<str => int> << 42 => 30");
+        var ex = AssertThrows("ages:<str = int> << 42 = 30");
         Assert.Equal((int)PaktErrorCode.TypeMismatch, ex.Code);
     }
 

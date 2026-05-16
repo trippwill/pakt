@@ -11,7 +11,7 @@ PAKT uses complete-version specifications. Parser libraries advertise which spec
 | Version | Status | Meaning |
 |---------|--------|---------|
 | PAKT 0 | Draft | Earlier draft using comma/newline separators and semicolon map binding |
-| PAKT 0.1a | Draft experiment | Layout-only syntax, `=>` map binding, single-quoted strings only |
+| PAKT 0.1a | Draft experiment | Layout-only syntax, `=` map binding, single-quoted strings only |
 | PAKT 1 | (future) | First stable release; no breaking changes within major version |
 
 ### 0.1 Design Principles
@@ -193,7 +193,7 @@ HASH    = '#'
 ASSIGN  = '='
 COLON   = ':'                       ; type annotation only
 PACK    = '<<'
-BIND    = '=>'
+BIND    = '='
 PIPE    = '|'
 QMARK   = '?'
 SEMI    = ';'+                      ; pack terminator (run of one or more)
@@ -272,7 +272,7 @@ Atom values in data position use the `|` prefix: `|dev`, `|staging`, `|prod`.
 | Struct | `{field:type ...}` | `{ }` | Field names (static) | Heterogeneous |
 | Tuple | `(type ...)` | `( )` | None (positional) | Heterogeneous |
 | List | `[type]` | `[ ]` | None (ordered) | Homogeneous |
-| Map | `<keytype => valtype>` | `< >` | Any typed value | Homogeneous |
+| Map | `<keytype = valtype>` | `< >` | Any typed value | Homogeneous |
 
 Five unique delimiter pairs — no overloads:
 
@@ -351,30 +351,25 @@ A newline is not permitted inside a statement header. Specifically, no newline m
 
 The value of an assign statement may begin on the same line as `=` or on a following line. The body of a pack statement may begin on the same line as `<<` or on a following line.
 
-Layout is required around the statement operator:
+Layout around the statement operator is optional:
 
 ```pakt
 name:str = 'midwatch'
-events:[event] <<
-```
-
-Invalid:
-
-```pakt
 name:str='midwatch'
+events:[event] <<
 events:[event]<<
 ```
 
 ### 5.3 Assign
 
 ```ebnf
-assign = IDENT type_annot LAYOUT ASSIGN LAYOUT value
+assign = IDENT type_annot layout_opt ASSIGN layout_opt value
 ```
 
 ### 5.4 Pack
 
 ```ebnf
-pack = IDENT type_annot LAYOUT PACK (LAYOUT pack_body?)? SEMI?
+pack = IDENT type_annot layout_opt PACK (layout_opt pack_body?)? SEMI?
 ```
 
 A pack delivers zero or more bare values of the annotated collection type. The type must be a list type or map type.
@@ -385,7 +380,7 @@ list_pack_body   = value (LAYOUT value)*
 map_pack_body    = map_entry (LAYOUT map_entry)*
 ```
 
-For list packs, each value conforms to the list's element type. For map packs, each entry is `key => value` conforming to the map's key and value types.
+For list packs, each value conforms to the list's element type. For map packs, each entry is `key = value` conforming to the map's key and value types.
 
 **Termination**: A pack ends when the parser encounters:
 
@@ -437,7 +432,7 @@ tuple_type  = LPAREN layout_opt (type (LAYOUT type)*)? layout_opt RPAREN
 
 list_type   = LBRACK layout_opt type layout_opt RBRACK
 
-map_type    = LANGLE layout_opt type LAYOUT BIND LAYOUT type layout_opt RANGLE
+map_type    = LANGLE layout_opt type layout_opt BIND layout_opt type layout_opt RANGLE
 ```
 
 ### 5.7 Values
@@ -491,10 +486,10 @@ All elements must conform to the declared element type. An empty list (`[]`) is 
 ```ebnf
 map_val     = LANGLE layout_opt map_entries? layout_opt RANGLE
 map_entries = map_entry (LAYOUT map_entry)*
-map_entry   = value LAYOUT BIND LAYOUT value
+map_entry   = value layout_opt BIND layout_opt value
 ```
 
-Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are associated using `=>`. An empty map (`<>`) is valid. Duplicate keys are preserved in encounter order; interpreting them is an application/domain concern (see §6).
+Keys conform to the declared key type. Values conform to the declared value type. Key-value pairs are associated using `=`. An empty map (`<>`) is valid. Duplicate keys are preserved in encounter order; interpreting them is an application/domain concern (see §6).
 
 ## 6. Duplicates
 
@@ -520,7 +515,7 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Commas are not separators.
 - Consecutive layout is equivalent to a single layout separator where layout is permitted.
 - Layout before the first member, after the last member, and around delimiters is ignored where the grammar permits `layout_opt`.
-- Layout is required around `=`, `<<`, and `=>`.
+- Layout is optional around `=` and `<<`.
 - Layout is not required around `;` (pack terminator). `;` may appear immediately after the last pack value.
 - Layout is not permitted around `:` in type annotations.
 - Indentation is insignificant to the core parser.
@@ -538,9 +533,9 @@ deploy:{level:str release:int active:bool} = {
   true
 }
 
-headers:<str => str> = <
-  'content-type' => 'application/json'
-  'accept' => 'application/json'
+headers:<str = str> = <
+  'content-type' = 'application/json'
+  'accept' = 'application/json'
 >
 ```
 
@@ -677,7 +672,7 @@ layout_opt  = LAYOUT?
 ASSIGN  = '='
 COLON   = ':'
 PACK    = '<<'
-BIND    = '=>'
+BIND    = '='
 PIPE    = '|'
 QMARK   = '?'
 SEMI    = ';'+                      ; pack terminator (run of one or more)
@@ -778,7 +773,7 @@ field_decl  = IDENT COLON type
 
 tuple_type  = LPAREN layout_opt (type (LAYOUT type)*)? layout_opt RPAREN
 list_type   = LBRACK layout_opt type layout_opt RBRACK
-map_type    = LANGLE layout_opt type LAYOUT BIND LAYOUT type layout_opt RANGLE
+map_type    = LANGLE layout_opt type layout_opt BIND layout_opt type layout_opt RANGLE
 
 ; --- Values ---
 
@@ -795,7 +790,7 @@ struct_val  = LBRACE layout_opt (value (LAYOUT value)*)? layout_opt RBRACE
 tuple_val   = LPAREN layout_opt (value (LAYOUT value)*)? layout_opt RPAREN
 list_val    = LBRACK layout_opt (value (LAYOUT value)*)? layout_opt RBRACK
 map_val     = LANGLE layout_opt (map_entry (LAYOUT map_entry)*)? layout_opt RANGLE
-map_entry   = value LAYOUT BIND LAYOUT value
+map_entry   = value layout_opt BIND layout_opt value
 ```
 
 ### A.3 Reserved Keywords
@@ -814,9 +809,9 @@ version:(int int int) = (1 0 0)
 
 env:|dev staging prod| = |dev
 
-headers:<str => str> = <
-  'content-type' => 'application/json'
-  'accept' => 'application/json'
+headers:<str = str> = <
+  'content-type' = 'application/json'
+  'accept' = 'application/json'
 >
 
 events:[{ts:ts level:|info warn error| msg:str}] <<

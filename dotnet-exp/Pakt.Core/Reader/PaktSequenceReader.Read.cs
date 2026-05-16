@@ -257,19 +257,12 @@ public ref partial struct PaktSequenceReader
                         break;
 
                     case PaktConstants.EqualsSign:
-                        if (TryPeek(1, out byte eqNextA) && eqNextA == PaktConstants.RAngle)
-                        {
-                            // '=>' — map binding inside annotation (or operator at depth 0)
-                            // At nesting 0, this should not appear (operator is '=' not '=>')
-                            _consumed += 2;
-                            _bytePositionInLine += 2;
-                            break;
-                        }
                         if (nesting == 0)
                         {
-                            // Plain '=' — annotation ends here
+                            // '=' at depth 0 — annotation ends here (statement operator)
                             goto AnnotationEnd;
                         }
+                        // '=' inside a composite type (e.g. <str = str>) — skip
                         _consumed++;
                         _bytePositionInLine++;
                         break;
@@ -335,9 +328,6 @@ public ref partial struct PaktSequenceReader
 
         if (b == PaktConstants.EqualsSign)
         {
-            if (TryPeek(1, out byte eqNext) && eqNext == PaktConstants.RAngle)
-                ThrowSyntax("Unexpected '=>' — expected '=' or '<<'");
-
             _consumed++;
             _bytePositionInLine++;
             _tokenType = PaktTokenType.AssignOperator;
@@ -429,17 +419,18 @@ public ref partial struct PaktSequenceReader
                 return CloseContainer(PaktTokenType.MapEnd);
         }
 
-        // Map entry bind
-        if (b == PaktConstants.EqualsSign && TryPeek(1, out byte next) && next == PaktConstants.RAngle)
+        // Map entry bind — = inside map context or at pack top level
+        if (b == PaktConstants.EqualsSign)
         {
-            _consumed++;
-            _bytePositionInLine++;
-            if (_consumed >= _buffer.Length) GetNextSpan();
-            _consumed++;
-            _bytePositionInLine++;
-            _tokenType = PaktTokenType.MapEntryBind;
-            _valueSequence = _sequence.Slice(_tokenStartIndex, 2);
-            return true;
+            if ((_containerStack.CurrentDepth > 0 && _containerStack.Peek() == ContainerKind.Map)
+                || (_phase == PaktReaderPhase.InPackValue && _containerStack.CurrentDepth == 0))
+            {
+                _consumed++;
+                _bytePositionInLine++;
+                _tokenType = PaktTokenType.MapEntryBind;
+                _valueSequence = _sequence.Slice(_tokenStartIndex, 1);
+                return true;
+            }
         }
 
         // String literals

@@ -89,7 +89,7 @@ public class PaktUnitDeserializerTests
     [Fact]
     public void ConfigWithMap_AssignMap_Deserializes()
     {
-        var pakt = "name:str = 'test'\nages:<str => int> = <'Alice' => 30 'Bob' => 25>"u8;
+        var pakt = "name:str = 'test'\nages:<str = int> = <'Alice' = 30 'Bob' = 25>"u8;
         var result = PaktUnitDeserializer.Deserialize<ConfigWithMap>(
             pakt.ToArray(), TestSerializerContext.Default);
 
@@ -101,7 +101,7 @@ public class PaktUnitDeserializerTests
     [Fact]
     public void ConfigWithMap_PackMap_Deserializes()
     {
-        var pakt = "name:str = 'test'\nages:<str => int> << 'Alice' => 30 'Bob' => 25"u8;
+        var pakt = "name:str = 'test'\nages:<str = int> << 'Alice' = 30 'Bob' = 25"u8;
         var result = PaktUnitDeserializer.Deserialize<ConfigWithMap>(
             pakt.ToArray(), TestSerializerContext.Default);
 

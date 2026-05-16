@@ -148,7 +148,7 @@ public class PaktReaderV8Tests
     [Fact]
     public void MapEntryBind()
     {
-        var tokens = DrainV8("h:<int => int> = < 1 => 2 >");
+        var tokens = DrainV8("h:<int = int> = < 1 = 2 >");
         Assert.Contains(tokens, t => t.Type == PaktTokenType.MapEntryBind);
         Assert.Contains(tokens, t => t.Type == PaktTokenType.MapStart);
         Assert.Contains(tokens, t => t.Type == PaktTokenType.MapEnd);
@@ -189,7 +189,7 @@ public class PaktReaderV8Tests
     [Fact]
     public void MapWithStrings()
     {
-        var tokens = DrainV8("h:<str => str> = < 'a' => 'b' >");
+        var tokens = DrainV8("h:<str = str> = < 'a' = 'b' >");
         Assert.Contains(tokens, t => t.Type == PaktTokenType.MapEntryBind);
         Assert.Contains(tokens, t => t.Type == PaktTokenType.String);
     }

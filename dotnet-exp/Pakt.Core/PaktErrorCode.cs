@@ -7,9 +7,6 @@ public enum PaktErrorCode : byte
     TypeMismatch = 2,
     NilNonNullable = 3,
     Syntax = 4,
-    MissingLayout = 5,
-    ReservedToken = 6,
-    InvalidHeader = 7,
     ArityMismatch = 8,
 
     // Implementation-defined.

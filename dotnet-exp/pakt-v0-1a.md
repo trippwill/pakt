@@ -619,9 +619,6 @@ Codes 1–99 are reserved for the spec. Implementations MUST support at least th
 | 2 | `type_mismatch` | A value does not conform to its declared type |
 | 3 | `nil_non_nullable` | `nil` appears where the type is not nullable |
 | 4 | `syntax` | Any lexical or grammatical error not covered by a more specific category |
-| 5 | `missing_layout` | Adjacent syntactic items appear without required layout |
-| 6 | `reserved_token` | A reserved token appears outside a string literal |
-| 7 | `invalid_header` | A statement header is malformed |
 | 8 | `arity_mismatch` | A struct or tuple value has too few or too many values |
 
 ### 11.3 Extensibility

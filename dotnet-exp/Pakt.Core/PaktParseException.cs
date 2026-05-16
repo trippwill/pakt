@@ -41,10 +41,7 @@ public sealed class PaktParseException : Exception
         PaktErrorCode.UnexpectedEof => "unexpected_eof",
         PaktErrorCode.TypeMismatch => "type_mismatch",
         PaktErrorCode.NilNonNullable => "nil_non_nullable",
-        PaktErrorCode.Syntax => "syntax_error",
-        PaktErrorCode.MissingLayout => "missing_layout",
-        PaktErrorCode.ReservedToken => "reserved_token",
-        PaktErrorCode.InvalidHeader => "invalid_header",
+        PaktErrorCode.Syntax => "syntax",
         PaktErrorCode.ArityMismatch => "arity_mismatch",
         PaktErrorCode.NestingDepthExceeded => "nesting_depth_exceeded",
         PaktErrorCode.TokenLengthExceeded => "token_length_exceeded",
@@ -73,15 +70,6 @@ internal readonly record struct PaktParseError(
 
     public static PaktParseError Syntax(SourcePosition position, string? msg = null) =>
         new(PaktErrorCode.Syntax, position, msg);
-
-    public static PaktParseError MissingLayout(SourcePosition position, string? msg = null) =>
-        new(PaktErrorCode.MissingLayout, position, msg);
-
-    public static PaktParseError ReservedToken(SourcePosition position, string? msg = null) =>
-        new(PaktErrorCode.ReservedToken, position, msg);
-
-    public static PaktParseError InvalidHeader(SourcePosition position, string? msg = null) =>
-        new(PaktErrorCode.InvalidHeader, position, msg);
 
     public static PaktParseError ArityMismatch(SourcePosition position, string? msg = null) =>
         new(PaktErrorCode.ArityMismatch, position, msg);

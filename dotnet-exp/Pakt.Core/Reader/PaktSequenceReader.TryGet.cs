@@ -31,7 +31,7 @@ public ref partial struct PaktSequenceReader
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void ThrowTokenMismatch(PaktTokenType expected) =>
-        throw PaktParseError.TypeMismatch(
+        throw PaktParseError.Syntax(
             new SourcePosition(_totalConsumed + _consumed, (int)_lineNumber, _bytePositionInLine),
             $"Cannot read {_tokenType} as {expected}").ToException();
 

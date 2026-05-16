@@ -145,12 +145,31 @@ public class DeserializeBenchmarks
     {
         Utf8JsonReader reader = new(_fsJson);
         int count = 0;
+        string? propName = null;
         while (reader.Read())
         {
             switch (reader.TokenType)
             {
+                case JsonTokenType.PropertyName:
+                    propName = reader.GetString();
+                    break;
                 case JsonTokenType.String:
-                    _ = reader.GetString();
+                    // JSON encodes ts and bin as strings — must parse
+                    switch (propName)
+                    {
+                        case "mod_time":
+                            _ = DateTimeOffset.Parse(reader.GetString()!,
+                                System.Globalization.CultureInfo.InvariantCulture);
+                            break;
+                        case "hash":
+                            string? hex = reader.GetString();
+                            if (hex is { Length: > 0 })
+                                _ = Convert.FromHexString(hex);
+                            break;
+                        default:
+                            _ = reader.GetString();
+                            break;
+                    }
                     count++;
                     break;
                 case JsonTokenType.Number:

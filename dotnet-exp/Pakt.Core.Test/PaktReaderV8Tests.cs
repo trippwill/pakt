@@ -88,6 +88,21 @@ public class PaktReaderV8Tests
     }
 
     [Fact]
+    public void MultiLineTypeAnnotation()
+    {
+        var tokens = DrainV8("config:{\n    name:str\n    port:int\n} = {\n    'localhost'\n    8080\n}");
+        Assert.Equal(PaktTokenType.StatementName, tokens[0].Type);
+        Assert.Equal("config", tokens[0].Value);
+        Assert.Equal(PaktTokenType.TypeAnnotationStart, tokens[1].Type);
+        Assert.Equal(PaktTokenType.AssignOperator, tokens[2].Type);
+        Assert.Equal(PaktTokenType.StructStart, tokens[3].Type);
+        Assert.Equal(PaktTokenType.String, tokens[4].Type);
+        Assert.Equal("'localhost'", tokens[4].Value);
+        Assert.Equal(PaktTokenType.Int, tokens[5].Type);
+        Assert.Equal(PaktTokenType.StructEnd, tokens[6].Type);
+    }
+
+    [Fact]
     public void StreamingList()
     {
         var tokens = DrainV8("items:[int] = ~[1 2 3]");

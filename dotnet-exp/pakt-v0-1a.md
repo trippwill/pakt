@@ -337,13 +337,21 @@ A statement header consists of:
 IDENT type_annot ASSIGN
 ```
 
-A newline is not permitted inside a statement header. Specifically, no newline may appear between:
+Layout (including newlines) is permitted between any tokens in a statement header. This allows complex type annotations to wrap across lines for readability:
 
-- the statement name and `:`
-- the `:` and the type annotation
-- the type annotation and the statement operator
+```pakt
+# Single-line (conventional for simple types)
+name:str = 'midwatch'
 
-The value of an assign statement may begin on the same line as `=` or on a following line.
+# Multi-line type annotation (useful for complex structs)
+config:{
+    server:{host:str port:int}
+    db:{host:str port:int name:str}
+} = {
+    { 'api.example.com' 443 }
+    { 'db.internal' 5432 'myapp' }
+}
+```
 
 Layout around the statement operator is optional:
 
@@ -620,7 +628,7 @@ Codes 1–99 are reserved for the spec. Implementations MUST support at least th
 | 4 | `syntax` | Any lexical or grammatical error not covered by a more specific category |
 | 5 | `missing_layout` | Adjacent syntactic items appear without required layout |
 | 6 | `reserved_token` | A reserved token appears outside a string literal |
-| 7 | `invalid_header` | A statement header is malformed or spans multiple lines |
+| 7 | `invalid_header` | A statement header is malformed |
 | 8 | `arity_mismatch` | A struct or tuple value has too few or too many values |
 
 ### 11.3 Extensibility
@@ -733,7 +741,7 @@ statement   = assign
 
 assign      = IDENT type_annot layout_opt ASSIGN layout_opt value
 
-; no newline is permitted inside the statement header
+; layout (including newlines) is permitted between header tokens
 
 ; --- Streaming collections ---
 ;     ~[ or ~< opens a collection that tolerates missing close delimiter.

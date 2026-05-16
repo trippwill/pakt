@@ -12,6 +12,7 @@ internal static class PaktConstants
     public const byte Tab = 0x09;
     public const byte LF = 0x0A;
     public const byte CR = 0x0D;
+    public const byte Comma = 0x2C;
     public const byte Hash = 0x23;
 
     // ── Paired delimiters ──
@@ -63,13 +64,13 @@ internal static class PaktConstants
     // ── Value terminators (for number/ident boundary detection) ──
 
     /// <summary>Bytes that end a number or identifier token.</summary>
-    public static ReadOnlySpan<byte> Delimiters => " \t\r\n{}()[]<>|:=?';#\0"u8;
+    public static ReadOnlySpan<byte> Delimiters => " \t\r\n,{}()[]<>|:=?';#\0"u8;
 
     // ── Character classification (inline, branch-free) ──
 
-    public static bool IsWhitespace(byte b) => b is Space or Tab;
+    public static bool IsWhitespace(byte b) => b is Space or Tab or Comma;
 
-    public static bool IsLayout(byte b) => b is Space or Tab or LF or CR;
+    public static bool IsLayout(byte b) => b is Space or Tab or LF or CR or Comma;
 
     public static bool IsDigit(byte b) => (uint)(b - (byte)'0') <= 9;
 

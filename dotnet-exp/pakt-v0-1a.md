@@ -63,7 +63,7 @@ ALPHA       = 'a'-'z' | 'A'-'Z'
 DIGIT       = '0'-'9'
 IDENT       = (ALPHA | '_') (ALPHA | DIGIT | '_' | '-')*
 
-WS          = ' ' | '\t'
+WS          = ' ' | '\t' | ','
 NL          = '\n' | '\r\n'
 LAYOUT_CHAR = WS | NL
 COMMENT     = '#' (any char except NL)*
@@ -72,7 +72,7 @@ LAYOUT      = (LAYOUT_CHAR | COMMENT)+
 
 Layout separates adjacent syntactic items. A comment does not consume the following newline. Comments are trivia that may appear where layout is permitted.
 
-Commas are not separators in PAKT 0.1a.
+Commas are layout in PAKT 0.1a — they are treated as whitespace and have no semantic meaning. This means PAKT data authored with commas (e.g., from v0 conventions or JSON habits) parses identically to data without them.
 
 ### 3.2 Comments
 
@@ -203,7 +203,6 @@ LBRACK  = '['    RBRACK = ']'
 LANGLE  = '<'    RANGLE = '>'
 
 ; Reserved tokens (see §4.5)
-COMMA   = ','
 DQUOTE  = '"'
 AT      = '@'
 BANG    = '!'
@@ -292,7 +291,6 @@ The following tokens are reserved for future use or deliberately excluded from P
 
 | Token | Status / possible future use |
 |-------|-------------------------------|
-| `,` | Reserved; not a separator in PAKT 0.1a |
 | `"` | Reserved; double-quoted strings are not part of PAKT 0.1a |
 | `@` | Constraints (`@len`, `@range`, `@pattern`) |
 | `!` | Assertions or negation |
@@ -660,7 +658,7 @@ BASE64_CHAR = ALPHA | DIGIT | '+' | '/' | '='
 
 IDENT       = (ALPHA | '_') (ALPHA | DIGIT | '_' | '-')*
 
-WS          = ' ' | '\t'
+WS          = ' ' | '\t' | ','
 NL          = '\n' | '\r\n'
 LAYOUT_CHAR = WS | NL
 COMMENT     = '#' (any char except NL)*
@@ -682,7 +680,6 @@ LBRACK  = '['    RBRACK  = ']'
 LANGLE  = '<'    RANGLE  = '>'
 
 ; Reserved tokens
-COMMA   = ','
 DQUOTE  = '"'
 AT      = '@'
 BANG    = '!'

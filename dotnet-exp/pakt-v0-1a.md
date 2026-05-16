@@ -6,7 +6,7 @@
 
 This document defines **PAKT 0.1a** (draft experiment). The specification is not stable — breaking changes may occur before PAKT 1.
 
-PAKT uses complete-version specifications. Parser libraries advertise which spec versions they support.
+PAKT uses complete-version specifications. Reader libraries advertise which spec versions they support.
 
 | Version | Status | Meaning |
 |---------|--------|---------|
@@ -14,15 +14,22 @@ PAKT uses complete-version specifications. Parser libraries advertise which spec
 | PAKT 0.1a | Draft experiment | Layout-only syntax, `=` map binding, single-quoted strings only |
 | PAKT 1 | (future) | First stable release; no breaking changes within major version |
 
-### 0.1 Design Principles
+### 0.1 Definitions
 
-1. **Performance is a feature.** The format, grammar, and type system are designed so that a conforming parser can operate in a single streaming pass with minimal allocation. Spec rules must not require unbounded buffering or retroactive reinterpretation.
+- **Reader**: The component that consumes PAKT-encoded bytes and produces a token or event stream. A reader validates syntax and type annotations. Implementations may split this into layers (e.g., a tokenizer and a validating wrapper), but the spec addresses them as one logical unit.
+- **Producer**: The entity that generates PAKT data — a serializer, encoder, or human author.
+- **Consumer**: The entity that processes PAKT data using a reader. A consumer may be a deserializer, materializer, or application-level handler.
+- **Conforming reader**: A reader that implements all normative requirements of this specification: grammar, type checking, error codes, streaming, and NUL framing.
 
-2. **Type context flows with the data.** Every value carries or inherits its type. The parser never guesses. This enables type-directed parsing without schema negotiation.
+### 0.2 Design Principles
 
-3. **The decoder is lossless; interpretation is layered.** A conforming decoder preserves all information present in the source — including duplicate statement names, duplicate map keys, encounter order, raw string content, and raw multi-line string content. Policy decisions such as rejecting duplicates, applying last-wins, accumulating values, stripping indentation, or normalizing presentation belong to higher-level consumers, not the core decoder.
+1. **Performance is a feature.** The format, grammar, and type system are designed so that a conforming reader can operate in a single streaming pass with minimal allocation. Spec rules must not require unbounded buffering or retroactive reinterpretation.
 
-4. **Presentation is an application concern.** Human-readable formatting, event enrichment, indentation normalization, and display transformations are not encoder or decoder responsibilities. The core event contract is minimal and machine-oriented.
+2. **Type context flows with the data.** Every value carries or inherits its type. The reader never guesses. This enables type-directed reading without schema negotiation.
+
+3. **The reader is lossless; interpretation is layered.** A conforming reader preserves all information present in the source — including duplicate statement names, duplicate map keys, encounter order, raw string content, and raw multi-line string content. Policy decisions such as rejecting duplicates, applying last-wins, accumulating values, stripping indentation, or normalizing presentation belong to higher-level consumers, not the core reader.
+
+4. **Presentation is an application concern.** Human-readable formatting, event enrichment, indentation normalization, and display transformations are not reader or writer responsibilities. The core event contract is minimal and machine-oriented.
 
 5. **The grammar is the event model.** Each grammatical construct — assign, pack, struct, tuple, list, map, scalar — maps to a distinct event kind. Consumers should not need to inspect payload strings to determine structural context.
 
@@ -81,7 +88,7 @@ Line comments begin with `#` and extend until, but do not include, the next newl
 COMMENT = '#' (any char except NL)*
 ```
 
-Comments do not consume newlines. The newline remains visible to the parser and participates in layout.
+Comments do not consume newlines. The newline remains visible to the reader and participates in layout.
 
 ```pakt
 ports:[int] = [
@@ -129,7 +136,7 @@ ATOM     = '|' IDENT
 ```
 
 - Leading zeros on decimal `INT` are permitted and ignored (`01` evaluates to `1`).
-- `_` in numeric literals is a visual separator, ignored by the parser.
+- `_` in numeric literals is a visual separator, ignored by the reader.
 - `ATOM` values use a `|` prefix to distinguish them from identifiers. Atom set type declarations use bare names inside pipe delimiters (`|dev staging prod|`), while atom values use the prefix (`|dev`).
 - `bin` literals use a prefix to indicate encoding: `x'...'` for hexadecimal, `b'...'` for base64.
 - Hex literals must contain an even number of hex digits; an odd count is a parse error.
@@ -137,7 +144,7 @@ ATOM     = '|' IDENT
 - Strings are always quoted. There are no unquoted string values.
 - Double-quoted strings are not part of PAKT 0.1a.
 
-Scalar literal validation is performed against the expected type. A parser need not classify every numeric-looking token before type context is known.
+Scalar literal validation is performed against the expected type. A reader need not classify every numeric-looking token before type context is known.
 
 ### 3.4 Raw Strings
 
@@ -162,7 +169,7 @@ query:str = '''
 '''
 ```
 
-The content of a multi-line string is the exact sequence of Unicode code points between the opening and closing delimiters, excluding the delimiters themselves. No indentation stripping is performed by the core decoder.
+The content of a multi-line string is the exact sequence of Unicode code points between the opening and closing delimiters, excluding the delimiters themselves. No indentation stripping is performed by the core reader.
 
 For non-raw multi-line strings, escape sequences are recognized using the same rules as single-line strings. Raw multi-line strings (`r'''...'''`) perform no escape processing.
 
@@ -285,7 +292,7 @@ Empty lists (`[]`), empty maps (`<>`), empty structs (`{}`), and empty tuples (`
 
 ### 4.5 Reserved
 
-The following tokens are reserved for future use or deliberately excluded from PAKT 0.1a. They must not appear in units outside of string literals. A conforming parser encountering a reserved token in an unexpected position should report a syntax error.
+The following tokens are reserved for future use or deliberately excluded from PAKT 0.1a. They must not appear in units outside of string literals. A conforming reader encountering a reserved token in an unexpected position should report a syntax error.
 
 | Token | Status / possible future use |
 |-------|-------------------------------|
@@ -375,7 +382,7 @@ streaming_list = STREAM LBRACK layout_opt list_members? layout_opt RBRACK?
 streaming_map  = STREAM LANGLE layout_opt map_entries? layout_opt RANGLE?
 ```
 
-Streaming collections enable append-only scenarios (e.g., log files) where a producer writes elements incrementally without knowing the total count. The `~` prefix tells the parser to tolerate a missing close delimiter.
+Streaming collections enable append-only scenarios (e.g., log files) where a producer writes elements incrementally without knowing the total count. The `~` prefix tells the reader to tolerate a missing close delimiter.
 
 When a streaming collection appears mid-unit (before another statement), the closing delimiter is required. When it appears at the tail of a unit, the closing delimiter may be omitted and end-of-unit terminates the collection.
 
@@ -492,7 +499,7 @@ Keys conform to the declared key type. Values conform to the declared value type
 
 Duplicate names at the unit root are not a format-level parse error and do not carry built-in replacement semantics.
 
-A conforming decoder preserves repeated statements in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
+A conforming reader preserves repeated statements in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
 
 The reserved keywords `true`, `false`, and `nil` cannot be used as statement names.
 
@@ -500,7 +507,7 @@ The reserved keywords `true`, `false`, and `nil` cannot be used as statement nam
 
 Duplicate keys in a map value (`= <...>` or `= ~<...>`) are not a format-level parse error and do not carry built-in replacement semantics in the format itself.
 
-A conforming decoder preserves repeated map entries in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
+A conforming reader preserves repeated map entries in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
 
 Struct field names are declared in the type, not in the value, so duplicates are caught at the type level.
 
@@ -513,7 +520,7 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Layout is optional around `=`.
 
 - Layout around `:` in type annotations is permitted but conventionally omitted.
-- Indentation is insignificant to the core parser.
+- Indentation is insignificant to the core reader.
 - A comment does not consume a newline. The newline remains part of layout.
 - A comment participates in layout only where layout is permitted.
 
@@ -570,7 +577,7 @@ release:int = 26
 status:|active inactive| = |active
 ```
 
-The parser checks each value against its declared type at parse time. A type mismatch is an immediate error.
+The reader checks each value against its declared type at parse time. A type mismatch is an immediate error.
 
 ### 9.1 Future Consideration: Spec Files and Projections
 
@@ -590,7 +597,7 @@ When transmitting PAKT units over a raw byte stream (e.g., pipes, sockets, seria
 
 Since NUL is forbidden in all PAKT text, it is unambiguous as a boundary marker.
 
-A parser encountering a NUL byte at the top level MUST treat it as end-of-unit. Behavior on encountering NUL inside a syntactic construct is a parse error.
+A reader encountering a NUL byte at the top level MUST treat it as end-of-unit. Behavior on encountering NUL inside a syntactic construct is a parse error.
 
 When reading from a file, end-of-file serves as end-of-unit. NUL framing is optional for file-based usage.
 
@@ -598,7 +605,7 @@ When reading from a file, end-of-file serves as end-of-unit. NUL framing is opti
 
 A conforming implementation must report parse errors with sufficient detail for programmatic handling and human diagnosis.
 
-PAKT parsers are expected to fail fast. A malformed value, malformed type, missing layout separator, invalid reserved token, unterminated string, or type mismatch is an immediate parse error. Parsers should not reinterpret malformed input to continue.
+PAKT readers are expected to fail fast. A malformed value, malformed type, missing layout separator, invalid reserved token, unterminated string, or type mismatch is an immediate parse error. Readers should not reinterpret malformed input to continue.
 
 ### 11.1 Error Structure
 
@@ -631,7 +638,7 @@ The following conditions are explicitly not parse errors:
 
 - **Duplicate root statement names** — preserved in encounter order per §6.1 and principle 3.
 - **Duplicate map keys** — preserved in encounter order per §6.2 and principle 3.
-- **Multi-line string indentation shape** — preserved by the core decoder. Indentation stripping or normalization is a consumer policy.
+- **Multi-line string indentation shape** — preserved by the core reader. Indentation stripping or normalization is a consumer policy.
 
 ## Appendix A. Collected Formal Grammar
 

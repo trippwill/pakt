@@ -7,7 +7,7 @@ public enum PaktTokenType : byte
     // Statement framing
     StatementName,
     TypeAnnotationStart, TypeAnnotationEnd,
-    AssignOperator, PackOperator,
+    AssignOperator,
 
     // Scalar values
     String, Int, Decimal, Float, Bool,

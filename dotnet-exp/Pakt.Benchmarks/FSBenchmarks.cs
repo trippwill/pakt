@@ -62,7 +62,7 @@ public class FSBenchmarks
 
         pb.AppendLine("root:str = '/data/warehouse'");
         pb.AppendLine("scanned:ts = 2026-06-01T14:30:00Z");
-        pb.AppendLine("entries:[{path:str size:int mode:int mod_time:ts is_dir:bool owner:str group:str hash:bin}] <<");
+        pb.AppendLine("entries:[{path:str size:int mode:int mod_time:ts is_dir:bool owner:str group:str hash:bin}] = ~[");
 
         jb.Append("{\"root\":\"/data/warehouse\",\"scanned\":\"2026-06-01T14:30:00Z\",\"entries\":[");
 

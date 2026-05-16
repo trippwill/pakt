@@ -420,30 +420,30 @@ public class PaktValidatingReaderTests
     [Fact]
     public void ListPack_ValidElements_Passes()
     {
-        var tokens = Drain("nums:[int] << 1 2 3");
-        Assert.Contains(tokens, t => t.Type == PaktTokenType.PackOperator);
+        var tokens = Drain("nums:[int] = ~[1 2 3]");
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.ListStart);
         Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
     }
 
     [Fact]
     public void ListPack_WrongElementType_ThrowsTypeMismatch()
     {
-        var ex = AssertThrows("nums:[int] << 1 'hello' 3");
+        var ex = AssertThrows("nums:[int] = ~[1 'hello' 3]");
         Assert.Equal((int)PaktErrorCode.TypeMismatch, ex.Code);
     }
 
     [Fact]
     public void MapPack_ValidEntries_Passes()
     {
-        var tokens = Drain("ages:<str = int> << 'Alice' = 30 'Bob' = 25");
-        Assert.Contains(tokens, t => t.Type == PaktTokenType.PackOperator);
+        var tokens = Drain("ages:<str = int> = ~<'Alice' = 30 'Bob' = 25>");
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.MapStart);
         Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
     }
 
     [Fact]
     public void MapPack_WrongKeyType_ThrowsTypeMismatch()
     {
-        var ex = AssertThrows("ages:<str = int> << 42 = 30");
+        var ex = AssertThrows("ages:<str = int> = ~<42 = 30>");
         Assert.Equal((int)PaktErrorCode.TypeMismatch, ex.Code);
     }
 
@@ -514,7 +514,7 @@ public class PaktValidatingReaderTests
     [Fact]
     public void ListPack_WithStructElements_Passes()
     {
-        var tokens = Drain("items:[{id:int name:str}] << {1 'one'} {2 'two'}");
+        var tokens = Drain("items:[{id:int name:str}] = ~[{1 'one'} {2 'two'}]");
         Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
     }
 }

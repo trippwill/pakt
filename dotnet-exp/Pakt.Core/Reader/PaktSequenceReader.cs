@@ -40,7 +40,7 @@ public ref partial struct PaktSequenceReader
     private PaktTokenType _tokenType;
     private PaktReaderPhase _phase;
     private ContainerStack _containerStack;
-    private bool _isPack;
+    private bool _isStreaming;
     private int _statementCount;
     private readonly int _annotationNesting;
 
@@ -79,7 +79,7 @@ public ref partial struct PaktSequenceReader
         _phase = state._phase;
         _tokenType = state._tokenType;
         _containerStack = state._containerStack;
-        _isPack = state._isPack;
+        _isStreaming = state._isStreaming;
         _statementCount = state._statementCount;
         _annotationNesting = state._annotationNesting;
 
@@ -160,6 +160,9 @@ public ref partial struct PaktSequenceReader
     /// <summary>Byte position within the current line (0-based).</summary>
     public long BytePositionInLine => _bytePositionInLine;
 
+    /// <summary>Whether the current collection value was opened with streaming prefix (~[ or ~&lt;).</summary>
+    public bool IsStreaming => _isStreaming;
+
     /// <summary>Capture the current state for cross-buffer resumption.</summary>
     public PaktReaderState CurrentState => new(
         _lineNumber,
@@ -167,7 +170,7 @@ public ref partial struct PaktSequenceReader
         _phase,
         _tokenType,
         _containerStack,
-        _isPack,
+        _isStreaming,
         _statementCount,
         _annotationNesting,
         _options);

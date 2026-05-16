@@ -34,6 +34,7 @@ internal static class PaktConstants
     public const byte SingleQuote = 0x27;
     public const byte Backslash = 0x5C;
     public const byte Nul = 0x00;
+    public const byte Tilde = 0x7E;
 
     // ── Letters used in literal syntax ──
     public const byte LowerR = (byte)'r';
@@ -64,7 +65,7 @@ internal static class PaktConstants
     // ── Value terminators (for number/ident boundary detection) ──
 
     /// <summary>Bytes that end a number or identifier token.</summary>
-    public static ReadOnlySpan<byte> Delimiters => " \t\r\n,{}()[]<>|:=?';#\0"u8;
+    public static ReadOnlySpan<byte> Delimiters => " \t\r\n,{}()[]<>|:=?';#~\0"u8;
 
     // ── Character classification (inline, branch-free) ──
 

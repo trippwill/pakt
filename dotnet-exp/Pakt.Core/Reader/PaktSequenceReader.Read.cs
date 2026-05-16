@@ -16,8 +16,16 @@ public ref partial struct PaktSequenceReader
             if (IsLastSpan)
             {
                 // End of input
-                if (_phase is PaktReaderPhase.Start or PaktReaderPhase.ExpectStatementOrEnd
-                    or PaktReaderPhase.InPackValue)
+                if (_phase is PaktReaderPhase.Start or PaktReaderPhase.ExpectStatementOrEnd)
+                {
+                    _tokenType = PaktTokenType.EndOfUnit;
+                    _phase = PaktReaderPhase.Done;
+                    _valueSequence = default;
+                    return true;
+                }
+
+                // Streaming collection at EOF — implicit close
+                if (_phase == PaktReaderPhase.InAssignValue && _isStreaming && _containerStack.CurrentDepth > 0)
                 {
                     _tokenType = PaktTokenType.EndOfUnit;
                     _phase = PaktReaderPhase.Done;
@@ -44,7 +52,7 @@ public ref partial struct PaktSequenceReader
                 => ConsumeAnnotationToken(),
             PaktReaderPhase.ExpectOperator
                 => ConsumeOperator(),
-            PaktReaderPhase.InAssignValue or PaktReaderPhase.InPackValue
+            PaktReaderPhase.InAssignValue
                 => ConsumeValue(),
             PaktReaderPhase.Done
                 => false,
@@ -161,21 +169,6 @@ public ref partial struct PaktSequenceReader
             _valueSequence = default;
             _phase = PaktReaderPhase.ExpectStatementOrEnd; // allow more units after NUL
             return true;
-        }
-
-        // Semicolon at statement level (trailing from pack)
-        if (b == PaktConstants.Semicolon && _isPack)
-        {
-            _consumed++;
-            _bytePositionInLine++;
-            // Consume consecutive semicolons
-            while (_consumed < _buffer.Length && _buffer[_consumed] == PaktConstants.Semicolon)
-            {
-                _consumed++;
-                _bytePositionInLine++;
-            }
-            // Re-enter: look for next statement or end
-            return Read();
         }
 
         // Must be an identifier (statement name)
@@ -332,37 +325,12 @@ public ref partial struct PaktSequenceReader
             _bytePositionInLine++;
             _tokenType = PaktTokenType.AssignOperator;
             _valueSequence = _sequence.Slice(_tokenStartIndex, 1);
-            _isPack = false;
+            _isStreaming = false;
             _phase = PaktReaderPhase.InAssignValue;
             return true;
         }
 
-        if (b == PaktConstants.LAngle)
-        {
-            if (!TryPeek(1, out byte packNext))
-            {
-                if (IsLastSpan)
-                    ThrowSyntax("Unexpected '<' at end of input — expected '<<'");
-                return false;
-            }
-
-            if (packNext != PaktConstants.LAngle)
-                ThrowSyntax("Expected '<<' pack operator");
-
-            // Consume both '<' bytes — may span segments
-            _consumed++;
-            _bytePositionInLine++;
-            if (_consumed >= _buffer.Length) GetNextSpan();
-            _consumed++;
-            _bytePositionInLine++;
-            _tokenType = PaktTokenType.PackOperator;
-            _valueSequence = _sequence.Slice(_tokenStartIndex, 2);
-            _isPack = true;
-            _phase = PaktReaderPhase.InPackValue;
-            return true;
-        }
-
-        ThrowSyntax($"Expected '=' or '<<', got 0x{b:X2}");
+        ThrowSyntax($"Expected '=', got 0x{b:X2}");
         return false;
     }
 
@@ -372,30 +340,26 @@ public ref partial struct PaktSequenceReader
     {
         byte b = _buffer[_consumed];
 
-        // Pack termination checks
-        if (_phase == PaktReaderPhase.InPackValue && _containerStack.CurrentDepth == 0)
+        // Streaming prefix: ~[ or ~<
+        if (b == PaktConstants.Tilde)
         {
-            if (b == PaktConstants.Semicolon)
+            if (!TryPeek(1, out byte streamNext))
             {
-                // Consume semicolon run
-                while (_consumed < _buffer.Length && _buffer[_consumed] == PaktConstants.Semicolon)
-                {
-                    _consumed++;
-                    _bytePositionInLine++;
-                }
-                _phase = PaktReaderPhase.ExpectStatementOrEnd;
-                return Read(); // continue to next statement or end
+                if (IsLastSpan) ThrowSyntax("Unexpected '~' at end of input");
+                return false;
             }
 
-            if (b == PaktConstants.Nul)
-            {
-                _consumed++;
-                _bytePositionInLine++;
-                _tokenType = PaktTokenType.EndOfUnit;
-                _valueSequence = default;
-                _phase = PaktReaderPhase.ExpectStatementOrEnd;
-                return true;
-            }
+            _consumed++; // skip ~
+            _bytePositionInLine++;
+            _isStreaming = true;
+            _tokenStartIndex = _totalConsumed + _consumed; // point to [ or <
+
+            if (streamNext == PaktConstants.LBrack)
+                return OpenContainer(PaktTokenType.ListStart, ContainerKind.List);
+            if (streamNext == PaktConstants.LAngle)
+                return OpenContainer(PaktTokenType.MapStart, ContainerKind.Map);
+
+            ThrowSyntax($"Expected '[' or '<' after '~', got 0x{streamNext:X2}");
         }
 
         // Structural delimiters
@@ -419,11 +383,10 @@ public ref partial struct PaktSequenceReader
                 return CloseContainer(PaktTokenType.MapEnd);
         }
 
-        // Map entry bind — = inside map context or at pack top level
+        // Map entry bind — = inside map context
         if (b == PaktConstants.EqualsSign)
         {
-            if ((_containerStack.CurrentDepth > 0 && _containerStack.Peek() == ContainerKind.Map)
-                || (_phase == PaktReaderPhase.InPackValue && _containerStack.CurrentDepth == 0))
+            if (_containerStack.CurrentDepth > 0 && _containerStack.Peek() == ContainerKind.Map)
             {
                 _consumed++;
                 _bytePositionInLine++;
@@ -853,15 +816,16 @@ public ref partial struct PaktSequenceReader
             while (_consumed < local.Length)
             {
                 byte b = local[_consumed];
-                // Stop at layout, structural delimiters, quotes, semicolons, NUL
+                // Stop at layout, structural delimiters, quotes, NUL, tilde
                 if (b is PaktConstants.Space or PaktConstants.Tab
                     or PaktConstants.LF or PaktConstants.CR
+                    or PaktConstants.Comma
                     or PaktConstants.LBrace or PaktConstants.RBrace
                     or PaktConstants.LParen or PaktConstants.RParen
                     or PaktConstants.LBrack or PaktConstants.RBrack
                     or PaktConstants.LAngle or PaktConstants.RAngle
                     or PaktConstants.Pipe or PaktConstants.SingleQuote
-                    or PaktConstants.Hash or PaktConstants.Semicolon
+                    or PaktConstants.Hash or PaktConstants.Tilde
                     or PaktConstants.Nul
                     or PaktConstants.EqualsSign or PaktConstants.Question)
                 {

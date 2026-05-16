@@ -20,7 +20,6 @@ public ref struct PaktValidatingReader
 
     // Validation state
     private ValidatorPhase _phase;
-    private bool _isPack;
     private int _expectedNodeIndex; // which node describes the next expected value
     private ValidationFrameStack _frames;
 
@@ -34,7 +33,6 @@ public ref struct PaktValidatingReader
     {
         _inner = new PaktSequenceReader(paktData, isFinalBlock, state.InnerState);
         _phase = state.Phase;
-        _isPack = state.IsPack;
         _typeNodes = [];
         _members = [];
         _childIndices = [];
@@ -65,7 +63,7 @@ public ref struct PaktValidatingReader
             new PaktValidatingReaderState(
                 new PaktReaderState(0, 0, PaktReaderPhase.Start, PaktTokenType.None,
                     default, false, 0, 0, options ?? PaktReaderOptions.Default),
-                null, -1, false, ValidatorPhase.NoStatement, null, 0))
+                null, -1, ValidatorPhase.NoStatement, null, 0))
     {
     }
 
@@ -98,12 +96,14 @@ public ref struct PaktValidatingReader
     /// <summary>Byte position within the current line (0-based).</summary>
     public long BytePositionInLine => _inner.BytePositionInLine;
 
+    /// <summary>Whether the current collection was opened with streaming prefix (~[ or ~&lt;).</summary>
+    public bool IsStreaming => _inner.IsStreaming;
+
     /// <summary>Capture the current state for cross-buffer resumption.</summary>
     public PaktValidatingReaderState CurrentState => new(
         _inner.CurrentState,
         _annotationBytes.Length > 0 ? _annotationBytes : null,
         _expectedNodeIndex,
-        _isPack,
         _phase,
         _frames.ToSnapshots(),
         _frames.Depth);
@@ -152,14 +152,8 @@ public ref struct PaktValidatingReader
                 return true;
 
             case PaktTokenType.AssignOperator:
-                _isPack = false;
                 _expectedNodeIndex = _rootNodeIndex;
                 _phase = ValidatorPhase.AssignExpectValue;
-                return true;
-
-            case PaktTokenType.PackOperator:
-                _isPack = true;
-                SetupPackPhase();
                 return true;
 
             case PaktTokenType.EndOfUnit:
@@ -202,7 +196,6 @@ public ref struct PaktValidatingReader
         _annotationBytes = [];
         _rootNodeIndex = -1;
         _expectedNodeIndex = -1;
-        _isPack = false;
         _frames.Clear();
     }
 
@@ -216,33 +209,6 @@ public ref struct PaktValidatingReader
         _rootNodeIndex = ValidationTypeParser.Parse(
             _annotationBytes, _inner.CurrentState.Options.MaxNestingDepth,
             out _typeNodes, out _members, out _childIndices);
-    }
-
-    private void SetupPackPhase()
-    {
-        if (_rootNodeIndex < 0 || _rootNodeIndex >= _typeNodes.Length)
-            ThrowValidation("Pack operator without valid type annotation");
-
-        ref readonly ValidationNode root = ref _typeNodes[_rootNodeIndex];
-
-        switch (root.Kind)
-        {
-            case ValidationNodeKind.List:
-                // Pack values are list elements — validate each against element type
-                _expectedNodeIndex = _childIndices[root.ChildStart];
-                _phase = ValidatorPhase.PackListExpectItem;
-                break;
-
-            case ValidationNodeKind.Map:
-                // Pack values alternate key => value
-                _expectedNodeIndex = _childIndices[root.ChildStart]; // key type
-                _phase = ValidatorPhase.PackMapExpectKey;
-                break;
-
-            default:
-                ThrowValidation("Pack operator requires list or map type");
-                break;
-        }
     }
 
     // ── Value Validation ──
@@ -412,27 +378,17 @@ public ref struct PaktValidatingReader
 
     private void ValidateMapBind()
     {
-        // => is valid only inside a map composite or map pack
-        if (_phase == ValidatorPhase.PackMapExpectBind)
-        {
-            // Map pack: transition from key done to value
-            ref readonly ValidationNode root = ref _typeNodes[_rootNodeIndex];
-            _expectedNodeIndex = _childIndices[root.ChildStart + 1]; // value type
-            _phase = ValidatorPhase.PackMapExpectValue;
-            return;
-        }
-
         if (_frames.Depth == 0)
-            ThrowValidation("'=>' outside of map context");
+            ThrowValidation("'=' bind outside of map context");
 
         ref ValidationFrame frame = ref _frames.Peek();
         ref readonly ValidationNode mapNode = ref _typeNodes[frame.TypeNodeIndex];
 
         if (mapNode.Kind != ValidationNodeKind.Map)
-            ThrowValidation("'=>' inside non-map composite");
+            ThrowValidation("'=' bind inside non-map composite");
 
         if (frame.Phase != MapPhase.ExpectBind)
-            ThrowValidation("Unexpected '=>' — expected key or close");
+            ThrowValidation("Unexpected '=' bind — expected key or close");
 
         // After =>, expect the value type
         _expectedNodeIndex = _childIndices[mapNode.ChildStart + 1];
@@ -455,22 +411,6 @@ public ref struct PaktValidatingReader
                 case ValidatorPhase.AssignExpectValue:
                     // Assign value complete — next token should be a new statement
                     _phase = ValidatorPhase.NoStatement;
-                    return;
-
-                case ValidatorPhase.PackListExpectItem:
-                    // Stay in pack list mode, expected node stays the same
-                    return;
-
-                case ValidatorPhase.PackMapExpectKey:
-                    // Key complete, expect =>
-                    _phase = ValidatorPhase.PackMapExpectBind;
-                    return;
-
-                case ValidatorPhase.PackMapExpectValue:
-                    // Value complete, expect next key or end
-                    ref readonly ValidationNode root = ref _typeNodes[_rootNodeIndex];
-                    _expectedNodeIndex = _childIndices[root.ChildStart]; // back to key type
-                    _phase = ValidatorPhase.PackMapExpectKey;
                     return;
 
                 default:

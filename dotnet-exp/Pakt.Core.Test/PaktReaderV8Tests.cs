@@ -88,27 +88,31 @@ public class PaktReaderV8Tests
     }
 
     [Fact]
-    public void ListPack_WithSemicolon()
+    public void StreamingList()
     {
-        var tokens = DrainV8("items:[int] << 1 2 3;");
+        var tokens = DrainV8("items:[int] = ~[1 2 3]");
         Assert.Equal(PaktTokenType.StatementName, tokens[0].Type);
-        Assert.Equal(PaktTokenType.PackOperator, tokens[2].Type);
-        Assert.Equal(PaktTokenType.Int, tokens[3].Type);
-        Assert.Equal("1", tokens[3].Value);
+        Assert.Equal(PaktTokenType.AssignOperator, tokens[2].Type);
+        Assert.Equal(PaktTokenType.ListStart, tokens[3].Type);
         Assert.Equal(PaktTokenType.Int, tokens[4].Type);
-        Assert.Equal("2", tokens[4].Value);
+        Assert.Equal("1", tokens[4].Value);
         Assert.Equal(PaktTokenType.Int, tokens[5].Type);
-        Assert.Equal("3", tokens[5].Value);
-        Assert.Equal(PaktTokenType.EndOfUnit, tokens[6].Type);
+        Assert.Equal("2", tokens[5].Value);
+        Assert.Equal(PaktTokenType.Int, tokens[6].Type);
+        Assert.Equal("3", tokens[6].Value);
+        Assert.Equal(PaktTokenType.ListEnd, tokens[7].Type);
+        Assert.Equal(PaktTokenType.EndOfUnit, tokens[8].Type);
     }
 
     [Fact]
-    public void ListPack_TailEof()
+    public void StreamingList_TailEof()
     {
-        var tokens = DrainV8("items:[int] << 1 2 3");
-        Assert.Equal(PaktTokenType.Int, tokens[5].Type);
-        Assert.Equal("3", tokens[5].Value);
-        Assert.Equal(PaktTokenType.EndOfUnit, tokens[6].Type);
+        // ~[ without closing ] — EOF terminates
+        var tokens = DrainV8("items:[int] = ~[1 2 3");
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.ListStart);
+        Assert.Equal(PaktTokenType.Int, tokens[^2].Type);
+        Assert.Equal("3", tokens[^2].Value);
+        Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
     }
 
     [Fact]
@@ -122,9 +126,9 @@ public class PaktReaderV8Tests
     }
 
     [Fact]
-    public void PackTerminatedBySemicolon_ThenStatement()
+    public void StreamingList_ThenStatement()
     {
-        var tokens = DrainV8("items:[int] << 1 2;\nnext:int = 99");
+        var tokens = DrainV8("items:[int] = ~[1 2]\nnext:int = 99");
         var stmts = tokens.Where(t => t.Type == PaktTokenType.StatementName).ToList();
         Assert.Equal(2, stmts.Count);
         Assert.Equal("items", stmts[0].Value);
@@ -244,12 +248,13 @@ public class PaktReaderV8Tests
     }
 
     [Fact]
-    public void MultiSegment_OperatorSplitAcrossSegments()
+    public void MultiSegment_ValueSplitAcrossSegments()
     {
-        var seq = CreateMultiSegment("items:[int] <"u8, "< 1 2"u8);
+        var seq = CreateMultiSegment("items:[int] = ["u8, "1 2]"u8);
         var tokens = DrainV8Seq(seq);
-        Assert.Equal(PaktTokenType.PackOperator, tokens[2].Type);
-        Assert.Equal(PaktTokenType.Int, tokens[3].Type);
+        Assert.Equal(PaktTokenType.AssignOperator, tokens[2].Type);
+        Assert.Equal(PaktTokenType.ListStart, tokens[3].Type);
+        Assert.Equal(PaktTokenType.Int, tokens[4].Type);
     }
 
     private static ReadOnlySequence<byte> CreateMultiSegment(

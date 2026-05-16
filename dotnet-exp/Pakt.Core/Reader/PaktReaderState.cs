@@ -11,7 +11,7 @@ public readonly struct PaktReaderState
     internal readonly PaktReaderPhase _phase;
     internal readonly PaktTokenType _tokenType;
     internal readonly ContainerStack _containerStack;
-    internal readonly bool _isPack;
+    internal readonly bool _isStreaming;
     internal readonly int _statementCount;
     internal readonly int _annotationNesting;
     internal readonly PaktReaderOptions _options;
@@ -22,7 +22,7 @@ public readonly struct PaktReaderState
         PaktReaderPhase phase,
         PaktTokenType tokenType,
         ContainerStack containerStack,
-        bool isPack,
+        bool isStreaming,
         int statementCount,
         int annotationNesting,
         PaktReaderOptions options)
@@ -32,7 +32,7 @@ public readonly struct PaktReaderState
         _phase = phase;
         _tokenType = tokenType;
         _containerStack = containerStack;
-        _isPack = isPack;
+        _isStreaming = isStreaming;
         _statementCount = statementCount;
         _annotationNesting = annotationNesting;
         _options = options;

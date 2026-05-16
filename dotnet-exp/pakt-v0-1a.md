@@ -30,22 +30,21 @@ PAKT uses complete-version specifications. Parser libraries advertise which spec
 
 ## 1. Data Model
 
-A PAKT unit is a sequence of **statements** at the top level. A statement is either an **assign** (a named, typed, single value) or a **pack** (a named, typed, open-ended sequence of values).
+A PAKT unit is a sequence of **statements** at the top level. Each statement is a named, typed value assignment: `name:type = value`.
 
-The unit root uses self-describing statements (`name:type = value` or `name:type << values...`) rather than positional values. This is the system boundary where data enters without a parent type context.
+The unit root uses self-describing statements rather than positional values. This is the system boundary where data enters without a parent type context.
 
 ```pakt
 name:str = 'midwatch'
 version:(int int int) = (1 0 0)
 ```
 
-Packs deliver zero or more values of a collection type, terminated by `;`, end-of-unit, or NUL:
+Streaming collections use `~[` or `~<` to open a collection that may not close. This enables append-only log scenarios where a producer writes elements incrementally:
 
 ```pakt
-events:[{ts:ts level:|info warn error| msg:str}] <<
+events:[{ts:ts level:|info warn error| msg:str}] = ~[
 { 2026-06-01T14:30:00Z |info 'server started' }
 { 2026-06-01T14:31:00Z |warn 'high latency' }
-;
 ```
 
 ## 2. Encoding
@@ -192,11 +191,10 @@ Any other `\` followed by a character is a parse error. Null bytes (`U+0000`) ar
 HASH    = '#'
 ASSIGN  = '='
 COLON   = ':'                       ; type annotation only
-PACK    = '<<'
-BIND    = '='
+BIND    = '='                       ; map entry binding (= in map context)
+STREAM  = '~'                       ; streaming collection prefix (~[ or ~<)
 PIPE    = '|'
 QMARK   = '?'
-SEMI    = ';'+                      ; pack terminator (run of one or more)
 LBRACE  = '{'    RBRACE = '}'
 LPAREN  = '('    RPAREN = ')'
 LBRACK  = '['    RBRACK = ']'
@@ -209,7 +207,7 @@ BANG    = '!'
 STAR    = '*'
 DOLLAR  = '$'
 AMP     = '&'
-TILDE   = '~'
+SEMI    = ';'
 BTICK   = '`'
 ```
 
@@ -297,7 +295,7 @@ The following tokens are reserved for future use or deliberately excluded from P
 | `*` | Wildcards or glob patterns |
 | `$` | Variable references or interpolation |
 | `&` | Type aliases (see §4.6) |
-| `~` | Approximate matching or home paths |
+| `;` | Reserved |
 | `` ` `` | Alternate string delimiters or template literals |
 
 ### 4.6 Future Consideration: Type Aliases
@@ -310,8 +308,8 @@ Type aliases would allow naming a type once and referencing it by name in type p
 &entry = {path:str size:int is_dir:bool hash:bin?}
 &level = |info warn error|
 
-entries:[&entry] << ...
-events:[{ts:ts level:&level msg:str}] << ...
+entries:[&entry] = ~[...
+events:[{ts:ts level:&level msg:str}] = ~[...
 ```
 
 Planned semantics:
@@ -328,7 +326,7 @@ Planned semantics:
 
 ```ebnf
 unit      = layout_opt statement*
-statement = assign | pack
+statement = assign
 ```
 
 ### 5.2 Statement Headers
@@ -336,10 +334,8 @@ statement = assign | pack
 A statement header consists of:
 
 ```ebnf
-IDENT type_annot operator
+IDENT type_annot ASSIGN
 ```
-
-where `operator` is either `=` for assign or `<<` for pack.
 
 A newline is not permitted inside a statement header. Specifically, no newline may appear between:
 
@@ -347,15 +343,13 @@ A newline is not permitted inside a statement header. Specifically, no newline m
 - the `:` and the type annotation
 - the type annotation and the statement operator
 
-The value of an assign statement may begin on the same line as `=` or on a following line. The body of a pack statement may begin on the same line as `<<` or on a following line.
+The value of an assign statement may begin on the same line as `=` or on a following line.
 
 Layout around the statement operator is optional:
 
 ```pakt
 name:str = 'midwatch'
 name:str='midwatch'
-events:[event] <<
-events:[event]<<
 ```
 
 ### 5.3 Assign
@@ -364,32 +358,34 @@ events:[event]<<
 assign = IDENT type_annot layout_opt ASSIGN layout_opt value
 ```
 
-### 5.4 Pack
+### 5.4 Streaming Collections
+
+A collection value may be opened with a streaming prefix `~` before `[` or `<`. This signals that the closing delimiter is optional — the collection may be terminated by end-of-unit (EOF or NUL) instead.
 
 ```ebnf
-pack = IDENT type_annot layout_opt PACK (layout_opt pack_body?)? SEMI?
+streaming_list = STREAM LBRACK layout_opt list_members? layout_opt RBRACK?
+streaming_map  = STREAM LANGLE layout_opt map_entries? layout_opt RANGLE?
 ```
 
-A pack delivers zero or more bare values of the annotated collection type. The type must be a list type or map type.
+Streaming collections enable append-only scenarios (e.g., log files) where a producer writes elements incrementally without knowing the total count. The `~` prefix tells the parser to tolerate a missing close delimiter.
 
-```ebnf
-pack_body        = list_pack_body | map_pack_body
-list_pack_body   = value (LAYOUT value)*
-map_pack_body    = map_entry (LAYOUT map_entry)*
+When a streaming collection appears mid-unit (before another statement), the closing delimiter is required. When it appears at the tail of a unit, the closing delimiter may be omitted and end-of-unit terminates the collection.
+
+If the closing delimiter is present, the collection is structurally identical to a non-streaming collection. The `~` is a signal to consumers about streaming intent, not a structural difference.
+
+```pakt
+# Mid-unit streaming (] required before next statement)
+events:[{ts:ts msg:str}] = ~[
+    { 2026-06-01T14:30:00Z 'started' }
+    { 2026-06-01T14:30:05Z 'lag detected' }
+]
+name:str = 'midwatch'
+
+# Tail streaming (] optional, EOF terminates)
+log:[{ts:ts msg:str}] = ~[
+    { 2026-06-01T14:30:00Z 'started' }
+    { 2026-06-01T14:30:05Z 'lag detected' }
 ```
-
-For list packs, each value conforms to the list's element type. For map packs, each entry is `key = value` conforming to the map's key and value types.
-
-**Termination**: A pack ends when the parser encounters:
-
-1. **`;`** (semicolon) — the explicit pack terminator. One or more consecutive `;` characters (with optional interleaved layout) are treated as a single terminator. A pack followed by another statement **must** be terminated with `;`.
-2. **End-of-unit** — EOF or NUL terminator (per §10.1). A pack at the tail of a unit may rely on end-of-unit for termination without `;`.
-
-A `;` outside of a pack context (e.g., after an assign statement) is a syntax error.
-
-**Duplicate keys**: Repeated map entries are preserved in encounter order. Interpreting duplicate keys is an application/domain concern (see §6).
-
-**Root duplicates**: Pack names participate in root duplicate handling — see §6.
 
 ### 5.5 Type Annotation
 
@@ -501,7 +497,7 @@ The reserved keywords `true`, `false`, and `nil` cannot be used as statement nam
 
 ### 6.2 Map Duplicate Keys
 
-Duplicate keys in either a map value (`= <...>`) or a map pack (`<<`) are not a format-level parse error and do not carry built-in replacement semantics in the format itself.
+Duplicate keys in a map value (`= <...>` or `= ~<...>`) are not a format-level parse error and do not carry built-in replacement semantics in the format itself.
 
 A conforming decoder preserves repeated map entries in encounter order. How duplicates are interpreted is an application/domain concern. Higher-level consumers or bindings may choose to reject duplicates, apply first-wins or last-wins semantics, accumulate all values, or preserve raw order for later processing, but they must document that behavior.
 
@@ -513,8 +509,8 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Commas are not separators.
 - Consecutive layout is equivalent to a single layout separator where layout is permitted.
 - Layout before the first member, after the last member, and around delimiters is ignored where the grammar permits `layout_opt`.
-- Layout is optional around `=` and `<<`.
-- Layout is not required around `;` (pack terminator). `;` may appear immediately after the last pack value.
+- Layout is optional around `=`.
+
 - Layout is not permitted around `:` in type annotations.
 - Indentation is insignificant to the core parser.
 - A comment does not consume a newline. The newline remains part of layout.
@@ -669,11 +665,10 @@ layout_opt  = LAYOUT?
 
 ASSIGN  = '='
 COLON   = ':'
-PACK    = '<<'
-BIND    = '='
+BIND    = '='                       ; map entry binding (= in map context)
+STREAM  = '~'                       ; streaming collection prefix (~[ or ~<)
 PIPE    = '|'
 QMARK   = '?'
-SEMI    = ';'+                      ; pack terminator (run of one or more)
 LBRACE  = '{'    RBRACE  = '}'
 LPAREN  = '('    RPAREN  = ')'
 LBRACK  = '['    RBRACK  = ']'
@@ -686,7 +681,7 @@ BANG    = '!'
 STAR    = '*'
 DOLLAR  = '$'
 AMP     = '&'
-TILDE   = '~'
+SEMI    = ';'
 BTICK   = '`'
 
 ; --- Scalar literals ---
@@ -732,22 +727,20 @@ ATOM        = PIPE IDENT
 ; --- Unit structure ---
 
 unit        = layout_opt statement*
-statement   = assign | pack
+statement   = assign
 
 ; --- Statement headers ---
 
-assign      = IDENT type_annot LAYOUT ASSIGN LAYOUT value
-pack        = IDENT type_annot LAYOUT PACK (LAYOUT pack_body?)? SEMI?
+assign      = IDENT type_annot layout_opt ASSIGN layout_opt value
 
 ; no newline is permitted inside the statement header
 
-; --- Pack body ---
-;     Terminates at SEMI, end-of-unit (EOF or NUL).
-;     A pack followed by another statement MUST end with SEMI.
+; --- Streaming collections ---
+;     ~[ or ~< opens a collection that tolerates missing close delimiter.
+;     EOF or NUL terminates. Close delimiter required if more statements follow.
 
-pack_body       = list_pack_body | map_pack_body
-list_pack_body  = value (LAYOUT value)*
-map_pack_body   = map_entry (LAYOUT map_entry)*
+streaming_list = STREAM LBRACK layout_opt list_members? layout_opt RBRACK?
+streaming_map  = STREAM LANGLE layout_opt map_entries? layout_opt RANGLE?
 
 ; --- Type annotations ---
 
@@ -811,8 +804,7 @@ headers:<str = str> = <
   'accept' = 'application/json'
 >
 
-events:[{ts:ts level:|info warn error| msg:str}] <<
+events:[{ts:ts level:|info warn error| msg:str}] = ~[
 { 2026-06-01T14:30:00Z |info 'server started' }
 { 2026-06-01T14:31:00Z |warn 'high latency' }
-;
 ```

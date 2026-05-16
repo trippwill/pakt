@@ -20,9 +20,6 @@ internal enum PaktReaderPhase : byte
     /// <summary>Reading the value of an assign statement.</summary>
     InAssignValue,
 
-    /// <summary>Reading values in a pack body.</summary>
-    InPackValue,
-
     /// <summary>Parsing complete.</summary>
     Done,
 }

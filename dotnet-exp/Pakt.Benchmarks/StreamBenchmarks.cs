@@ -68,7 +68,7 @@ public class StreamBenchmarks
     private static byte[] GeneratePakt(int n)
     {
         StringBuilder sb = new();
-        sb.AppendLine("entries:[{path:str size:int is_dir:bool mod_time:str}] <<");
+        sb.AppendLine("entries:[{path:str size:int is_dir:bool mod_time:str}] = ~[");
         for (int i = 0; i < n; i++)
         {
             string path = $"/data/warehouse/incoming/file_{i:D6}.dat";

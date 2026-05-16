@@ -91,8 +91,7 @@ internal static class DeserializerEmitter
         sb.AppendLine();
         sb.AppendLine("            // Skip annotation and operator");
         sb.AppendLine("            reader.Read(); // TypeAnnotationStart");
-        sb.AppendLine("            reader.Read(); // AssignOperator or PackOperator");
-        sb.AppendLine("            var __isPack = reader.TokenType == global::Pakt.PaktTokenType.PackOperator;");
+        sb.AppendLine("            reader.Read(); // AssignOperator");
         sb.AppendLine();
 
         // Duplicate check
@@ -212,36 +211,7 @@ internal static class DeserializerEmitter
     {
         string varName = $"__{prop.ClrName}";
 
-        if (prop.Kind is PaktTypeKind.List && true)
-        {
-            // Lists can come as assign ([...]) or pack (<<)
-            sb.AppendLine($"                    if (__isPack)");
-            sb.AppendLine($"                    {{");
-            EmitPackListRead(sb, prop, varName, "                        ");
-            sb.AppendLine($"                    }}");
-            sb.AppendLine($"                    else");
-            sb.AppendLine($"                    {{");
-            sb.AppendLine($"                        reader.Read(); // advance to value");
-            EmitAssignValueRead(sb, prop, varName, "                        ");
-            sb.AppendLine($"                    }}");
-            return;
-        }
-
-        if (prop.Kind is PaktTypeKind.Map)
-        {
-            sb.AppendLine($"                    if (__isPack)");
-            sb.AppendLine($"                    {{");
-            EmitPackMapRead(sb, prop, varName, "                        ");
-            sb.AppendLine($"                    }}");
-            sb.AppendLine($"                    else");
-            sb.AppendLine($"                    {{");
-            sb.AppendLine($"                        reader.Read(); // advance to value");
-            EmitAssignValueRead(sb, prop, varName, "                        ");
-            sb.AppendLine($"                    }}");
-            return;
-        }
-
-        // Scalar/struct: always assign
+        // All values (including streaming collections) start with a Read() to get the first token
         sb.AppendLine($"                    reader.Read(); // advance to value");
         EmitAssignValueRead(sb, prop, varName, "                    ");
     }
@@ -313,20 +283,6 @@ internal static class DeserializerEmitter
         sb.AppendLine($"{indent}}}");
     }
 
-    private static void EmitPackListRead(StringBuilder sb, PropertyModel prop, string varName, string indent)
-    {
-        string elemFqn = prop.ElementTypeFqn ?? "object";
-        var elemKind = ClassifyElementKind(elemFqn);
-        sb.AppendLine($"{indent}var {varName}_list = new global::System.Collections.Generic.List<{elemFqn}>();");
-        sb.AppendLine($"{indent}while (reader.Read())");
-        sb.AppendLine($"{indent}{{");
-        sb.AppendLine($"{indent}    var __tt = reader.TokenType;");
-        sb.AppendLine($"{indent}    if (__tt == global::Pakt.PaktTokenType.EndOfUnit || __tt == global::Pakt.PaktTokenType.StatementName) break;");
-        sb.AppendLine($"{indent}    {varName}_list.Add({EmitGetForKind(elemKind, elemFqn)});");
-        sb.AppendLine($"{indent}}}");
-        sb.AppendLine($"{indent}{varName} = {varName}_list;");
-    }
-
     // ── Map reading ──
 
     private static void EmitMapRead(StringBuilder sb, PropertyModel prop, string varName)
@@ -351,25 +307,6 @@ internal static class DeserializerEmitter
         sb.AppendLine($"{indent}    var __val = {EmitGetForKind(valKind, valFqn)};");
         sb.AppendLine($"{indent}    {varName}[__key] = __val;");
         sb.AppendLine($"{indent}}}");
-    }
-
-    private static void EmitPackMapRead(StringBuilder sb, PropertyModel prop, string varName, string indent)
-    {
-        string keyFqn = prop.KeyTypeFqn ?? "string";
-        string valFqn = prop.ValueTypeFqn ?? "object";
-        var valKind = ClassifyElementKind(valFqn);
-        sb.AppendLine($"{indent}var {varName}_dict = new global::System.Collections.Generic.Dictionary<{keyFqn}, {valFqn}>();");
-        sb.AppendLine($"{indent}while (reader.Read())");
-        sb.AppendLine($"{indent}{{");
-        sb.AppendLine($"{indent}    var __tt = reader.TokenType;");
-        sb.AppendLine($"{indent}    if (__tt == global::Pakt.PaktTokenType.EndOfUnit || __tt == global::Pakt.PaktTokenType.StatementName) break;");
-        sb.AppendLine($"{indent}    var __key = reader.GetString();");
-        sb.AppendLine($"{indent}    reader.Read(); // MapEntryBind");
-        sb.AppendLine($"{indent}    reader.Read(); // value token");
-        sb.AppendLine($"{indent}    var __val = {EmitGetForKind(valKind, valFqn)};");
-        sb.AppendLine($"{indent}    {varName}_dict[__key] = __val;");
-        sb.AppendLine($"{indent}}}");
-        sb.AppendLine($"{indent}{varName} = {varName}_dict;");
     }
 
     // ── Helpers ──

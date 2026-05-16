@@ -139,7 +139,7 @@ public class MaterializeBenchmarks
         var jb = new StringBuilder();
 
         // PAKT: pack of structs with all typed fields
-        pb.AppendLine("records:[{name:str count:int price:dec active:bool id:uuid created:date modified:ts hash:bin}] <<");
+        pb.AppendLine("records:[{name:str count:int price:dec active:bool id:uuid created:date modified:ts hash:bin}] = ~[");
 
         // JSON: array of objects (uuid/date/ts/binary as strings)
         jb.Append("[");

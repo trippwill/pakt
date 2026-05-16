@@ -226,7 +226,7 @@ Every value must have a type. There is no default type and no type inference.
 | `bool` | Boolean keyword | `true`, `false` |
 | `uuid` | UUID | `550e8400-e29b-41d4-a716-446655440000` |
 | `date` | ISO date | `2026-06-01` |
-| `ts` | ISO timestamp (tz required) | `2026-06-01T14:30:00Z` |
+| `ts` | ISO timestamp (tz recommended) | `2026-06-01T14:30:00Z` |
 | `bin` | Binary data | `x'48656C6C6F'`, `b'SGVsbG8='` |
 
 **Numeric precision:**
@@ -401,19 +401,12 @@ log:[{ts:ts msg:str}] = ~[
 type_annot = COLON type
 ```
 
-Whitespace around `:` in type annotations is not permitted. This applies to statement annotations and struct field declarations.
-
-Valid:
+Layout around `:` in type annotations is permitted but conventionally omitted. Both forms are valid:
 
 ```pakt
 name:str
-{level:str release:int}
-```
-
-Invalid:
-
-```pakt
 name : str
+{level:str release:int}
 {level : str release : int}
 ```
 
@@ -519,7 +512,7 @@ Struct field names are declared in the type, not in the value, so duplicates are
 - Layout before the first member, after the last member, and around delimiters is ignored where the grammar permits `layout_opt`.
 - Layout is optional around `=`.
 
-- Layout is not permitted around `:` in type annotations.
+- Layout around `:` in type annotations is permitted but conventionally omitted.
 - Indentation is insignificant to the core parser.
 - A comment does not consume a newline. The newline remains part of layout.
 - A comment participates in layout only where layout is permitted.

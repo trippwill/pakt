@@ -110,13 +110,17 @@ public ref partial struct PaktSequenceReader
                             | HexVal(content[i + 3]) << 8
                             | HexVal(content[i + 4]) << 4
                             | HexVal(content[i + 5]);
+                        if (cp is >= 0xD800 and <= 0xDFFF)
+                            throw PaktParseError.Syntax(default,
+                                "Surrogate code points (U+D800–U+DFFF) not valid in \\u escapes").ToException();
                         sb.Append((char)cp);
                         i += 6;
                     }
                     else { sb.Append('\\'); i++; }
                     break;
                 default:
-                    sb.Append('\\'); i++; break;
+                    throw PaktParseError.Syntax(default,
+                        $"Invalid escape sequence '\\{(char)esc}'").ToException();
             }
         }
         return sb.ToString();
@@ -358,6 +362,8 @@ public ref partial struct PaktSequenceReader
 
         if (prefix == (byte)'x')
         {
+            if (content.Length % 2 != 0)
+                ThrowSyntax("Hex literal must have even number of digits");
             return Convert.FromHexString(Encoding.ASCII.GetString(content));
         }
 

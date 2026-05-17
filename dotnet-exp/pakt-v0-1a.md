@@ -16,8 +16,9 @@ PAKT uses complete-version specifications. Reader libraries advertise which spec
 
 ### 0.1 Definitions
 
-- **Reader**: The component that consumes PAKT-encoded bytes and produces a token or event stream. A reader validates syntax and type annotations. Implementations may split this into layers (e.g., a tokenizer and a validating wrapper), but the spec addresses them as one logical unit.
-- **Producer**: The entity that generates PAKT data — a serializer, encoder, or human author.
+- **Reader**: The component that consumes PAKT-encoded bytes and produces a stream of tokens. A reader validates syntax and type annotations. Implementations may split this into layers (e.g., a raw tokenizer and a validating wrapper), but the spec addresses them as one logical unit.
+- **Token**: A single unit of reader output — a statement name, type annotation, operator, scalar value, composite delimiter, or end-of-unit marker. Each token has a type and an optional value. The token stream is the interface between the reader and the consumer.
+- **Producer**: The entity that generates PAKT data — a serializer, writer, or human author.
 - **Consumer**: The entity that processes PAKT data using a reader. A consumer may be a deserializer, materializer, or application-level handler.
 - **Conforming reader**: A reader that implements all normative requirements of this specification: grammar, type checking, error codes, streaming, and NUL framing.
 
@@ -29,9 +30,9 @@ PAKT uses complete-version specifications. Reader libraries advertise which spec
 
 3. **The reader is lossless; interpretation is layered.** A conforming reader preserves all information present in the source — including duplicate statement names, duplicate map keys, encounter order, raw string content, and raw multi-line string content. Policy decisions such as rejecting duplicates, applying last-wins, accumulating values, stripping indentation, or normalizing presentation belong to higher-level consumers, not the core reader.
 
-4. **Presentation is an application concern.** Human-readable formatting, event enrichment, indentation normalization, and display transformations are not reader or writer responsibilities. The core event contract is minimal and machine-oriented.
+4. **Presentation is an application concern.** Human-readable formatting, token enrichment, indentation normalization, and display transformations are not reader or writer responsibilities. The core token contract is minimal and machine-oriented.
 
-5. **The grammar is the event model.** Each grammatical construct — assign, pack, struct, tuple, list, map, scalar — maps to a distinct event kind. Consumers should not need to inspect payload strings to determine structural context.
+5. **The grammar is the token model.** Each grammatical construct — assign, struct, tuple, list, map, scalar — maps to a distinct token kind. Consumers should not need to inspect payload strings to determine structural context.
 
 6. **Layout separates members.** Layout separates adjacent type members, value members, atom members, and map entries. Punctuation marks structure and relationships; it is not used as a general list separator.
 
@@ -321,7 +322,7 @@ events:[{ts:ts level:&level msg:str}] = ~[...
 
 Planned semantics:
 
-- **`&name = type`** defines a type alias. It is not a statement — it emits no data events and does not participate in root duplicate handling.
+- **`&name = type`** defines a type alias. It is not a statement — it emits no tokens and does not participate in root duplicate handling.
 - **`&name`** in type position is a structural substitution — the alias expands to the underlying type. There is no nominal typing.
 - **Must appear before use.** This is the streaming-compatible ordering rule. Forward references are a parse error.
 - **`&` sigil required in both definition and reference.** This keeps alias names and statement names in separate namespaces.

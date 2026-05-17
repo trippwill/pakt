@@ -27,6 +27,14 @@ public abstract class PaktTypeInfo
 public delegate T PaktDeserializeFunc<out T>(ref PaktValidatingReader reader);
 
 /// <summary>
+/// Unit-level deserialize delegate using the raw sequence reader.
+/// Generated per-type: zero-alloc statement matching, no annotation parsing.
+/// </summary>
+public delegate T PaktRawUnitDeserializeFunc<out T>(
+    ref PaktSequenceReader reader,
+    PaktSerializationOptions options);
+
+/// <summary>
 /// Unit-level deserialize delegate that handles statement matching and policies.
 /// Generated per-type: reads statements by name, applies policies, returns T.
 /// </summary>
@@ -54,6 +62,12 @@ public sealed class PaktTypeInfo<T> : PaktTypeInfo
     /// from a positional token stream (used inside composites and by converters).
     /// </summary>
     public required PaktDeserializeFunc<T> Deserialize { get; init; }
+
+    /// <summary>
+    /// Delegate that deserializes <typeparamref name="T"/> from a full PAKT unit
+    /// using the raw sequence reader. Preferred path — no annotation parsing overhead.
+    /// </summary>
+    public PaktRawUnitDeserializeFunc<T>? RawDeserializeUnit { get; init; }
 
     /// <summary>
     /// Delegate that deserializes <typeparamref name="T"/> from a full PAKT unit,

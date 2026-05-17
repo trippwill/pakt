@@ -111,12 +111,76 @@ validateCommand.SetAction(parseResult =>
     }
 });
 
+// ── Codegen command ──
+
+var outputOption = new System.CommandLine.Option<FileInfo?>("--output", ["-o"])
+{
+    Description = "Output file (default: stdout)",
+};
+
+var namespaceOption = new System.CommandLine.Option<string?>("--namespace")
+{
+    Description = "C# namespace for generated types",
+};
+
+var classNameOption = new System.CommandLine.Option<string?>("--class-name")
+{
+    Description = "Root unit class name (default: from filename)",
+};
+
+var codegenCommand = new System.CommandLine.Command("codegen", "Generate C# POCOs from a .pakt file's type annotations")
+{
+    fileArgument,
+    outputOption,
+    namespaceOption,
+    classNameOption,
+};
+
+codegenCommand.SetAction(parseResult =>
+{
+    var file = parseResult.GetValue(fileArgument)!;
+    if (!file.Exists)
+    {
+        AnsiConsole.MarkupLine($"[red]File not found:[/] {file.FullName}");
+        return 1;
+    }
+
+    byte[] data = File.ReadAllBytes(file.FullName);
+    var output = parseResult.GetValue(outputOption);
+    var ns = parseResult.GetValue(namespaceOption);
+    var className = parseResult.GetValue(classNameOption);
+
+    try
+    {
+        var model = Pakt.Cli.Codegen.TypeExtractor.Extract(data, file.Name);
+        string code = Pakt.Cli.Codegen.CSharpEmitter.Emit(model, ns, className);
+
+        if (output != null)
+        {
+            File.WriteAllText(output.FullName, code);
+            AnsiConsole.MarkupLine($"[green]✓[/] Generated {output.Name} ({model.Statements.Count} statements, {model.Structs.Count} structs, {model.Enums.Count} enums)");
+        }
+        else
+        {
+            Console.Write(code);
+        }
+
+        return 0;
+    }
+    catch (PaktParseException ex)
+    {
+        AnsiConsole.MarkupLine($"[red]✗[/] {file.Name}: {EscapeMarkup(ex.Message)}");
+        return 1;
+    }
+});
+
 // ── Root command ──
 
 var rootCommand = new System.CommandLine.RootCommand("PAKT CLI — typed data interchange format")
 {
     parseCommand,
     validateCommand,
+    codegenCommand,
 };
 
 return await rootCommand.Parse(args).InvokeAsync();

@@ -32,7 +32,7 @@ public partial class TestSerializerContext : PaktSerializerContext;
 
 // ── Tests ──
 
-public class PaktUnitDeserializerTests
+public class PaktSerializerTests
 {
     // ═══════════════════ Basic unit deserialization ═══════════════════
 
@@ -40,7 +40,7 @@ public class PaktUnitDeserializerTests
     public void SimpleConfig_Deserializes()
     {
         var pakt = "name:str = 'my-app'\nversion:int = 42\ndebug:bool = true"u8;
-        var result = PaktUnitDeserializer.Deserialize<SimpleConfig>(
+        var result = PaktSerializer.Deserialize<SimpleConfig>(
             pakt.ToArray(), TestSerializerContext.Default);
 
         Assert.Equal("my-app", result.Name);
@@ -52,7 +52,7 @@ public class PaktUnitDeserializerTests
     public void SimpleConfig_OutOfOrder_Deserializes()
     {
         var pakt = "debug:bool = false\nname:str = 'test'\nversion:int = 7"u8;
-        var result = PaktUnitDeserializer.Deserialize<SimpleConfig>(
+        var result = PaktSerializer.Deserialize<SimpleConfig>(
             pakt.ToArray(), TestSerializerContext.Default);
 
         Assert.Equal("test", result.Name);
@@ -66,7 +66,7 @@ public class PaktUnitDeserializerTests
     public void ConfigWithList_AssignList_Deserializes()
     {
         var pakt = "name:str = 'test'\nscores:[int] = [90 85 92]"u8;
-        var result = PaktUnitDeserializer.Deserialize<ConfigWithList>(
+        var result = PaktSerializer.Deserialize<ConfigWithList>(
             pakt.ToArray(), TestSerializerContext.Default);
 
         Assert.Equal("test", result.Name);
@@ -77,7 +77,7 @@ public class PaktUnitDeserializerTests
     public void ConfigWithList_PackList_Deserializes()
     {
         var pakt = "name:str = 'test'\nscores:[int] = ~[90 85 92]"u8;
-        var result = PaktUnitDeserializer.Deserialize<ConfigWithList>(
+        var result = PaktSerializer.Deserialize<ConfigWithList>(
             pakt.ToArray(), TestSerializerContext.Default);
 
         Assert.Equal("test", result.Name);
@@ -89,7 +89,7 @@ public class PaktUnitDeserializerTests
     {
         // ~[ without ] — EOF terminates the streaming list
         var pakt = "name:str = 'test'\nscores:[int] = ~[90 85 92"u8;
-        var result = PaktUnitDeserializer.Deserialize<ConfigWithList>(
+        var result = PaktSerializer.Deserialize<ConfigWithList>(
             pakt.ToArray(), TestSerializerContext.Default);
 
         Assert.Equal("test", result.Name);
@@ -102,7 +102,7 @@ public class PaktUnitDeserializerTests
     public void ConfigWithMap_AssignMap_Deserializes()
     {
         var pakt = "name:str = 'test'\nages:<str = int> = <'Alice' = 30 'Bob' = 25>"u8;
-        var result = PaktUnitDeserializer.Deserialize<ConfigWithMap>(
+        var result = PaktSerializer.Deserialize<ConfigWithMap>(
             pakt.ToArray(), TestSerializerContext.Default);
 
         Assert.Equal("test", result.Name);
@@ -114,7 +114,7 @@ public class PaktUnitDeserializerTests
     public void ConfigWithMap_PackMap_Deserializes()
     {
         var pakt = "name:str = 'test'\nages:<str = int> = ~<'Alice' = 30 'Bob' = 25>"u8;
-        var result = PaktUnitDeserializer.Deserialize<ConfigWithMap>(
+        var result = PaktSerializer.Deserialize<ConfigWithMap>(
             pakt.ToArray(), TestSerializerContext.Default);
 
         Assert.Equal("test", result.Name);
@@ -128,7 +128,7 @@ public class PaktUnitDeserializerTests
     public void UnknownStatement_Skip_Succeeds()
     {
         var pakt = "name:str = 'test'\nextra:int = 99\nversion:int = 1\ndebug:bool = true"u8;
-        var result = PaktUnitDeserializer.Deserialize<SimpleConfig>(
+        var result = PaktSerializer.Deserialize<SimpleConfig>(
             pakt.ToArray(), TestSerializerContext.Default,
             new PaktSerializationOptions { UnknownStatements = UnknownMemberPolicy.Skip });
 
@@ -141,7 +141,7 @@ public class PaktUnitDeserializerTests
     {
         byte[] pakt = "name:str = 'test'\nextra:int = 99\nversion:int = 1\ndebug:bool = true"u8.ToArray();
         Assert.Throws<PaktParseException>(() =>
-            PaktUnitDeserializer.Deserialize<SimpleConfig>(
+            PaktSerializer.Deserialize<SimpleConfig>(
                 pakt, TestSerializerContext.Default,
                 new PaktSerializationOptions { UnknownStatements = UnknownMemberPolicy.Error }));
     }
@@ -152,7 +152,7 @@ public class PaktUnitDeserializerTests
     public void MissingStatement_UseDefault_Succeeds()
     {
         var pakt = "name:str = 'partial'"u8;
-        var result = PaktUnitDeserializer.Deserialize<SimpleConfig>(
+        var result = PaktSerializer.Deserialize<SimpleConfig>(
             pakt.ToArray(), TestSerializerContext.Default,
             new PaktSerializationOptions { MissingStatements = MissingMemberPolicy.UseDefault });
 
@@ -166,7 +166,7 @@ public class PaktUnitDeserializerTests
     {
         byte[] pakt = "name:str = 'partial'"u8.ToArray();
         Assert.Throws<PaktParseException>(() =>
-            PaktUnitDeserializer.Deserialize<SimpleConfig>(
+            PaktSerializer.Deserialize<SimpleConfig>(
                 pakt, TestSerializerContext.Default,
                 new PaktSerializationOptions { MissingStatements = MissingMemberPolicy.Error }));
     }
@@ -177,7 +177,7 @@ public class PaktUnitDeserializerTests
     public void DuplicateStatement_LastWins()
     {
         var pakt = "name:str = 'first'\nversion:int = 1\nname:str = 'last'\ndebug:bool = true"u8;
-        var result = PaktUnitDeserializer.Deserialize<SimpleConfig>(
+        var result = PaktSerializer.Deserialize<SimpleConfig>(
             pakt.ToArray(), TestSerializerContext.Default,
             new PaktSerializationOptions { DuplicateStatements = DuplicatePolicy.LastWins });
 
@@ -188,7 +188,7 @@ public class PaktUnitDeserializerTests
     public void DuplicateStatement_FirstWins()
     {
         var pakt = "name:str = 'first'\nversion:int = 1\nname:str = 'last'\ndebug:bool = true"u8;
-        var result = PaktUnitDeserializer.Deserialize<SimpleConfig>(
+        var result = PaktSerializer.Deserialize<SimpleConfig>(
             pakt.ToArray(), TestSerializerContext.Default,
             new PaktSerializationOptions { DuplicateStatements = DuplicatePolicy.FirstWins });
 
@@ -200,7 +200,7 @@ public class PaktUnitDeserializerTests
     {
         byte[] pakt = "name:str = 'first'\nversion:int = 1\nname:str = 'last'\ndebug:bool = true"u8.ToArray();
         Assert.Throws<PaktParseException>(() =>
-            PaktUnitDeserializer.Deserialize<SimpleConfig>(
+            PaktSerializer.Deserialize<SimpleConfig>(
                 pakt, TestSerializerContext.Default,
                 new PaktSerializationOptions { DuplicateStatements = DuplicatePolicy.Error }));
     }

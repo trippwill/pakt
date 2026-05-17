@@ -73,7 +73,7 @@ public class DeserializeBenchmarks
     [BenchmarkCategory("Small"), Benchmark(Baseline = true, Description = "PAKT unit deser")]
     public BenchSmallDoc PaktSmallDeserialize()
     {
-        return PaktUnitDeserializer.Deserialize<BenchSmallDoc>(
+        return PaktSerializer.Deserialize<BenchSmallDoc>(
             _smallPakt, BenchDeserContext.Default);
     }
 

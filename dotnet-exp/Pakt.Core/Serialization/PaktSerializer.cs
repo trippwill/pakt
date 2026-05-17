@@ -71,4 +71,36 @@ public static class PaktSerializer
             await source.DisposeAsync().ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Skip the current statement's value (everything after the operator token).
+    /// Used by generated sync deserializers for unknown/duplicate statement handling.
+    /// </summary>
+    public static void SkipStatementValue(ref PaktReader reader)
+    {
+        int depth = 0;
+        while (reader.Read())
+        {
+            PaktTokenType token = reader.TokenType;
+
+            if (token is PaktTokenType.StructStart or PaktTokenType.TupleStart
+                or PaktTokenType.ListStart or PaktTokenType.MapStart)
+            {
+                depth++;
+            }
+            else if (token is PaktTokenType.StructEnd or PaktTokenType.TupleEnd
+                or PaktTokenType.ListEnd or PaktTokenType.MapEnd)
+            {
+                depth--;
+                if (depth <= 0) return;
+            }
+            else if (depth == 0)
+            {
+                return;
+            }
+
+            if (token is PaktTokenType.EndOfUnit or PaktTokenType.StatementName)
+                return;
+        }
+    }
 }

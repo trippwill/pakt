@@ -129,7 +129,7 @@ internal static class DeserializerEmitter
                 sb.AppendLine($"                                throw new global::Pakt.PaktParseException(\"Duplicate statement: {prop.PaktName}\", (int)global::Pakt.PaktErrorCode.Syntax, default);");
                 sb.AppendLine($"                            if (options.DuplicateStatements == global::Pakt.DuplicatePolicy.FirstWins)");
                 sb.AppendLine($"                            {{");
-                sb.AppendLine($"                                global::Pakt.PaktUnitDeserializer.SkipStatementValue(ref reader);");
+                sb.AppendLine($"                                global::Pakt.PaktSerializer.SkipStatementValue(ref reader);");
                 sb.AppendLine($"                                break;");
                 sb.AppendLine($"                            }}");
                 sb.AppendLine($"                        }}");
@@ -150,7 +150,7 @@ internal static class DeserializerEmitter
         sb.AppendLine("                        string __unknownName = global::System.Text.Encoding.UTF8.GetString(__nameSpan);");
         sb.AppendLine("                        throw new global::Pakt.PaktParseException($\"Unknown statement: {__unknownName}\", (int)global::Pakt.PaktErrorCode.Syntax, default);");
         sb.AppendLine("                    }");
-        sb.AppendLine("                    global::Pakt.PaktUnitDeserializer.SkipStatementValue(ref reader);");
+        sb.AppendLine("                    global::Pakt.PaktSerializer.SkipStatementValue(ref reader);");
         sb.AppendLine("                    break;");
         sb.AppendLine("            }");
         sb.AppendLine("        }");

@@ -409,17 +409,14 @@ public ref partial struct PaktSequenceReader
             && TryPeek(1, out byte bNext) && bNext == PaktConstants.SingleQuote)
             return ConsumeBinary();
 
-        // Number (digit or minus)
-        if (PaktConstants.IsDigit(b) || b == PaktConstants.Minus)
-            return ConsumeNumber();
+        // Number (digit or minus) or keyword (true/false/nil)
+        // Unified: scan unquoted value with SIMD, then classify
+        if (PaktConstants.IsDigit(b) || b == PaktConstants.Minus || PaktConstants.IsIdentStart(b))
+            return ConsumeUnquotedValue();
 
         // Atom prefix: |ident
         if (b == PaktConstants.Pipe)
             return ConsumeAtom();
-
-        // Identifier: true, false, nil, or ident value
-        if (PaktConstants.IsIdentStart(b))
-            return ConsumeIdentifierOrKeyword();
 
         ThrowSyntax($"Unexpected byte 0x{b:X2} in value position");
         return false;
@@ -485,53 +482,7 @@ public ref partial struct PaktSequenceReader
         return true;
     }
 
-    private bool ConsumeIdentifierOrKeyword()
-    {
-        long absStart = _totalConsumed + _consumed;
-        _consumed++;
-        _bytePositionInLine++;
-
-        int partLen = ScanIdentParts();
-        int totalLen = 1 + partLen;
-
-        ReadOnlySequence<byte> identSeq = _sequence.Slice(absStart, totalLen);
-
-        // Classify — for single-segment (common case) use span directly
-        PaktTokenType identType;
-        if (identSeq.IsSingleSegment)
-        {
-            ReadOnlySpan<byte> ident = identSeq.FirstSpan;
-            if (ident.SequenceEqual("true"u8) || ident.SequenceEqual("false"u8))
-                identType = PaktTokenType.Bool;
-            else if (ident.SequenceEqual("nil"u8))
-                identType = PaktTokenType.Nil;
-            else
-            {
-                ThrowSyntax("Unknown identifier in value position");
-                return false;
-            }
-        }
-        else
-        {
-            // Multi-segment: copy to stack for comparison
-            Span<byte> tmp = stackalloc byte[(int)identSeq.Length];
-            identSeq.CopyTo(tmp);
-            if (tmp.SequenceEqual("true"u8) || tmp.SequenceEqual("false"u8))
-                identType = PaktTokenType.Bool;
-            else if (tmp.SequenceEqual("nil"u8))
-                identType = PaktTokenType.Nil;
-            else
-            {
-                ThrowSyntax("Unknown identifier in value position");
-                return false;
-            }
-        }
-
-        _tokenType = identType;
-        _valueSequence = identSeq;
-        CompleteScalar();
-        return true;
-    }
+    // ConsumeIdentifierOrKeyword removed — absorbed into ConsumeUnquotedValue
 
     // ───────────────────── Stub Consumers (Phase 4) ─────────────────────
 
@@ -770,119 +721,117 @@ public ref partial struct PaktSequenceReader
             _phase = PaktReaderPhase.ExpectStatementOrEnd;
     }
 
-    private bool ConsumeNumber()
+    /// <summary>
+    /// Consume an unquoted value using SIMD-accelerated boundary detection,
+    /// then classify the captured span. Handles numbers, dates, timestamps,
+    /// UUIDs, booleans, and nil in a single unified path.
+    /// </summary>
+    private bool ConsumeUnquotedValue()
     {
         long absStart = _totalConsumed + _consumed;
-        int len = ScanNumericValue();
+        int totalLen = 0;
 
-        if (len == 0)
+        // Vectorized scan — find end of value using SIMD IndexOfAny
+        while (true)
         {
-            ThrowSyntax("Expected number");
+            ReadOnlySpan<byte> remaining = _buffer[_consumed..];
+            int idx = remaining.IndexOfAny(PaktConstants.ValueStopBytes);
+
+            if (idx >= 0)
+            {
+                _consumed += idx;
+                _bytePositionInLine += idx;
+                totalLen += idx;
+                break;
+            }
+
+            // Consumed entire segment
+            totalLen += remaining.Length;
+            _consumed += remaining.Length;
+            _bytePositionInLine += remaining.Length;
+
+            if (!_isMultiSegment || _isLastSegment)
+                break;
+
+            if (!GetNextSpan())
+                break;
+        }
+
+        if (totalLen == 0)
+        {
+            ThrowSyntax("Expected value");
             return false;
         }
 
-        ReadOnlySequence<byte> numSeq = _sequence.Slice(absStart, len);
+        // Step 2: Classify from captured span
+        ReadOnlySequence<byte> valSeq = _sequence.Slice(absStart, totalLen);
 
-        if (numSeq.IsSingleSegment)
+        if (valSeq.IsSingleSegment)
         {
-            _tokenType = ClassifyNumericValue(numSeq.FirstSpan);
+            _tokenType = ClassifyUnquotedValue(valSeq.FirstSpan);
         }
         else
         {
-            Span<byte> tmp = stackalloc byte[(int)numSeq.Length];
-            numSeq.CopyTo(tmp);
-            _tokenType = ClassifyNumericValue(tmp);
+            Span<byte> tmp = stackalloc byte[(int)valSeq.Length];
+            valSeq.CopyTo(tmp);
+            _tokenType = ClassifyUnquotedValue(tmp);
         }
 
-        _valueSequence = numSeq;
+        _valueSequence = valSeq;
         CompleteScalar();
         return true;
     }
 
     /// <summary>
-    /// Scan a numeric-like value: numbers, dates, timestamps, UUIDs.
-    /// These all start with a digit (or minus) and may contain digits, letters,
-    /// colons, dashes, dots, plus, underscores — everything except layout and
-    /// structural delimiters.
+    /// Classify an unquoted value span. Handles keywords (true/false/nil),
+    /// fixed-length patterns (date/uuid), and numeric types using vectorized
+    /// <see cref="MemoryExtensions.Contains{T}"/> checks.
     /// </summary>
-    private int ScanNumericValue()
+    private static PaktTokenType ClassifyUnquotedValue(ReadOnlySpan<byte> v)
     {
-        int totalLen = 0;
+        // Keywords — exact match
+        if (v.SequenceEqual("true"u8) || v.SequenceEqual("false"u8))
+            return PaktTokenType.Bool;
+        if (v.SequenceEqual("nil"u8))
+            return PaktTokenType.Nil;
 
-        while (true)
+        // Fixed-length patterns
+        if (v.Length == 10 && v[4] == (byte)'-' && v[7] == (byte)'-')
+            return PaktTokenType.Date;
+        if (v.Length >= 32 && v[8] == (byte)'-' && v[13] == (byte)'-'
+            && v[18] == (byte)'-' && v[23] == (byte)'-')
+            return PaktTokenType.Uuid;
+
+        // Vectorized presence checks on bounded span
+        if (v.Contains((byte)'T') || v.Contains((byte)'Z') || v.Contains((byte)':'))
+            return PaktTokenType.Timestamp;
+        if (v.Contains((byte)'e') || v.Contains((byte)'E'))
         {
-            ReadOnlySpan<byte> local = _buffer;
-
-            while (_consumed < local.Length)
-            {
-                byte b = local[_consumed];
-                // Stop at layout, structural delimiters, quotes, NUL, tilde
-                if (b is PaktConstants.Space or PaktConstants.Tab
-                    or PaktConstants.LF or PaktConstants.CR
-                    or PaktConstants.Comma
-                    or PaktConstants.LBrace or PaktConstants.RBrace
-                    or PaktConstants.LParen or PaktConstants.RParen
-                    or PaktConstants.LBrack or PaktConstants.RBrack
-                    or PaktConstants.LAngle or PaktConstants.RAngle
-                    or PaktConstants.Pipe or PaktConstants.SingleQuote
-                    or PaktConstants.Hash or PaktConstants.Tilde
-                    or PaktConstants.Nul
-                    or PaktConstants.EqualsSign or PaktConstants.Question)
-                {
-                    return totalLen;
-                }
-
-                // Allow: digits, letters, colon, dash, dot, plus, underscore
-                _consumed++;
-                _bytePositionInLine++;
-                totalLen++;
-            }
-
-            if (!_isMultiSegment || _isLastSegment)
-                return totalLen;
-
-            if (!GetNextSpan())
-                return totalLen;
+            // Could be float exponent or hex prefix — check for 0x
+            if (v.Length >= 2 && v[0] == (byte)'0' && v[1] is (byte)'x' or (byte)'X')
+                return PaktTokenType.Int;
+            return PaktTokenType.Float;
         }
+        if (v.Contains((byte)'.'))
+            return PaktTokenType.Decimal;
+
+        // Base prefix check (0x, 0b, 0o)
+        if (v.Length >= 2 && v[0] == (byte)'0' && v[1] is (byte)'x' or (byte)'X' or (byte)'b' or (byte)'B' or (byte)'o' or (byte)'O')
+            return PaktTokenType.Int;
+
+        // Check if it starts with digit or minus — it's an int
+        if (v.Length > 0 && (PaktConstants.IsDigit(v[0]) || v[0] == (byte)'-'))
+            return PaktTokenType.Int;
+
+        // Unknown identifier in value position
+        ThrowUnknownValue(v);
+        return PaktTokenType.None; // unreachable
     }
 
-    /// <summary>
-    /// Classify a numeric-like value span into Int, Decimal, Float,
-    /// Date, Timestamp, or Uuid.
-    /// </summary>
-    private static PaktTokenType ClassifyNumericValue(ReadOnlySpan<byte> span)
-    {
-        if (span.Length == 0) return PaktTokenType.Int;
-
-        int i = 0;
-        if (span[i] == (byte)'-') i++;
-
-        bool hasColon = false;
-        bool hasDot = false;
-        bool hasExp = false;
-        bool hasT = false;
-        bool hasZ = false;
-        int dashCount = 0;
-
-        for (; i < span.Length; i++)
-        {
-            byte b = span[i];
-            if (b == (byte)':') hasColon = true;
-            else if (b == (byte)'.') hasDot = true;
-            else if (b is (byte)'e' or (byte)'E') hasExp = true;
-            else if (b == (byte)'T') hasT = true;
-            else if (b == (byte)'Z') hasZ = true;
-            else if (b == (byte)'-' && i > 0) dashCount++;
-            else if (b is (byte)'x' or (byte)'o') return PaktTokenType.Int;
-        }
-
-        if (hasT || hasZ || hasColon) return PaktTokenType.Timestamp;
-        if (dashCount == 4 && span.Length >= 32) return PaktTokenType.Uuid;
-        if (dashCount >= 2 && !hasDot && !hasExp) return PaktTokenType.Date;
-        if (hasExp) return PaktTokenType.Float;
-        if (hasDot) return PaktTokenType.Decimal;
-        return PaktTokenType.Int;
-    }
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void ThrowUnknownValue(ReadOnlySpan<byte> v) =>
+        throw PaktParseError.Syntax(default,
+            $"Unknown identifier in value position: '{System.Text.Encoding.UTF8.GetString(v)}'").ToException();
 
     private bool ConsumeAtom()
     {

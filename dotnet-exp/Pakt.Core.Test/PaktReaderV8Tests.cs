@@ -88,6 +88,15 @@ public class PaktReaderV8Tests
     }
 
     [Fact]
+    public void AtomInStructValue()
+    {
+        var tokens = DrainV8("x:{a:|buy sell| b:int} = { |buy 42 }");
+        Assert.Equal(PaktTokenType.StatementName, tokens[0].Type);
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.Atom && string.Equals(t.Value, "|buy", StringComparison.Ordinal));
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.Int && string.Equals(t.Value, "42", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void MultiLineTypeAnnotation()
     {
         var tokens = DrainV8("config:{\n    name:str\n    port:int\n} = {\n    'localhost'\n    8080\n}");

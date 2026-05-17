@@ -62,6 +62,14 @@ internal static class PaktConstants
     public static readonly SearchValues<byte> RawStringStopBytes =
         SearchValues.Create("'\0"u8);
 
+    /// <summary>
+    /// Stop bytes for unquoted/undelimited values (numbers, dates, UUIDs, keywords).
+    /// SIMD-accelerated boundary detection.
+    /// Note: ':' is NOT a stop byte — it appears inside timestamps (14:30:00).
+    /// </summary>
+    public static readonly SearchValues<byte> ValueStopBytes =
+        SearchValues.Create(" \t\r\n,{}()[]<>|=?';#~\0"u8);
+
     // ── Value terminators (for number/ident boundary detection) ──
 
     /// <summary>Bytes that end a number or identifier token.</summary>

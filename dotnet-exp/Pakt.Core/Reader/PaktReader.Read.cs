@@ -751,7 +751,13 @@ public ref partial struct PaktReader
             _bytePositionInLine += remaining.Length;
 
             if (!_isMultiSegment || _isLastSegment)
+            {
+                // At end of buffer — if not the final block, the value may
+                // continue in the next refill. Return false to request more data.
+                if (!IsLastSpan)
+                    return false;
                 break;
+            }
 
             if (!GetNextSpan())
                 break;

@@ -47,6 +47,7 @@ internal static class ContextEmitter
             sb.AppendLine($"        {{");
             sb.AppendLine($"            Deserialize = static (ref global::Pakt.PaktReader reader) => DeserializeValue{type.Name}(ref reader),");
             sb.AppendLine($"            DeserializeUnit = static (ref global::Pakt.PaktReader reader, global::Pakt.PaktSerializationOptions options) => DeserializeUnit{type.Name}(ref reader, options),");
+            sb.AppendLine($"            DeserializeUnitAsync = static (global::Pakt.PaktPipeSource source, global::Pakt.PaktSerializationOptions options, global::System.Threading.CancellationToken ct) => DeserializeUnitAsync{type.Name}(source, options, ct),");
             sb.AppendLine($"        }};");
             sb.AppendLine();
         }
@@ -87,6 +88,8 @@ internal static class ContextEmitter
             sb.Append(DeserializerEmitter.EmitValueDeserializeMethod(type));
             sb.AppendLine();
             sb.Append(DeserializerEmitter.EmitUnitDeserializeMethod(type));
+            sb.AppendLine();
+            sb.Append(DeserializerEmitter.EmitUnitDeserializeAsyncMethod(type));
             sb.AppendLine();
         }
 

@@ -74,6 +74,36 @@ while (await reader.ReadStatementAsync(ct))
 
 The PaktReader's state machine phases must be at clean boundaries between operations. After `ReadStatementAsync` consumes `StatementName + TypeAnnotation + AssignOperator`, the saved `PaktReaderState` must leave the reader in a phase where the next `Read()` yields the value token. After `ReadValue` consumes the value, the state must be at `ExpectStatementOrEnd`. This phase alignment needs careful testing with the refill loop.
 
+## Prerequisite: Annotation Classification on PaktReader
+
+Currently `TypeAnnotation` is emitted as raw bytes — the consumer must parse the annotation to know what shape of value follows. Adding a classification based on the first byte of the annotation (already available during `ConsumeTypeAnnotation`) would let the statement reader branch on value shape without name matching:
+
+```csharp
+public enum PaktAnnotationKind : byte
+{
+    Scalar,      // str, int, dec, float, bool, uuid, date, ts, bin
+    Struct,      // {...}
+    Tuple,       // (...)
+    List,        // [...]
+    Map,         // <...>
+    AtomSet,     // |...|
+}
+```
+
+One byte check at `TypeAnnotation` emit time, exposed as `PaktReader.AnnotationKind`. This enables:
+
+```csharp
+while (await reader.ReadStatementAsync(ct))
+{
+    if (reader.AnnotationKind is PaktAnnotationKind.List or PaktAnnotationKind.Map)
+        await reader.ReadElementsAsync<Event>(callback, ct);
+    else
+        ProcessScalar(reader.ReadValue<string>());
+}
+```
+
+Value tokens already classify *after* reading (`PaktTokenType.String`, `ListStart`, etc.). Annotation kind classifies *before* reading — the consumer knows the value shape without consuming the value token. Zero parsing cost.
+
 ## Relationship to PaktSerializer
 
 `PaktSerializer.DeserializeAsync<T>` (Model 1) materializes an entire unit into a POCO. `PaktStatementReader` (Model 2) gives fine-grained control. They share `PaktPipeSource` infrastructure.

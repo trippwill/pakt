@@ -194,4 +194,169 @@ public class PaktSerializerStreamTests
         Assert.Equal(1, result.Version);
         Assert.True(result.Debug);
     }
+
+    // ═══════════════════ Map via stream ═══════════════════
+
+    [Fact]
+    public async Task ConfigWithMap_Stream_ChunkSize8()
+    {
+        byte[] pakt = "name:str = 'map-test'\nages:<str = int> = <'alice' = 30 'bob' = 25>"u8.ToArray();
+        using var stream = new ThrottledStream(pakt, chunkSize: 8);
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await PaktSerializer.DeserializeAsync<ConfigWithMap>(
+            stream, TestSerializerContext.Default, ct: ct);
+
+        Assert.Equal("map-test", result.Name);
+        Assert.Equal(30, result.Ages["alice"]);
+        Assert.Equal(25, result.Ages["bob"]);
+    }
+
+    [Fact]
+    public async Task ConfigWithMap_Stream_ChunkSize1()
+    {
+        byte[] pakt = "name:str = 'tiny'\nages:<str = int> = <'x' = 1>"u8.ToArray();
+        using var stream = new ThrottledStream(pakt, chunkSize: 1);
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await PaktSerializer.DeserializeAsync<ConfigWithMap>(
+            stream, TestSerializerContext.Default, ct: ct);
+
+        Assert.Equal("tiny", result.Name);
+        Assert.Equal(1, result.Ages["x"]);
+    }
+
+    // ═══════════════════ Streaming EOF (no close delimiter) ═══════════════════
+
+    [Fact]
+    public async Task ConfigWithList_StreamingEof_Stream()
+    {
+        // ~[ without ] — EOF terminates the collection
+        byte[] pakt = "name:str = 'eof'\nscores:[int] = ~[10 20 30"u8.ToArray();
+        using var stream = new ThrottledStream(pakt, chunkSize: 8);
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await PaktSerializer.DeserializeAsync<ConfigWithList>(
+            stream, TestSerializerContext.Default, ct: ct);
+
+        Assert.Equal("eof", result.Name);
+        Assert.Equal([10, 20, 30], result.Scores);
+    }
+
+    // ═══════════════════ Policies via stream ═══════════════════
+
+    [Fact]
+    public async Task DuplicateStatement_LastWins_Stream()
+    {
+        byte[] pakt = "name:str = 'first'\nversion:int = 1\ndebug:bool = false\nname:str = 'second'"u8.ToArray();
+        using var stream = new ThrottledStream(pakt, chunkSize: 8);
+        var ct = TestContext.Current.CancellationToken;
+        var opts = new PaktSerializationOptions { DuplicateStatements = DuplicatePolicy.LastWins };
+
+        var result = await PaktSerializer.DeserializeAsync<SimpleConfig>(
+            stream, TestSerializerContext.Default, options: opts, ct: ct);
+
+        Assert.Equal("second", result.Name);
+    }
+
+    [Fact]
+    public async Task DuplicateStatement_FirstWins_Stream()
+    {
+        byte[] pakt = "name:str = 'first'\nversion:int = 1\ndebug:bool = false\nname:str = 'second'"u8.ToArray();
+        using var stream = new ThrottledStream(pakt, chunkSize: 8);
+        var ct = TestContext.Current.CancellationToken;
+        var opts = new PaktSerializationOptions { DuplicateStatements = DuplicatePolicy.FirstWins };
+
+        var result = await PaktSerializer.DeserializeAsync<SimpleConfig>(
+            stream, TestSerializerContext.Default, options: opts, ct: ct);
+
+        Assert.Equal("first", result.Name);
+    }
+
+    [Fact]
+    public async Task UnknownStatement_Skipped_Stream()
+    {
+        byte[] pakt = "name:str = 'known'\nunknown:str = 'skip-me'\nversion:int = 5\ndebug:bool = true"u8.ToArray();
+        using var stream = new ThrottledStream(pakt, chunkSize: 4);
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await PaktSerializer.DeserializeAsync<SimpleConfig>(
+            stream, TestSerializerContext.Default, ct: ct);
+
+        Assert.Equal("known", result.Name);
+        Assert.Equal(5, result.Version);
+        Assert.True(result.Debug);
+    }
+
+    // ═══════════════════ Memory path via PaktSerializer ═══════════════════
+
+    [Fact]
+    public void ConfigWithList_Memory_ViaSerializer()
+    {
+        byte[] pakt = "name:str = 'mem'\nscores:[int] = [1 2 3]"u8.ToArray();
+
+        var result = PaktSerializer.Deserialize<ConfigWithList>(
+            pakt, TestSerializerContext.Default);
+
+        Assert.Equal("mem", result.Name);
+        Assert.Equal([1, 2, 3], result.Scores);
+    }
+
+    [Fact]
+    public void ConfigWithMap_Memory_ViaSerializer()
+    {
+        byte[] pakt = "name:str = 'mem'\nages:<str = int> = <'a' = 1>"u8.ToArray();
+
+        var result = PaktSerializer.Deserialize<ConfigWithMap>(
+            pakt, TestSerializerContext.Default);
+
+        Assert.Equal("mem", result.Name);
+        Assert.Equal(1, result.Ages["a"]);
+    }
+
+    // ═══════════════════ Additional chunk sizes ═══════════════════
+
+    [Fact]
+    public async Task SimpleConfig_Stream_ChunkSize3()
+    {
+        byte[] pakt = "name:str = 'odd'\nversion:int = 7\ndebug:bool = false"u8.ToArray();
+        using var stream = new ThrottledStream(pakt, chunkSize: 3);
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await PaktSerializer.DeserializeAsync<SimpleConfig>(
+            stream, TestSerializerContext.Default, ct: ct);
+
+        Assert.Equal("odd", result.Name);
+        Assert.Equal(7, result.Version);
+        Assert.False(result.Debug);
+    }
+
+    [Fact]
+    public async Task SimpleConfig_Stream_ChunkSize16()
+    {
+        byte[] pakt = "name:str = 'med'\nversion:int = 16\ndebug:bool = true"u8.ToArray();
+        using var stream = new ThrottledStream(pakt, chunkSize: 16);
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await PaktSerializer.DeserializeAsync<SimpleConfig>(
+            stream, TestSerializerContext.Default, ct: ct);
+
+        Assert.Equal("med", result.Name);
+        Assert.Equal(16, result.Version);
+        Assert.True(result.Debug);
+    }
+
+    [Fact]
+    public async Task ConfigWithList_ClosedList_Stream_ChunkSize1()
+    {
+        byte[] pakt = "name:str = 'tiny'\nscores:[int] = [1 2]"u8.ToArray();
+        using var stream = new ThrottledStream(pakt, chunkSize: 1);
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await PaktSerializer.DeserializeAsync<ConfigWithList>(
+            stream, TestSerializerContext.Default, ct: ct);
+
+        Assert.Equal("tiny", result.Name);
+        Assert.Equal([1, 2], result.Scores);
+    }
 }

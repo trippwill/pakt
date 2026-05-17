@@ -1,15 +1,24 @@
+using System.Buffers;
+
 namespace Pakt;
 
 /// <summary>
-/// High-level API for PAKT deserialization supporting both synchronous in-memory
-/// and asynchronous stream-backed reads via <see cref="PaktPipeSource"/>.
+/// High-level API for PAKT serialization and deserialization.
+/// <para>
+/// <see cref="Deserialize{T}(ReadOnlyMemory{byte}, PaktSerializerContext, PaktSerializationOptions?)"/>
+/// is the synchronous in-memory fast path using the zero-overhead <c>ref PaktReader</c> delegate.
+/// </para>
+/// <para>
+/// <see cref="DeserializeAsync{T}(Stream, PaktSerializerContext, PaktSerializationOptions?, int, CancellationToken)"/>
+/// is the asynchronous stream-backed path using <see cref="PaktPipeSource"/> with automatic
+/// buffer management via <see cref="System.IO.Pipelines.PipeReader"/>.
+/// </para>
 /// </summary>
 public static class PaktSerializer
 {
     /// <summary>
     /// Deserialize a complete PAKT unit from in-memory data (synchronous fast path).
-    /// Uses <see cref="PaktPipeSource.CreateFromMemory"/> internally — the pipe returns
-    /// all data on the first read with <c>IsCompleted = true</c>, so the refill loop never runs.
+    /// Uses the zero-overhead <c>ref PaktReader</c> delegate directly.
     /// </summary>
     public static T Deserialize<T>(
         ReadOnlyMemory<byte> data,
@@ -20,22 +29,14 @@ public static class PaktSerializer
             ?? throw new InvalidOperationException(
                 $"Type {typeof(T).Name} is not registered in the serializer context.");
 
-        if (typeInfo.DeserializeUnitAsync is not { } unitDeserializeAsync)
+        if (typeInfo.DeserializeUnit is not { } unitDeserialize)
             throw new NotSupportedException(
-                $"No async unit deserializer generated for {typeof(T).Name}.");
+                $"No unit deserializer generated for {typeof(T).Name}.");
 
         var opts = options ?? context.Options;
-        var source = PaktPipeSource.CreateFromMemory(data);
-        try
-        {
-            source.InitialReadAsync(CancellationToken.None).GetAwaiter().GetResult();
-            var task = unitDeserializeAsync(source, opts, CancellationToken.None);
-            return task.GetAwaiter().GetResult();
-        }
-        finally
-        {
-            source.DisposeAsync().GetAwaiter().GetResult();
-        }
+        var seq = new ReadOnlySequence<byte>(data);
+        var reader = new PaktReader(seq, isFinalBlock: true);
+        return unitDeserialize(ref reader, opts);
     }
 
     /// <summary>

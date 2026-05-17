@@ -454,6 +454,23 @@ internal static class DeserializerEmitter
         sb.AppendLine("        }"); // end outer while
         sb.AppendLine();
 
+        // Finalize any open accumulators (streaming EOF — no close delimiter)
+        foreach (var lp in listProps)
+        {
+            int idx = activeProps.IndexOf(lp);
+            int bit = 1 << idx;
+            sb.AppendLine($"        if (__listAccum_{lp.ClrName} is not null)");
+            sb.AppendLine($"        {{ __{lp.ClrName} = __listAccum_{lp.ClrName}; __seen |= {bit}; }}");
+        }
+        foreach (var mp in mapProps)
+        {
+            int idx = activeProps.IndexOf(mp);
+            int bit = 1 << idx;
+            sb.AppendLine($"        if (__mapAccum_{mp.ClrName} is not null)");
+            sb.AppendLine($"        {{ __{mp.ClrName} = __mapAccum_{mp.ClrName}; __seen |= {bit}; }}");
+        }
+        sb.AppendLine();
+
         // Missing statement check
         sb.AppendLine("        if (options.MissingStatements == global::Pakt.MissingMemberPolicy.Error)");
         sb.AppendLine("        {");

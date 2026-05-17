@@ -84,6 +84,18 @@ public class PaktUnitDeserializerTests
         Assert.Equal([90, 85, 92], result.Scores);
     }
 
+    [Fact]
+    public void ConfigWithList_StreamingEof_Deserializes()
+    {
+        // ~[ without ] — EOF terminates the streaming list
+        var pakt = "name:str = 'test'\nscores:[int] = ~[90 85 92"u8;
+        var result = PaktUnitDeserializer.Deserialize<ConfigWithList>(
+            pakt.ToArray(), TestSerializerContext.Default);
+
+        Assert.Equal("test", result.Name);
+        Assert.Equal([90, 85, 92], result.Scores);
+    }
+
     // ═══════════════════ Map deserialization ═══════════════════
 
     [Fact]

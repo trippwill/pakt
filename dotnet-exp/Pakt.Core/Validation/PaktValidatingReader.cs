@@ -157,6 +157,7 @@ public ref struct PaktValidatingReader
                 return true;
 
             case PaktTokenType.EndOfUnit:
+                _frames.Clear(); // streaming collections may leave frames on stack
                 _phase = ValidatorPhase.Done;
                 return true;
 

@@ -517,4 +517,32 @@ public class PaktValidatingReaderTests
         var tokens = Drain("items:[{id:int name:str}] = ~[{1 'one'} {2 'two'}]");
         Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
     }
+
+    // ═══════════════════ Streaming EOF Tests ═══════════════════
+
+    [Fact]
+    public void StreamingList_TailEof_ValidatesCorrectly()
+    {
+        // ~[ without closing ] — EOF terminates, validator should accept
+        var tokens = Drain("nums:[int] = ~[1 2 3");
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.ListStart);
+        Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
+    }
+
+    [Fact]
+    public void StreamingMap_TailEof_ValidatesCorrectly()
+    {
+        var tokens = Drain("m:<str = int> = ~<'a' = 1 'b' = 2");
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.MapStart);
+        Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
+    }
+
+    [Fact]
+    public void StreamingList_Closed_ValidatesCorrectly()
+    {
+        var tokens = Drain("nums:[int] = ~[1 2 3]");
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.ListStart);
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.ListEnd);
+        Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
+    }
 }

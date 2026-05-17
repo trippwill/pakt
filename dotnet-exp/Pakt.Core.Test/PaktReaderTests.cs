@@ -160,6 +160,23 @@ public class PaktReaderTests
     }
 
     [Fact]
+    public void StreamingMap_TailEof()
+    {
+        var tokens = DrainV8("m:<str = int> = ~<'a' = 1 'b' = 2");
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.MapStart);
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.MapEntryBind);
+        Assert.Equal(PaktTokenType.EndOfUnit, tokens[^1].Type);
+    }
+
+    [Fact]
+    public void StreamingMap_Closed()
+    {
+        var tokens = DrainV8("m:<str = int> = ~<'a' = 1 'b' = 2>");
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.MapStart);
+        Assert.Contains(tokens, t => t.Type == PaktTokenType.MapEnd);
+    }
+
+    [Fact]
     public void NulTermination()
     {
         byte[] data = [.. "x:int = 42"u8, 0x00];

@@ -311,7 +311,7 @@ internal static class DeserializerEmitter
         sb.AppendLine($"{indent}{decl}{varName} = new global::System.Collections.Generic.List<{elemFqn}>();");
         sb.AppendLine($"{indent}while (reader.Read())");
         sb.AppendLine($"{indent}{{");
-        sb.AppendLine($"{indent}    if (reader.TokenType == global::Pakt.PaktTokenType.ListEnd) break;");
+        sb.AppendLine($"{indent}    if (reader.TokenType == global::Pakt.PaktTokenType.ListEnd || reader.TokenType == global::Pakt.PaktTokenType.EndOfUnit) break;");
         sb.AppendLine($"{indent}    {varName}.Add({EmitGetForKind(elemKind, elemFqn)});");
         sb.AppendLine($"{indent}}}");
     }
@@ -333,7 +333,7 @@ internal static class DeserializerEmitter
         sb.AppendLine($"{indent}{decl}{varName} = new global::System.Collections.Generic.Dictionary<{keyFqn}, {valFqn}>();");
         sb.AppendLine($"{indent}while (reader.Read())");
         sb.AppendLine($"{indent}{{");
-        sb.AppendLine($"{indent}    if (reader.TokenType == global::Pakt.PaktTokenType.MapEnd) break;");
+        sb.AppendLine($"{indent}    if (reader.TokenType == global::Pakt.PaktTokenType.MapEnd || reader.TokenType == global::Pakt.PaktTokenType.EndOfUnit) break;");
         sb.AppendLine($"{indent}    var __key = reader.GetString();");
         sb.AppendLine($"{indent}    reader.Read(); // MapEntryBind");
         sb.AppendLine($"{indent}    reader.Read(); // value token");

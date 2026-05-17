@@ -21,25 +21,17 @@ public abstract class PaktTypeInfo
 }
 
 /// <summary>
-/// Deserialize delegate signature for source-generated deserializers.
+/// Deserialize delegate for positional struct values.
 /// Operates on <see cref="PaktValidatingReader"/> for type-enforced reading.
 /// </summary>
 public delegate T PaktDeserializeFunc<out T>(ref PaktValidatingReader reader);
 
 /// <summary>
-/// Unit-level deserialize delegate using the raw sequence reader.
-/// Generated per-type: zero-alloc statement matching, no annotation parsing.
-/// </summary>
-public delegate T PaktRawUnitDeserializeFunc<out T>(
-    ref PaktSequenceReader reader,
-    PaktSerializationOptions options);
-
-/// <summary>
-/// Unit-level deserialize delegate that handles statement matching and policies.
-/// Generated per-type: reads statements by name, applies policies, returns T.
+/// Unit-level deserialize delegate. Generated per-type: reads statements
+/// by name with zero-alloc matching using the raw sequence reader.
 /// </summary>
 public delegate T PaktUnitDeserializeFunc<out T>(
-    ref PaktValidatingReader reader,
+    ref PaktSequenceReader reader,
     PaktSerializationOptions options);
 
 /// <summary>
@@ -64,15 +56,8 @@ public sealed class PaktTypeInfo<T> : PaktTypeInfo
     public required PaktDeserializeFunc<T> Deserialize { get; init; }
 
     /// <summary>
-    /// Delegate that deserializes <typeparamref name="T"/> from a full PAKT unit
-    /// using the raw sequence reader. Preferred path — no annotation parsing overhead.
-    /// </summary>
-    public PaktRawUnitDeserializeFunc<T>? RawDeserializeUnit { get; init; }
-
-    /// <summary>
-    /// Delegate that deserializes <typeparamref name="T"/> from a full PAKT unit,
-    /// handling statement name matching and policies.
-    /// Null for types that are never deserialized at the unit level.
+    /// Delegate that deserializes <typeparamref name="T"/> from a full PAKT unit.
+    /// Generated per-type with zero-alloc statement name matching.
     /// </summary>
     public PaktUnitDeserializeFunc<T>? DeserializeUnit { get; init; }
 

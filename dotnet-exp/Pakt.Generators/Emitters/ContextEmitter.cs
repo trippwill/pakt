@@ -46,8 +46,7 @@ internal static class ContextEmitter
             sb.AppendLine($"        _{type.Name}TypeInfo ??= new global::Pakt.PaktTypeInfo<{typeFqn}>(\"{sig}\", {type.Name}Properties)");
             sb.AppendLine($"        {{");
             sb.AppendLine($"            Deserialize = static (ref global::Pakt.PaktValidatingReader reader) => DeserializeValue{type.Name}(ref reader),");
-            sb.AppendLine($"            RawDeserializeUnit = static (ref global::Pakt.PaktSequenceReader reader, global::Pakt.PaktSerializationOptions options) => RawDeserializeUnit{type.Name}(ref reader, options),");
-            sb.AppendLine($"            DeserializeUnit = static (ref global::Pakt.PaktValidatingReader reader, global::Pakt.PaktSerializationOptions options) => DeserializeUnit{type.Name}(ref reader, options),");
+            sb.AppendLine($"            DeserializeUnit = static (ref global::Pakt.PaktSequenceReader reader, global::Pakt.PaktSerializationOptions options) => DeserializeUnit{type.Name}(ref reader, options),");
             sb.AppendLine($"        }};");
             sb.AppendLine();
         }
@@ -86,8 +85,6 @@ internal static class ContextEmitter
         foreach (var type in types)
         {
             sb.Append(DeserializerEmitter.EmitValueDeserializeMethod(type));
-            sb.AppendLine();
-            sb.Append(DeserializerEmitter.EmitRawUnitDeserializeMethod(type));
             sb.AppendLine();
             sb.Append(DeserializerEmitter.EmitUnitDeserializeMethod(type));
             sb.AppendLine();

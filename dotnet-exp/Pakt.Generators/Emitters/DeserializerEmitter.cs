@@ -54,20 +54,14 @@ internal static class DeserializerEmitter
     /// Emit a unit-level deserializer: reads statement-by-statement, matches names,
     /// and applies serialization policies.
     /// </summary>
-    public static string EmitUnitDeserializeMethod(SerializableTypeModel model) =>
-        EmitUnitDeserializeMethodCore(model, "DeserializeUnit", "global::Pakt.PaktValidatingReader");
-
-    public static string EmitRawUnitDeserializeMethod(SerializableTypeModel model) =>
-        EmitUnitDeserializeMethodCore(model, "RawDeserializeUnit", "global::Pakt.PaktSequenceReader");
-
-    private static string EmitUnitDeserializeMethodCore(SerializableTypeModel model, string methodPrefix, string readerType)
+    public static string EmitUnitDeserializeMethod(SerializableTypeModel model)
     {
         var sb = new StringBuilder(2048);
         string typeFqn = model.FullyQualifiedName;
         var activeProps = model.Properties.Where(p => !p.IsIgnored).ToList();
 
         // Exp 3: Use PaktSequenceReader directly — generated code IS the validation
-        sb.AppendLine($"    private static {typeFqn} {methodPrefix}{model.Name}(ref {readerType} reader, global::Pakt.PaktSerializationOptions options)");
+        sb.AppendLine($"    private static {typeFqn} DeserializeUnit{model.Name}(ref global::Pakt.PaktSequenceReader reader, global::Pakt.PaktSerializationOptions options)");
         sb.AppendLine("    {");
 
         // Declare locals for each property

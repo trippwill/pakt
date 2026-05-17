@@ -406,10 +406,10 @@ public class PaktReaderScalarTests
     /// <summary>Advance past statement header to the first value token.</summary>
     private static void AdvanceToValue(ref PaktReader reader)
     {
-        // StatementName → TypeAnnotationStart → AssignOperator → value
+        // StatementName → TypeAnnotation → AssignOperator → value
         Assert.True(reader.Read()); // StatementName
-        Assert.True(reader.Read()); // TypeAnnotationStart
-        Assert.True(reader.Read()); // AssignOperator (v8 doesn't emit TypeAnnotationEnd)
+        Assert.True(reader.Read()); // TypeAnnotation
+        Assert.True(reader.Read()); // AssignOperator (v8 doesn't emit TypeAnnotation)
         Assert.True(reader.Read()); // The value token
     }
 }

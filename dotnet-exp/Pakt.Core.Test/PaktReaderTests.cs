@@ -53,7 +53,7 @@ public class PaktReaderTests
         var tokens = DrainV8("x:int = 42");
         Assert.Equal(PaktTokenType.StatementName, tokens[0].Type);
         Assert.Equal("x", tokens[0].Value);
-        Assert.Equal(PaktTokenType.TypeAnnotationStart, tokens[1].Type);
+        Assert.Equal(PaktTokenType.TypeAnnotation, tokens[1].Type);
         Assert.Equal("int", tokens[1].Value);
         Assert.Equal(PaktTokenType.AssignOperator, tokens[2].Type);
         Assert.Equal(PaktTokenType.Int, tokens[3].Type);
@@ -76,7 +76,7 @@ public class PaktReaderTests
     {
         var tokens = DrainV8("pt:{x:int y:int} = { 1 2 }");
         Assert.Equal(PaktTokenType.StatementName, tokens[0].Type);
-        Assert.Equal(PaktTokenType.TypeAnnotationStart, tokens[1].Type);
+        Assert.Equal(PaktTokenType.TypeAnnotation, tokens[1].Type);
         Assert.Equal(PaktTokenType.AssignOperator, tokens[2].Type);
         Assert.Equal(PaktTokenType.StructStart, tokens[3].Type);
         Assert.Equal(PaktTokenType.Int, tokens[4].Type);
@@ -102,7 +102,7 @@ public class PaktReaderTests
         var tokens = DrainV8("config:{\n    name:str\n    port:int\n} = {\n    'localhost'\n    8080\n}");
         Assert.Equal(PaktTokenType.StatementName, tokens[0].Type);
         Assert.Equal("config", tokens[0].Value);
-        Assert.Equal(PaktTokenType.TypeAnnotationStart, tokens[1].Type);
+        Assert.Equal(PaktTokenType.TypeAnnotation, tokens[1].Type);
         Assert.Equal(PaktTokenType.AssignOperator, tokens[2].Type);
         Assert.Equal(PaktTokenType.StructStart, tokens[3].Type);
         Assert.Equal(PaktTokenType.String, tokens[4].Type);

@@ -146,7 +146,7 @@ public ref struct PaktValidatingReader
                 _phase = ValidatorPhase.NoStatement;
                 return true;
 
-            case PaktTokenType.TypeAnnotationStart:
+            case PaktTokenType.TypeAnnotation:
                 ParseAnnotation();
                 _phase = ValidatorPhase.ExpectOperator;
                 return true;

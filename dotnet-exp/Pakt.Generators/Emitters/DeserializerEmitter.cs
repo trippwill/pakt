@@ -96,7 +96,7 @@ internal static class DeserializerEmitter
         sb.AppendLine("            }");
         sb.AppendLine();
         sb.AppendLine("            // Skip annotation and operator");
-        sb.AppendLine("            reader.Read(); // TypeAnnotationStart");
+        sb.AppendLine("            reader.Read(); // TypeAnnotation");
         sb.AppendLine("            reader.Read(); // AssignOperator");
         sb.AppendLine();
 

@@ -202,7 +202,7 @@ public ref partial struct PaktReader
     }
 
     /// <summary>
-    /// Scan the type annotation bytes and emit TypeAnnotationStart.
+    /// Scan the type annotation bytes and emit TypeAnnotation.
     /// The annotation is everything from the current position until we find
     /// '=' or '&lt;&lt;' at nesting depth 0.
     /// </summary>
@@ -292,7 +292,7 @@ public ref partial struct PaktReader
             len--;
         }
 
-        _tokenType = PaktTokenType.TypeAnnotationStart;
+        _tokenType = PaktTokenType.TypeAnnotation;
         _valueSequence = _sequence.Slice(absStart, len);
         _phase = PaktReaderPhase.ExpectOperator;
         return true;

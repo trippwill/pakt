@@ -6,7 +6,7 @@ namespace Pakt;
 /// <summary>
 /// Deserializes a PAKT unit into a CLR object using the generated
 /// <see cref="PaktSerializerContext"/> for type resolution and the
-/// raw <see cref="PaktSequenceReader"/> for zero-overhead reading.
+/// raw <see cref="PaktReader"/> for zero-overhead reading.
 /// </summary>
 public static class PaktUnitDeserializer
 {
@@ -19,7 +19,7 @@ public static class PaktUnitDeserializer
         PaktSerializationOptions? options = null)
     {
         var seq = new ReadOnlySequence<byte>(data);
-        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
+        var reader = new PaktReader(seq, isFinalBlock: true);
         return DeserializeCore<T>(ref reader, context, options ?? context.Options);
     }
 
@@ -32,12 +32,12 @@ public static class PaktUnitDeserializer
         bool isFinalBlock = true,
         PaktSerializationOptions? options = null)
     {
-        var reader = new PaktSequenceReader(data, isFinalBlock);
+        var reader = new PaktReader(data, isFinalBlock);
         return DeserializeCore<T>(ref reader, context, options ?? context.Options);
     }
 
     private static T DeserializeCore<T>(
-        ref PaktSequenceReader reader,
+        ref PaktReader reader,
         PaktSerializerContext context,
         PaktSerializationOptions options)
     {
@@ -56,7 +56,7 @@ public static class PaktUnitDeserializer
     /// <summary>
     /// Skip the current statement's value (everything after the operator token).
     /// </summary>
-    public static void SkipStatementValue(ref PaktSequenceReader reader)
+    public static void SkipStatementValue(ref PaktReader reader)
     {
         int depth = 0;
         while (reader.Read())

@@ -45,8 +45,8 @@ internal static class ContextEmitter
             sb.AppendLine($"    public global::Pakt.PaktTypeInfo<{typeFqn}> {type.Name} =>");
             sb.AppendLine($"        _{type.Name}TypeInfo ??= new global::Pakt.PaktTypeInfo<{typeFqn}>(\"{sig}\", {type.Name}Properties)");
             sb.AppendLine($"        {{");
-            sb.AppendLine($"            Deserialize = static (ref global::Pakt.PaktValidatingReader reader) => DeserializeValue{type.Name}(ref reader),");
-            sb.AppendLine($"            DeserializeUnit = static (ref global::Pakt.PaktSequenceReader reader, global::Pakt.PaktSerializationOptions options) => DeserializeUnit{type.Name}(ref reader, options),");
+            sb.AppendLine($"            Deserialize = static (ref global::Pakt.PaktReader reader) => DeserializeValue{type.Name}(ref reader),");
+            sb.AppendLine($"            DeserializeUnit = static (ref global::Pakt.PaktReader reader, global::Pakt.PaktSerializationOptions options) => DeserializeUnit{type.Name}(ref reader, options),");
             sb.AppendLine($"        }};");
             sb.AppendLine();
         }

@@ -4,12 +4,12 @@ using System.Runtime.CompilerServices;
 namespace Pakt;
 
 /// <summary>
-/// A validating reader that wraps <see cref="PaktSequenceReader"/> and enforces
+/// A validating reader that wraps <see cref="PaktReader"/> and enforces
 /// type annotations. Each value token is checked against the declared type.
 /// </summary>
 public ref struct PaktValidatingReader
 {
-    private PaktSequenceReader _inner;
+    private PaktReader _inner;
 
     // Type tree from the current statement's annotation
     private ValidationNode[] _typeNodes;
@@ -31,7 +31,7 @@ public ref struct PaktValidatingReader
         bool isFinalBlock,
         PaktValidatingReaderState state = default)
     {
-        _inner = new PaktSequenceReader(paktData, isFinalBlock, state.InnerState);
+        _inner = new PaktReader(paktData, isFinalBlock, state.InnerState);
         _phase = state.Phase;
         _typeNodes = [];
         _members = [];

@@ -7,7 +7,7 @@ namespace Pakt.Benchmarks;
 
 /// <summary>
 /// Measures the overhead of <see cref="PaktValidatingReader"/> vs raw
-/// <see cref="PaktSequenceReader"/>. Each pair reads identical data —
+/// <see cref="PaktReader"/>. Each pair reads identical data —
 /// the only difference is type-annotation enforcement.
 /// </summary>
 [MemoryDiagnoser]
@@ -32,7 +32,7 @@ public class ValidationBenchmarks
     public int RawScalars()
     {
         var seq = new System.Buffers.ReadOnlySequence<byte>(_scalarBytes);
-        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
+        var reader = new PaktReader(seq, isFinalBlock: true);
         int count = 0;
         while (reader.Read()) count++;
         return count;
@@ -53,7 +53,7 @@ public class ValidationBenchmarks
     public int RawNested()
     {
         var seq = new System.Buffers.ReadOnlySequence<byte>(_nestedBytes);
-        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
+        var reader = new PaktReader(seq, isFinalBlock: true);
         int count = 0;
         while (reader.Read()) count++;
         return count;
@@ -74,7 +74,7 @@ public class ValidationBenchmarks
     public int RawFS()
     {
         var seq = new System.Buffers.ReadOnlySequence<byte>(_fsBytes);
-        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
+        var reader = new PaktReader(seq, isFinalBlock: true);
         int count = 0;
         while (reader.Read()) count++;
         return count;

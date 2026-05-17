@@ -52,7 +52,7 @@ public readonly ref struct PaktConvertContext
     /// Skip the current value (composite or scalar) in the reader.
     /// Useful for converters that want to ignore certain fields.
     /// </summary>
-    public static void Skip(ref PaktValidatingReader reader)
+    public static void Skip(ref PaktReader reader)
     {
         PaktTokenType token = reader.TokenType;
 

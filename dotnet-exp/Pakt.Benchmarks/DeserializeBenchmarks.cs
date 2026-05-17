@@ -89,7 +89,7 @@ public class DeserializeBenchmarks
     public int PaktFSDecode()
     {
         var seq = new ReadOnlySequence<byte>(_fsPakt);
-        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
+        var reader = new PaktReader(seq, isFinalBlock: true);
         int count = 0;
         while (reader.Read()) count++;
         return count;

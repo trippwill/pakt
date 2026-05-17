@@ -22,16 +22,16 @@ public abstract class PaktTypeInfo
 
 /// <summary>
 /// Deserialize delegate for positional struct values.
-/// Operates on <see cref="PaktValidatingReader"/> for type-enforced reading.
+/// Operates on <see cref="PaktReader"/> for type-enforced reading.
 /// </summary>
-public delegate T PaktDeserializeFunc<out T>(ref PaktValidatingReader reader);
+public delegate T PaktDeserializeFunc<out T>(ref PaktReader reader);
 
 /// <summary>
 /// Unit-level deserialize delegate. Generated per-type: reads statements
 /// by name with zero-alloc matching using the raw sequence reader.
 /// </summary>
 public delegate T PaktUnitDeserializeFunc<out T>(
-    ref PaktSequenceReader reader,
+    ref PaktReader reader,
     PaktSerializationOptions options);
 
 /// <summary>

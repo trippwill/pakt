@@ -5,7 +5,7 @@ using Pakt.Generators.Models;
 namespace Pakt.Generators.Emitters;
 
 /// <summary>
-/// Emits source code for deserialize methods targeting <c>PaktValidatingReader</c>.
+/// Emits source code for deserialize methods targeting <c>PaktReader</c>.
 /// Two methods per type:
 /// - <c>DeserializeValue{Name}</c> — positional struct value read (inside composites)
 /// - <c>DeserializeUnit{Name}</c> — statement-name-matching unit read (top level)
@@ -21,7 +21,7 @@ internal static class DeserializerEmitter
         var sb = new StringBuilder(1024);
         string typeFqn = model.FullyQualifiedName;
 
-        sb.AppendLine($"    private static {typeFqn} DeserializeValue{model.Name}(ref global::Pakt.PaktValidatingReader reader)");
+        sb.AppendLine($"    private static {typeFqn} DeserializeValue{model.Name}(ref global::Pakt.PaktReader reader)");
         sb.AppendLine("    {");
         sb.AppendLine($"        reader.Read(); // StructStart");
 
@@ -60,8 +60,8 @@ internal static class DeserializerEmitter
         string typeFqn = model.FullyQualifiedName;
         var activeProps = model.Properties.Where(p => !p.IsIgnored).ToList();
 
-        // Exp 3: Use PaktSequenceReader directly — generated code IS the validation
-        sb.AppendLine($"    private static {typeFqn} DeserializeUnit{model.Name}(ref global::Pakt.PaktSequenceReader reader, global::Pakt.PaktSerializationOptions options)");
+        // Exp 3: Use PaktReader directly — generated code IS the validation
+        sb.AppendLine($"    private static {typeFqn} DeserializeUnit{model.Name}(ref global::Pakt.PaktReader reader, global::Pakt.PaktSerializationOptions options)");
         sb.AppendLine("    {");
 
         // Declare locals for each property

@@ -9,7 +9,7 @@ namespace Pakt;
 /// <para>
 /// Usage pattern:
 /// <code>
-/// var reader = new PaktSequenceReader(data, isFinalBlock: true, state: default);
+/// var reader = new PaktReader(data, isFinalBlock: true, state: default);
 /// while (reader.Read())
 /// {
 ///     switch (reader.TokenType) { /* process tokens */ }
@@ -17,7 +17,7 @@ namespace Pakt;
 /// </code>
 /// </para>
 /// </summary>
-public ref partial struct PaktSequenceReader
+public ref partial struct PaktReader
 {
     // ── Input source ──
     private ReadOnlySpan<byte> _buffer;
@@ -64,7 +64,7 @@ public ref partial struct PaktSequenceReader
     /// <summary>
     /// Create a reader over a <see cref="ReadOnlySequence{T}"/> of UTF-8 PAKT data.
     /// </summary>
-    public PaktSequenceReader(
+    public PaktReader(
         ReadOnlySequence<byte> paktData,
         bool isFinalBlock,
         PaktReaderState state = default)
@@ -124,7 +124,7 @@ public ref partial struct PaktSequenceReader
     /// <summary>
     /// Convenience constructor for complete in-memory data.
     /// </summary>
-    public PaktSequenceReader(ReadOnlyMemory<byte> paktData, PaktReaderOptions? options = null)
+    public PaktReader(ReadOnlyMemory<byte> paktData, PaktReaderOptions? options = null)
         : this(new ReadOnlySequence<byte>(paktData), isFinalBlock: true,
             new PaktReaderState(0, 0, PaktReaderPhase.Start, PaktTokenType.None,
                 default, false, 0, 0, options ?? PaktReaderOptions.Default))
@@ -176,5 +176,5 @@ public ref partial struct PaktSequenceReader
         _options);
 
     // ───────────────────── Read ─────────────────────
-    // Implemented in PaktSequenceReader.Read.cs (partial)
+    // Implemented in PaktReader.Read.cs (partial)
 }

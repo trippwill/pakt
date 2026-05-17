@@ -2,8 +2,8 @@ using System.Runtime.CompilerServices;
 
 namespace Pakt;
 
-// Multi-segment support methods for PaktSequenceReader.
-public ref partial struct PaktSequenceReader
+// Multi-segment support methods for PaktReader.
+public ref partial struct PaktReader
 {
     /// <summary>
     /// Peek at a byte at the given offset from current position,
@@ -88,7 +88,7 @@ public ref partial struct PaktSequenceReader
         public readonly SequencePosition NextPosition;
         public readonly bool IsLastSegment;
 
-        public RollbackState(ref PaktSequenceReader reader)
+        public RollbackState(ref PaktReader reader)
         {
             Consumed = reader._consumed;
             TotalConsumed = reader._totalConsumed;

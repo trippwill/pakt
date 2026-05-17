@@ -80,7 +80,7 @@ public class DocumentBenchmarks
     private static int DrainPakt(byte[] data)
     {
         var seq = new System.Buffers.ReadOnlySequence<byte>(data);
-        var reader = new PaktSequenceReader(seq, isFinalBlock: true);
+        var reader = new PaktReader(seq, isFinalBlock: true);
         int count = 0;
         while (reader.Read())
             count++;

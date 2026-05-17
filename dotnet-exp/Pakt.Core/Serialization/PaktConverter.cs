@@ -9,7 +9,7 @@ public abstract class PaktConverter
     /// <summary>The CLR type this converter handles.</summary>
     public abstract Type TargetType { get; }
 
-    internal abstract object? ReadObject(ref PaktValidatingReader reader, PaktConvertContext context);
+    internal abstract object? ReadObject(ref PaktReader reader, PaktConvertContext context);
 }
 
 /// <summary>
@@ -25,8 +25,8 @@ public abstract class PaktConverter<T> : PaktConverter
     /// Read a value of type <typeparamref name="T"/> from the reader.
     /// The reader is positioned at the first value token (after statement header).
     /// </summary>
-    public abstract T Read(ref PaktValidatingReader reader, PaktConvertContext context);
+    public abstract T Read(ref PaktReader reader, PaktConvertContext context);
 
-    internal sealed override object? ReadObject(ref PaktValidatingReader reader, PaktConvertContext context)
+    internal sealed override object? ReadObject(ref PaktReader reader, PaktConvertContext context)
         => Read(ref reader, context);
 }

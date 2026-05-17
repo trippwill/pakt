@@ -1,8 +1,8 @@
 namespace Pakt;
 
 /// <summary>
-/// Captures the parser state between buffer refills for <see cref="PaktSequenceReader"/>.
-/// Pass to the next <see cref="PaktSequenceReader"/> constructor to resume parsing.
+/// Captures the parser state between buffer refills for <see cref="PaktReader"/>.
+/// Pass to the next <see cref="PaktReader"/> constructor to resume parsing.
 /// </summary>
 public readonly struct PaktReaderState
 {

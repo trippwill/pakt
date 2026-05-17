@@ -18,8 +18,24 @@ public static class PaktUnitDeserializer
         PaktSerializerContext context,
         PaktSerializationOptions? options = null)
     {
+        PaktTypeInfo<T>? typeInfo = context.GetTypeInfo<T>();
+        if (typeInfo is null)
+            throw new InvalidOperationException(
+                $"Type {typeof(T).Name} is not registered in the serializer context.");
+
+        var opts = options ?? context.Options;
+
+        // Prefer raw path — no annotation parsing overhead
+        if (typeInfo.RawDeserializeUnit is { } rawDeserialize)
+        {
+            var seq = new ReadOnlySequence<byte>(data);
+            var rawReader = new PaktSequenceReader(seq, isFinalBlock: true);
+            return rawDeserialize(ref rawReader, opts);
+        }
+
+        // Fallback to validating reader
         var reader = new PaktValidatingReader(data);
-        return DeserializeCore<T>(ref reader, context, options ?? context.Options);
+        return DeserializeCoreValidating<T>(ref reader, typeInfo, opts);
     }
 
     /// <summary>
@@ -31,37 +47,50 @@ public static class PaktUnitDeserializer
         bool isFinalBlock = true,
         PaktSerializationOptions? options = null)
     {
+        PaktTypeInfo<T>? typeInfo = context.GetTypeInfo<T>();
+        if (typeInfo is null)
+            throw new InvalidOperationException(
+                $"Type {typeof(T).Name} is not registered in the serializer context.");
+
+        var opts = options ?? context.Options;
+
+        if (typeInfo.RawDeserializeUnit is { } rawDeserialize)
+        {
+            var rawReader = new PaktSequenceReader(data, isFinalBlock);
+            return rawDeserialize(ref rawReader, opts);
+        }
+
         var reader = new PaktValidatingReader(data, isFinalBlock);
-        return DeserializeCore<T>(ref reader, context, options ?? context.Options);
+        return DeserializeCoreValidating<T>(ref reader, typeInfo, opts);
     }
 
     /// <summary>
-    /// Deserialize from an already-constructed reader.
+    /// Deserialize from an already-constructed validating reader.
     /// </summary>
     public static T Deserialize<T>(
         ref PaktValidatingReader reader,
         PaktSerializerContext context,
         PaktSerializationOptions? options = null)
     {
-        return DeserializeCore<T>(ref reader, context, options ?? context.Options);
-    }
-
-    private static T DeserializeCore<T>(
-        ref PaktValidatingReader reader,
-        PaktSerializerContext context,
-        PaktSerializationOptions options)
-    {
         PaktTypeInfo<T>? typeInfo = context.GetTypeInfo<T>();
         if (typeInfo is null)
             throw new InvalidOperationException(
                 $"Type {typeof(T).Name} is not registered in the serializer context.");
 
-        // If there's a generated unit-level deserializer, use it directly
+        return DeserializeCoreValidating<T>(ref reader, typeInfo, options ?? context.Options);
+    }
+
+    private static T DeserializeCoreValidating<T>(
+        ref PaktValidatingReader reader,
+        PaktTypeInfo<T> typeInfo,
+        PaktSerializationOptions options)
+    {
         if (typeInfo.DeserializeUnit is { } unitDeserialize)
             return unitDeserialize(ref reader, options);
 
         // Fallback: use properties metadata for runtime statement matching
-        return DeserializeWithProperties(ref reader, typeInfo, context, options);
+        return DeserializeWithProperties(ref reader, typeInfo,
+            null! /* context not available in this path */, options);
     }
 
     /// <summary>
@@ -106,12 +135,42 @@ public static class PaktUnitDeserializer
             }
             else if (depth == 0)
             {
-                // Scalar value at top level — statement value consumed
                 return;
             }
 
             if (token is PaktTokenType.EndOfUnit or PaktTokenType.StatementName)
-                return; // shouldn't happen in well-formed input, but be safe
+                return;
+        }
+    }
+
+    /// <summary>
+    /// Skip the current statement's value using the raw sequence reader.
+    /// </summary>
+    public static void SkipStatementValue(ref PaktSequenceReader reader)
+    {
+        int depth = 0;
+        while (reader.Read())
+        {
+            PaktTokenType token = reader.TokenType;
+
+            if (token is PaktTokenType.StructStart or PaktTokenType.TupleStart
+                or PaktTokenType.ListStart or PaktTokenType.MapStart)
+            {
+                depth++;
+            }
+            else if (token is PaktTokenType.StructEnd or PaktTokenType.TupleEnd
+                or PaktTokenType.ListEnd or PaktTokenType.MapEnd)
+            {
+                depth--;
+                if (depth <= 0) return;
+            }
+            else if (depth == 0)
+            {
+                return;
+            }
+
+            if (token is PaktTokenType.EndOfUnit or PaktTokenType.StatementName)
+                return;
         }
     }
 }

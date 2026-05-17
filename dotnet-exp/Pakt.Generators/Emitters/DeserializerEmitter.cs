@@ -60,6 +60,7 @@ internal static class DeserializerEmitter
         string typeFqn = model.FullyQualifiedName;
         var activeProps = model.Properties.Where(p => !p.IsIgnored).ToList();
 
+        // Exp 3: Use PaktSequenceReader directly — generated code IS the validation
         sb.AppendLine($"    private static {typeFqn} DeserializeUnit{model.Name}(ref global::Pakt.PaktValidatingReader reader, global::Pakt.PaktSerializationOptions options)");
         sb.AppendLine("    {");
 
@@ -69,7 +70,9 @@ internal static class DeserializerEmitter
             string defaultVal = GetDefaultValue(prop);
             sb.AppendLine($"        {prop.ClrTypeFqn} __{prop.ClrName} = {defaultVal};");
         }
-        sb.AppendLine($"        var __seen = new global::System.Collections.Generic.HashSet<string>();");
+
+        // Exp 2: Bitmask duplicate tracking instead of HashSet<string>
+        sb.AppendLine($"        int __seen = 0;");
         sb.AppendLine();
 
         // Statement reading loop
@@ -78,15 +81,18 @@ internal static class DeserializerEmitter
         sb.AppendLine("            if (reader.TokenType == global::Pakt.PaktTokenType.EndOfUnit) break;");
         sb.AppendLine("            if (reader.TokenType != global::Pakt.PaktTokenType.StatementName) continue;");
         sb.AppendLine();
-        sb.AppendLine("            var __stmtSeq = reader.ValueSequence;");
-        sb.AppendLine("            string __stmtName;");
-        sb.AppendLine("            if (__stmtSeq.IsSingleSegment)");
-        sb.AppendLine("                __stmtName = global::System.Text.Encoding.UTF8.GetString(__stmtSeq.FirstSpan);");
-        sb.AppendLine("            else");
+
+        // Exp 1: Get raw bytes instead of allocating string
+        sb.AppendLine("            // Zero-alloc statement name matching");
+        sb.AppendLine("            var __nameSeq = reader.ValueSequence;");
+        sb.AppendLine("            ReadOnlySpan<byte> __nameSpan = __nameSeq.IsSingleSegment");
+        sb.AppendLine("                ? __nameSeq.FirstSpan");
+        sb.AppendLine("                : stackalloc byte[0];");
+        sb.AppendLine("            if (!__nameSeq.IsSingleSegment)");
         sb.AppendLine("            {");
-        sb.AppendLine("                Span<byte> __stmtBuf = stackalloc byte[(int)__stmtSeq.Length];");
-        sb.AppendLine("                global::System.Buffers.BuffersExtensions.CopyTo(__stmtSeq, __stmtBuf);");
-        sb.AppendLine("                __stmtName = global::System.Text.Encoding.UTF8.GetString(__stmtBuf);");
+        sb.AppendLine("                Span<byte> __nameBuf = stackalloc byte[(int)__nameSeq.Length];");
+        sb.AppendLine("                global::System.Buffers.BuffersExtensions.CopyTo(__nameSeq, __nameBuf);");
+        sb.AppendLine("                __nameSpan = __nameBuf;");
         sb.AppendLine("            }");
         sb.AppendLine();
         sb.AppendLine("            // Skip annotation and operator");
@@ -94,50 +100,77 @@ internal static class DeserializerEmitter
         sb.AppendLine("            reader.Read(); // AssignOperator");
         sb.AppendLine();
 
-        // Duplicate check
-        sb.AppendLine("            if (!__seen.Add(__stmtName))");
-        sb.AppendLine("            {");
-        sb.AppendLine("                if (options.DuplicateStatements == global::Pakt.DuplicatePolicy.Error)");
-        sb.AppendLine("                    throw new global::Pakt.PaktParseException($\"Duplicate statement: {__stmtName}\", (int)global::Pakt.PaktErrorCode.Syntax, default);");
-        sb.AppendLine("                if (options.DuplicateStatements == global::Pakt.DuplicatePolicy.FirstWins)");
-        sb.AppendLine("                {");
-        sb.AppendLine("                    global::Pakt.PaktUnitDeserializer.SkipStatementValue(ref reader);");
-        sb.AppendLine("                    continue;");
-        sb.AppendLine("                }");
-        sb.AppendLine("                // LastWins: fall through and overwrite");
-        sb.AppendLine("            }");
-        sb.AppendLine();
+        // Exp 1 + 4: Byte-span matching with first-byte dispatch
+        sb.AppendLine("            // First-byte dispatch + byte-span matching");
 
-        // Name matching switch
-        sb.AppendLine("            switch (__stmtName)");
+        // Group properties by first byte for efficient dispatch
+        var byFirstByte = activeProps
+            .GroupBy(p => (byte)p.PaktName[0])
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        sb.AppendLine("            switch (__nameSpan.Length > 0 ? __nameSpan[0] : (byte)0)");
         sb.AppendLine("            {");
 
-        foreach (var prop in activeProps)
+        foreach (var group in byFirstByte)
         {
-            sb.AppendLine($"                case \"{prop.PaktName}\":");
-            EmitStatementValueRead(sb, prop);
-            sb.AppendLine("                    break;");
+            sb.AppendLine($"                case (byte)'{(char)group.Key}':");
+            foreach (var prop in group)
+            {
+                int propIndex = activeProps.IndexOf(prop);
+                int bit = 1 << propIndex;
+                sb.AppendLine($"                    if (__nameSpan.SequenceEqual(\"{prop.PaktName}\"u8))");
+                sb.AppendLine($"                    {{");
+
+                // Exp 2: Bitmask duplicate check
+                sb.AppendLine($"                        if ((__seen & {bit}) != 0)");
+                sb.AppendLine($"                        {{");
+                sb.AppendLine($"                            if (options.DuplicateStatements == global::Pakt.DuplicatePolicy.Error)");
+                sb.AppendLine($"                                throw new global::Pakt.PaktParseException(\"Duplicate statement: {prop.PaktName}\", (int)global::Pakt.PaktErrorCode.Syntax, default);");
+                sb.AppendLine($"                            if (options.DuplicateStatements == global::Pakt.DuplicatePolicy.FirstWins)");
+                sb.AppendLine($"                            {{");
+                sb.AppendLine($"                                global::Pakt.PaktUnitDeserializer.SkipStatementValue(ref reader);");
+                sb.AppendLine($"                                break;");
+                sb.AppendLine($"                            }}");
+                sb.AppendLine($"                        }}");
+                sb.AppendLine($"                        __seen |= {bit};");
+
+                EmitStatementValueRead(sb, prop);
+                sb.AppendLine($"                        break;");
+                sb.AppendLine($"                    }}");
+            }
+            // If none matched in this first-byte group, fall through to unknown
+            sb.AppendLine($"                    goto default;");
         }
 
         // Unknown statement handling
         sb.AppendLine("                default:");
         sb.AppendLine("                    if (options.UnknownStatements == global::Pakt.UnknownMemberPolicy.Error)");
-        sb.AppendLine("                        throw new global::Pakt.PaktParseException($\"Unknown statement: {__stmtName}\", (int)global::Pakt.PaktErrorCode.Syntax, default);");
+        sb.AppendLine("                    {");
+        sb.AppendLine("                        string __unknownName = global::System.Text.Encoding.UTF8.GetString(__nameSpan);");
+        sb.AppendLine("                        throw new global::Pakt.PaktParseException($\"Unknown statement: {__unknownName}\", (int)global::Pakt.PaktErrorCode.Syntax, default);");
+        sb.AppendLine("                    }");
         sb.AppendLine("                    global::Pakt.PaktUnitDeserializer.SkipStatementValue(ref reader);");
         sb.AppendLine("                    break;");
         sb.AppendLine("            }");
         sb.AppendLine("        }");
         sb.AppendLine();
 
-        // Missing statement check
+        // Missing statement check — bitmask
         sb.AppendLine("        if (options.MissingStatements == global::Pakt.MissingMemberPolicy.Error)");
         sb.AppendLine("        {");
-        foreach (var prop in activeProps)
+        int allBits = (1 << activeProps.Count) - 1;
+        sb.AppendLine($"            if (__seen != {allBits})");
+        sb.AppendLine("            {");
+        for (int i = 0; i < activeProps.Count; i++)
         {
-            sb.AppendLine($"            if (!__seen.Contains(\"{prop.PaktName}\"))");
-            sb.AppendLine($"                throw new global::Pakt.PaktParseException(\"Missing statement: {prop.PaktName}\", (int)global::Pakt.PaktErrorCode.Syntax, default);");
+            int bit = 1 << i;
+            sb.AppendLine($"                if ((__seen & {bit}) == 0)");
+            sb.AppendLine($"                    throw new global::Pakt.PaktParseException(\"Missing statement: {activeProps[i].PaktName}\", (int)global::Pakt.PaktErrorCode.Syntax, default);");
         }
+        sb.AppendLine("            }");
         sb.AppendLine("        }");
+        sb.AppendLine();
         sb.AppendLine();
 
         // Construct result

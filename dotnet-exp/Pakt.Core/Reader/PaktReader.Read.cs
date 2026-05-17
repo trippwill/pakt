@@ -76,7 +76,7 @@ public ref partial struct PaktReader
             {
                 byte b = local[_consumed];
 
-                if (b == PaktConstants.Space || b == PaktConstants.Tab)
+                if (b == PaktConstants.Space || b == PaktConstants.Tab || b == PaktConstants.Comma)
                 {
                     _consumed++;
                     _bytePositionInLine++;
